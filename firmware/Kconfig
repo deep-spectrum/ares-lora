@@ -1,0 +1,20 @@
+
+mainmenu "Lora Application"
+
+menu "Application Configurations"
+
+choice "ARES_LORA_RADIO_DIRECTION"
+    prompt "Lora Radio Configuration"
+    default ARES_LORA_RX
+
+config ARES_LORA_RX
+    bool "Receive mode"
+
+config ARES_LORA_TX
+    bool "Transmit mode"
+
+endchoice  # ARES_LORA_RADIO_DIRECTION
+
+endmenu  # Application Configurations
+
+source "Kconfig.zephyr"
