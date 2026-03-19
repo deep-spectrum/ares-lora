@@ -19,6 +19,15 @@ LOG_MODULE_REGISTER(lora, CONFIG_LORA_LOG_LEVEL);
 
 const struct device *const lora_dev = DEVICE_DT_GET_OR_NULL(DT_ALIAS(lora0));
 
+K_MSGQ_DEFINE(lora_rx_q, sizeof(struct lora_payload), 10, 1);
+
+void lora_receive_cb(const struct device *dev, uint8_t *data, uint16_t size,
+                     int16_t rssi, int8_t snr, void *user_data) {
+    ARG_UNUSED(dev);
+
+    LOG_HEXDUMP_DBG(data, size, "LoRa RX payload");
+}
+
 int ares_lora_config(void) {
     struct lora_modem_config config = {};
     int ret;
@@ -36,7 +45,7 @@ int ares_lora_config(void) {
     config.iq_inverted = false;
     config.public_network = false;
     config.tx_power = 4;
-    config.tx = true;
+    config.tx = !IS_ENABLED(CONFIG_ARES_LORA_RX);
 
     ret = lora_config(lora_dev, &config);
     if (ret < 0) {
@@ -46,10 +55,18 @@ int ares_lora_config(void) {
 
     LOG_INF("LoRa configured");
 
+#if IS_ENABLED(ARES_LORA_RX)
+    ret = lora_recv_async(lora_dev, lora_receive_cb, NULL);
+    if (ret < 0) {
+        LOG_ERR("Failed to set LoRa async rx callback: %d", ret);
+        return ret;
+    }
+#endif // IS_ENABLED(ARES_LORA_RX)
+
     return 0;
 }
 
-int ares_lora_send(const struct lora_send_data *data, uint8_t repeat_count,
+int ares_lora_send(const struct lora_payload *data, uint8_t repeat_count,
                    k_timeout_t interval) {
     static uint64_t send_id = UINT64_C(0);
     uint8_t serial_frame[lora_frame_size];
