@@ -3,4 +3,11 @@ find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
 
 project(lora-start)
 
-target_sources(app PRIVATE src/main.c)
+include_directories(include)
+set(SRC
+        src/main.c
+        src/lora.c
+        src/lora_frame.c
+)
+
+target_sources(app PRIVATE ${SRC})

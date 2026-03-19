@@ -15,6 +15,30 @@ config ARES_LORA_TX
 
 endchoice  # ARES_LORA_RADIO_DIRECTION
 
+menu "CRC Configurations"
+
+config LORA_CRC_SEED
+    hex "CRC16 Seed"
+    default 0xFFFF
+
+config LORA_CRC_XOR_OUTPUT
+    hex "XOR CRC16 output value"
+    default 0xFFFF
+
+config LORA_REFLECT_CRC_INPUT
+    bool "Reflect the CRC16 input"
+    default y
+
+config LORA_REFLECT_CRC_OUTPUT
+    bool "Reflect the CRC16 output"
+    default n
+
+config LORA_CRC_POLYNOMIAL
+    hex "CRC16 polynomial"
+    default 0x9eb2
+
+endmenu # CRC Configurations
+
 endmenu  # Application Configurations
 
 source "Kconfig.zephyr"
