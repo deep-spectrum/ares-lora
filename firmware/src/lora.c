@@ -15,9 +15,9 @@
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
 
-LOG_MODULE_REGISTER(lora);
+LOG_MODULE_REGISTER(lora, CONFIG_LORA_LOG_LEVEL);
 
-const struct device *const lora_dev = DEVICE_DT_GET(DT_ALIAS(lora0));
+const struct device *const lora_dev = DEVICE_DT_GET_OR_NULL(DT_ALIAS(lora0));
 
 int ares_lora_config(void) {
     struct lora_modem_config config = {};
@@ -73,13 +73,6 @@ int ares_lora_send(const struct lora_send_data *data, uint8_t repeat_count,
             return ret;
         }
 
-        // todo: DELETE THIS WHEN CHECK PASSES
-        if (check_lora_frame(serial_frame, sizeof(serial_frame)) !=
-            LORA_FRAME_CHECK_OK) {
-            LOG_ERR("LoRa frame check doesn't work");
-            break;
-        }
-
         ret = lora_send(lora_dev, serial_frame, sizeof(serial_frame));
         if (ret < 0) {
             LOG_ERR("LoRa send failed");
@@ -90,6 +83,8 @@ int ares_lora_send(const struct lora_send_data *data, uint8_t repeat_count,
             (void)k_sleep(interval);
         }
     }
+
+    LOG_INF("Message sent over LoRa %d times", repeat_count);
 
     return 0;
 }

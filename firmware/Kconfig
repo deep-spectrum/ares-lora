@@ -39,6 +39,12 @@ config LORA_CRC_POLYNOMIAL
 
 endmenu # CRC Configurations
 
+menu "LoRa Logging"
+module = LORA
+module-str = LoRa
+source "subsys/logging/Kconfig.template.log_config"
+endmenu # LoRa Logging
+
 endmenu  # Application Configurations
 
 source "Kconfig.zephyr"
