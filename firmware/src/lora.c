@@ -8,12 +8,12 @@
  * @author Tom Schmitz \<tschmitz@andrew.cmu.edu\>
  */
 
-#include <zephyr/kernel.h>
-#include <zephyr/device.h>
-#include <zephyr/drivers/lora.h>
-#include <zephyr/logging/log.h>
 #include <lora.h>
 #include <lora_frame.h>
+#include <zephyr/device.h>
+#include <zephyr/drivers/lora.h>
+#include <zephyr/kernel.h>
+#include <zephyr/logging/log.h>
 
 LOG_MODULE_REGISTER(lora);
 
@@ -49,7 +49,8 @@ int ares_lora_config(void) {
     return 0;
 }
 
-int ares_lora_send(const struct lora_send_data *data, uint8_t repeat_count, k_timeout_t interval) {
+int ares_lora_send(const struct lora_send_data *data, uint8_t repeat_count,
+                   k_timeout_t interval) {
     static uint64_t send_id = UINT64_C(0);
     uint8_t serial_frame[lora_frame_size];
     int ret;
@@ -73,7 +74,8 @@ int ares_lora_send(const struct lora_send_data *data, uint8_t repeat_count, k_ti
         }
 
         // todo: DELETE THIS WHEN CHECK PASSES
-        if (check_lora_frame(serial_frame, sizeof(serial_frame)) != LORA_FRAME_CHECK_OK) {
+        if (check_lora_frame(serial_frame, sizeof(serial_frame)) !=
+            LORA_FRAME_CHECK_OK) {
             LOG_ERR("LoRa frame check doesn't work");
             break;
         }

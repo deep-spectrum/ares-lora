@@ -8,7 +8,6 @@
  * @author Tom Schmitz \<tschmitz@andrew.cmu.edu\>
  */
 
-
 #ifndef ARES_LORA_H
 #define ARES_LORA_H
 
@@ -19,6 +18,7 @@ struct lora_send_data {
     uint64_t nanosecond;
 };
 
-int ares_lora_send(const struct lora_send_data *data, uint8_t repeat_count, k_timeout_t interval);
+int ares_lora_send(const struct lora_send_data *data, uint8_t repeat_count,
+                   k_timeout_t interval);
 
-#endif //ARES_LORA_H
+#endif // ARES_LORA_H
