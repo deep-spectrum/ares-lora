@@ -28,7 +28,6 @@ enum lora_frame_check_result {
 
 int serialize_lora_frame(uint8_t *buf, size_t len,
                          const struct lora_frame *frame);
-// todo: check if this works locally
 enum lora_frame_check_result check_lora_frame(const uint8_t *buf, size_t len);
 int deserialize_lora_frame(const uint8_t *buf, size_t len,
                            struct lora_frame *frame);
