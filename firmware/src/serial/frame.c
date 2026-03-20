@@ -11,20 +11,26 @@
 #include <serial/frame.h>
 #include <zephyr/kernel.h>
 
-#define ARES_FRAME_HEADER '^'
-#define ARES_FRAME_FOOTER '@'
+#define ARES_FRAME_HEADER          '^'
+#define ARES_FRAME_FOOTER          '@'
 
 #define ARES_FRAME_HEADER_OVERHEAD UINT64_C(1)
-#define ARES_FRAME_TYPE_OVERHEAD UINT64_C(1)
-#define ARES_FRAME_LEN_OVERHEAD UINT64_C(8)
+#define ARES_FRAME_TYPE_OVERHEAD   UINT64_C(1)
+#define ARES_FRAME_LEN_OVERHEAD    UINT64_C(8)
 #define ARES_FRAME_FOOTER_OVERHEAD UINT64_C(1)
-#define ARES_FRAME_OVERHEAD (uint64_t)(ARES_FRAME_HEADER_OVERHEAD + ARES_FRAME_TYPE_OVERHEAD + ARES_FRAME_LEN_OVERHEAD + ARES_FRAME_FOOTER_OVERHEAD)
+#define ARES_FRAME_OVERHEAD                                                    \
+    (uint64_t)(ARES_FRAME_HEADER_OVERHEAD + ARES_FRAME_TYPE_OVERHEAD +         \
+               ARES_FRAME_LEN_OVERHEAD + ARES_FRAME_FOOTER_OVERHEAD)
 
 #define ARES_FRAME_HEADER_OFFSET UINT64_C(0)
-#define ARES_FRAME_TYPE_OFFSET (ARES_FRAME_HEADER_OFFSET + ARES_FRAME_HEADER_OVERHEAD)
-#define ARES_FRAME_LEN_OFFSET (ARES_FRAME_TYPE_OFFSET + ARES_FRAME_TYPE_OVERHEAD)
-#define ARES_FRAME_PAYLOAD_OFFSET (ARES_FRAME_LEN_OFFSET + ARES_FRAME_LEN_OVERHEAD)
-#define ARES_FRAME_FOOTER_OFFSET(payload_len) (ARES_FRAME_PAYLOAD_OFFSET + (uint64_t)(payload_len))
+#define ARES_FRAME_TYPE_OFFSET                                                 \
+    (ARES_FRAME_HEADER_OFFSET + ARES_FRAME_HEADER_OVERHEAD)
+#define ARES_FRAME_LEN_OFFSET                                                  \
+    (ARES_FRAME_TYPE_OFFSET + ARES_FRAME_TYPE_OVERHEAD)
+#define ARES_FRAME_PAYLOAD_OFFSET                                              \
+    (ARES_FRAME_LEN_OFFSET + ARES_FRAME_LEN_OVERHEAD)
+#define ARES_FRAME_FOOTER_OFFSET(payload_len)                                  \
+    (ARES_FRAME_PAYLOAD_OFFSET + (uint64_t)(payload_len))
 
 static size_t ares_strlen(const char *s, size_t max_cnt) {
     size_t len = 0;
@@ -49,44 +55,49 @@ static size_t calculate_frame_length(const struct ares_frame *frame) {
     __ASSERT_NO_MSG(frame != NULL);
 
     switch (frame->type) {
-        case ARES_FRAME_WHOAMI: {
-            payload_len = ares_strlen(frame->payload.id, 0);
-            break;
-        }
-        case ARES_FRAME_START: {
-            payload_len = sizeof(frame->payload.timespec);
-            break;
-            default:
-            __ASSERT(false, "Invalid frame type received");
-        }
+    case ARES_FRAME_WHOAMI: {
+        payload_len = ares_strlen(frame->payload.id, 0);
+        break;
+    }
+    case ARES_FRAME_START: {
+        payload_len = sizeof(frame->payload.timespec);
+        break;
+    default:
+        __ASSERT(false, "Invalid frame type received");
+    }
     }
 
     return payload_len + ARES_FRAME_OVERHEAD;
 }
 
-static void serialize(uint8_t *buf, const struct ares_frame *frame, size_t frame_len) {
+static void serialize(uint8_t *buf, const struct ares_frame *frame,
+                      size_t frame_len) {
     uint64_t payload_len = frame_len - ARES_FRAME_OVERHEAD;
     buf[ARES_FRAME_HEADER_OFFSET] = ARES_FRAME_HEADER;
     buf[ARES_FRAME_TYPE_OFFSET] = (uint8_t)frame->type;
-    (void)memcpy(&buf[ARES_FRAME_LEN_OFFSET], &payload_len, ARES_FRAME_LEN_OVERHEAD);
+    (void)memcpy(&buf[ARES_FRAME_LEN_OFFSET], &payload_len,
+                 ARES_FRAME_LEN_OVERHEAD);
 
     switch (frame->type) {
-        case ARES_FRAME_WHOAMI: {
-            (void)memcpy(&buf[ARES_FRAME_PAYLOAD_OFFSET], frame->payload.id, payload_len);
-            break;
-        }
-        case ARES_FRAME_START: {
-            (void)memcpy(&buf[ARES_FRAME_PAYLOAD_OFFSET], &frame->payload.timespec, payload_len);
-            break;
-        }
-            default:
-            __ASSERT(false, "Invalid frame type received");
+    case ARES_FRAME_WHOAMI: {
+        (void)memcpy(&buf[ARES_FRAME_PAYLOAD_OFFSET], frame->payload.id,
+                     payload_len);
+        break;
+    }
+    case ARES_FRAME_START: {
+        (void)memcpy(&buf[ARES_FRAME_PAYLOAD_OFFSET], &frame->payload.timespec,
+                     payload_len);
+        break;
+    }
+    default:
+        __ASSERT(false, "Invalid frame type received");
     }
 
     buf[ARES_FRAME_FOOTER_OFFSET(payload_len)] = ARES_FRAME_FOOTER;
 }
 
-int ares_serialize_frame(uint8_t *buf, size_t len, const struct ares_frame *frame) {
+int ares_serialize_frame(uint8_t *buf, size_t len,
+                         const struct ares_frame *frame) {
     size_t frame_len;
 
     if (buf == NULL || len == 0 || frame == NULL) {
@@ -118,18 +129,20 @@ static void deserialize(struct ares_frame *frame, const uint8_t *buf) {
     frame->type = (enum ares_frame_type)buf[ARES_FRAME_TYPE_OFFSET];
 
     switch (frame->type) {
-        case ARES_FRAME_START: {
-            (void)memcpy(&frame->payload.timespec, &buf[ARES_FRAME_PAYLOAD_OFFSET], payload_len);
-            break;
-        }
-            default: {
-            __ASSERT(false, "Invalid frame type for deserialization.");
-            break;
-        }
+    case ARES_FRAME_START: {
+        (void)memcpy(&frame->payload.timespec, &buf[ARES_FRAME_PAYLOAD_OFFSET],
+                     payload_len);
+        break;
+    }
+    default: {
+        __ASSERT(false, "Invalid frame type for deserialization.");
+        break;
+    }
     }
 }
 
-int ares_deserialize_frame(struct ares_frame *frame, const uint8_t *buf, size_t len) {
+int ares_deserialize_frame(struct ares_frame *frame, const uint8_t *buf,
+                           size_t len) {
     if (!ares_check_if_frame(buf, len)) {
         return -EBADMSG;
     }

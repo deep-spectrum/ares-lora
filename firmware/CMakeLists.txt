@@ -13,6 +13,8 @@ set(SRC
 
 set(SERIAL_SRC
         src/serial/frame.c
+        src/serial/serial.c
+        src/serial/serial_backend.c
 )
 
 target_sources(app PRIVATE ${SRC} ${SERIAL_SRC})
