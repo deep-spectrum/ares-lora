@@ -190,3 +190,45 @@ static void ares_serial_process(const struct ares_serial *serial) {
         }
     }
 }
+
+static int ares_write(const struct ares_serial *serial, const void *data, size_t nbytes) {
+    __ASSERT_NO_MSG(serial);
+    __ASSERT_NO_MSG(serial->ctx);
+    __ASSERT_NO_MSG(data);
+    __ASSERT_NO_MSG(nbytes);
+
+    size_t offset = 0u, tmp_cnt, length = nbytes;
+
+    (void)k_mutex_lock(&serial->ctx->wr_mtx, K_FOREVER);
+    while (length != 0) {
+        int err = SERIAL_API_CALL(serial, write, &((const uint8_t *)data)[offset], length, &tmp_cnt);
+        ARG_UNUSED(err);
+
+        __ASSERT_NO_MSG(err == 0);
+        __ASSERT_NO_MSG(nbytes >= length);
+
+        offset += tmp_cnt;
+        length -= tmp_cnt;
+    }
+    (void)k_mutex_unlock(&serial->ctx->wr_mtx);
+
+    return (int)nbytes;
+}
+
+int ares_serial_write_frame(const struct ares_serial *serial, const struct ares_frame *frame) {
+    uint8_t buffer[ARES_FRAME_OVERHEAD + sizeof(frame->payload) + 1];
+    int len;
+
+    if (serial == NULL || frame == NULL) {
+        return -EINVAL;
+    }
+
+    len = ares_serialize_frame(buffer, sizeof(buffer), frame);
+
+    if (len < 0) {
+        return len;
+    }
+
+    (void)ares_write(serial, buffer, len);
+    return 0;
+}

@@ -11,14 +11,6 @@
 #include <serial/frame.h>
 #include <zephyr/kernel.h>
 
-#define ARES_FRAME_HEADER_OVERHEAD UINT32_C(1)
-#define ARES_FRAME_TYPE_OVERHEAD   UINT32_C(1)
-#define ARES_FRAME_LEN_OVERHEAD    UINT32_C(2)
-#define ARES_FRAME_FOOTER_OVERHEAD UINT32_C(1)
-#define ARES_FRAME_OVERHEAD                                                    \
-    (uint64_t)(ARES_FRAME_HEADER_OVERHEAD + ARES_FRAME_TYPE_OVERHEAD +         \
-               ARES_FRAME_LEN_OVERHEAD + ARES_FRAME_FOOTER_OVERHEAD)
-
 #define ARES_FRAME_HEADER_OFFSET UINT32_C(0)
 #define ARES_FRAME_TYPE_OFFSET                                                 \
     (ARES_FRAME_HEADER_OFFSET + ARES_FRAME_HEADER_OVERHEAD)
