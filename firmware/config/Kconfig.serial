@@ -1,0 +1,11 @@
+menu "Ares Serial"
+
+config ARES_SERIAL_STACK_SIZE
+    int "Serial thread stack size"
+    default 4096
+
+config ARES_SERIAL_PRIO
+    int "Serial thread priority"
+    default 1
+
+endmenu  # Ares Serial

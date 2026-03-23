@@ -3,6 +3,8 @@ mainmenu "Lora Application"
 
 menu "Application Configurations"
 
+rsource "config/Kconfig.serial"
+
 choice "ARES_LORA_RADIO_DIRECTION"
     prompt "Lora Radio Configuration"
     default ARES_LORA_RX
