@@ -118,6 +118,15 @@ int ares_serial_register_command_callbacks(const struct ares_serial *serial, con
     return 0;
 }
 
+static void report_error(const struct ares_serial *serial, enum ares_frame_error error) {
+    struct ares_frame frame = {
+        .type = ARES_FRAME_FRAMING_ERROR,
+        .payload.frame_error = error,
+    };
+
+    ares_serial_write_frame(serial, &frame);
+}
+
 static void dispatch(const struct ares_serial *serial, int start_index, int stop_index) {
     struct ares_frame frame;
     size_t length = stop_index - start_index;
@@ -125,7 +134,7 @@ static void dispatch(const struct ares_serial *serial, int start_index, int stop
 
     ret = ares_deserialize_frame(&frame, &serial->ctx->rx_buf.buf[start_index], length);
     if (ret < 0) {
-        // todo report bad frame
+        report_error(serial, ARES_FRAME_ERROR_BAD_FRAME);
         return;
     }
 
@@ -137,10 +146,11 @@ static void dispatch(const struct ares_serial *serial, int start_index, int stop
         if (serial->ctx->commands[i].callback != NULL) {
             serial->ctx->commands[i].callback(serial, &frame);
         }
+        report_error(serial, ARES_FRAME_ERROR_NOT_IMPLEMENTED);
         return;
     }
 
-    // todo: report bad frame type
+    report_error(serial, ARES_FRAME_ERROR_BAD_TYPE);
 }
 
 static void drop_data(const struct ares_serial *serial, struct ares_buf *buf) {
@@ -231,4 +241,50 @@ int ares_serial_write_frame(const struct ares_serial *serial, const struct ares_
 
     (void)ares_write(serial, buffer, len);
     return 0;
+}
+
+void ares_serial_flush_out(const struct ares_serial *serial, k_timeout_t timeout) {
+    unsigned int set;
+    int res;
+    struct k_poll_signal *sig;
+    const uint8_t data[] = { '\0' };
+
+    if (serial == NULL) {
+        return;
+    }
+
+    sig = &serial->ctx->signals[ARES_SIGNAL_TXDONE];
+    k_poll_signal_reset(sig);
+    ares_write(serial, data, 1);
+
+    k_poll(&serial->ctx->events[ARES_SIGNAL_TXDONE], 1, timeout);
+    k_poll_signal_check(sig, &set, &res);
+}
+
+int wait_serial_ready(const struct ares_serial *serial) {
+    if (serial == NULL) {
+        return -EINVAL;
+    }
+
+    if (serial->iface->api->wait_dtr == NULL) {
+        return -ENOTSUP;
+    }
+    SERIAL_API_CALL(serial, wait_dtr);
+    return 0;
+}
+
+int set_wait_usb_host(const struct ares_serial *serial, bool block) {
+    if (serial == NULL) {
+        return -EINVAL;
+    }
+
+    SERIAL_API_CALL(serial, block_no_usb_host, block);
+    return 0;
+}
+
+bool ares_serial_check_rx_error(const struct ares_serial *serial) {
+    if (serial == NULL) {
+        return true;
+    }
+    return SERIAL_API_CALL(serial, rx_error);
 }

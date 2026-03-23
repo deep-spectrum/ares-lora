@@ -24,9 +24,16 @@
 (uint64_t)(ARES_FRAME_HEADER_OVERHEAD + ARES_FRAME_TYPE_OVERHEAD +         \
 ARES_FRAME_LEN_OVERHEAD + ARES_FRAME_FOOTER_OVERHEAD)
 
+enum ares_frame_error {
+    ARES_FRAME_ERROR_BAD_FRAME = 0,
+    ARES_FRAME_ERROR_BAD_TYPE = 1,
+    ARES_FRAME_ERROR_NOT_IMPLEMENTED = 2,
+};
+
 enum ares_frame_type {
     ARES_FRAME_WHOAMI,
     ARES_FRAME_START,
+    ARES_FRAME_FRAMING_ERROR,
 
     ARES_FRAME_TYPE_INVALID,
 };
@@ -40,6 +47,7 @@ struct ares_frame {
             int64_t sec;
             uint64_t ns;
         } timespec; /// < ARES_FRAME_START (RX/TX)
+        enum ares_frame_error frame_error; ///< ARES_FRAME_FRAMING_ERROR (TX only)
     } payload;
 };
 
