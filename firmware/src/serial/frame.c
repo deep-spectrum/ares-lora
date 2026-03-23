@@ -62,6 +62,7 @@ static size_t calculate_frame_length(const struct ares_frame *frame) {
 static void serialize(uint8_t *buf, const struct ares_frame *frame,
                       size_t frame_len) {
     uint64_t payload_len = frame_len - ARES_FRAME_OVERHEAD;
+    uint8_t *payload = &buf[ARES_FRAME_PAYLOAD_OFFSET];
     buf[ARES_FRAME_HEADER_OFFSET] = ARES_FRAME_HEADER;
     buf[ARES_FRAME_TYPE_OFFSET] = (uint8_t)frame->type;
     (void)memcpy(&buf[ARES_FRAME_LEN_OFFSET], &payload_len,
@@ -69,13 +70,18 @@ static void serialize(uint8_t *buf, const struct ares_frame *frame,
 
     switch (frame->type) {
     case ARES_FRAME_WHOAMI: {
-        (void)memcpy(&buf[ARES_FRAME_PAYLOAD_OFFSET], frame->payload.id,
+        (void)memcpy(payload, frame->payload.id,
                      payload_len);
         break;
     }
     case ARES_FRAME_START: {
-        (void)memcpy(&buf[ARES_FRAME_PAYLOAD_OFFSET], &frame->payload.timespec,
+        (void)memcpy(payload, &frame->payload.timespec,
                      payload_len);
+        break;
+    }
+        case ARES_FRAME_FRAMING_ERROR: {
+        uint32_t error_code = frame->payload.frame_error;
+        (void)memcpy(payload, &error_code, sizeof(error_code));
         break;
     }
     default:
@@ -121,6 +127,10 @@ static void deserialize(struct ares_frame *frame, const uint8_t *buf) {
     case ARES_FRAME_START: {
         (void)memcpy(&frame->payload.timespec, &buf[ARES_FRAME_PAYLOAD_OFFSET],
                      payload_len);
+        break;
+    }
+        case ARES_FRAME_WHOAMI: {
+        // nop
         break;
     }
     default: {

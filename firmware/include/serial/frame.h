@@ -31,9 +31,9 @@ enum ares_frame_error {
 };
 
 enum ares_frame_type {
-    ARES_FRAME_WHOAMI,
-    ARES_FRAME_START,
-    ARES_FRAME_FRAMING_ERROR,
+    ARES_FRAME_WHOAMI, ///< Who am I frame. No receive payload.
+    ARES_FRAME_START, ///< Start time frame.
+    ARES_FRAME_FRAMING_ERROR, ///< Framing error frame. TX only.
 
     ARES_FRAME_TYPE_INVALID,
 };
