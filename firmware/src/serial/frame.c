@@ -11,18 +11,15 @@
 #include <serial/frame.h>
 #include <zephyr/kernel.h>
 
-#define ARES_FRAME_HEADER          '^'
-#define ARES_FRAME_FOOTER          '@'
-
-#define ARES_FRAME_HEADER_OVERHEAD UINT64_C(1)
-#define ARES_FRAME_TYPE_OVERHEAD   UINT64_C(1)
-#define ARES_FRAME_LEN_OVERHEAD    UINT64_C(8)
-#define ARES_FRAME_FOOTER_OVERHEAD UINT64_C(1)
+#define ARES_FRAME_HEADER_OVERHEAD UINT32_C(1)
+#define ARES_FRAME_TYPE_OVERHEAD   UINT32_C(1)
+#define ARES_FRAME_LEN_OVERHEAD    UINT32_C(2)
+#define ARES_FRAME_FOOTER_OVERHEAD UINT32_C(1)
 #define ARES_FRAME_OVERHEAD                                                    \
     (uint64_t)(ARES_FRAME_HEADER_OVERHEAD + ARES_FRAME_TYPE_OVERHEAD +         \
                ARES_FRAME_LEN_OVERHEAD + ARES_FRAME_FOOTER_OVERHEAD)
 
-#define ARES_FRAME_HEADER_OFFSET UINT64_C(0)
+#define ARES_FRAME_HEADER_OFFSET UINT32_C(0)
 #define ARES_FRAME_TYPE_OFFSET                                                 \
     (ARES_FRAME_HEADER_OFFSET + ARES_FRAME_HEADER_OVERHEAD)
 #define ARES_FRAME_LEN_OFFSET                                                  \
@@ -39,7 +36,7 @@ static size_t ares_strlen(const char *s, size_t max_cnt) {
     }
 
     if (max_cnt == 0) {
-        max_cnt = UINT32_MAX;
+        max_cnt = UINT16_MAX;
     }
 
     for (const char *buf = s; *buf != '\0' && len < max_cnt; buf++) {
@@ -114,7 +111,7 @@ int ares_serialize_frame(uint8_t *buf, size_t len,
     return (int)frame_len;
 }
 
-static uint64_t retrieve_payload_length(const uint8_t *buf) {
+static uint16_t retrieve_payload_length(const uint8_t *buf) {
     __ASSERT_NO_MSG(buf != NULL);
 
     uint64_t len;
@@ -155,6 +152,51 @@ int ares_deserialize_frame(struct ares_frame *frame, const uint8_t *buf,
     deserialize(frame, buf);
 
     return 0;
+}
+
+int ares_serial_frame_present(const uint8_t *buf, size_t len, int *start_index) {
+    if (buf == NULL || len < ARES_FRAME_OVERHEAD || start_index == NULL) {
+        return -EINVAL;
+    }
+
+    // if -EINVAL, invalid parameters
+    // if start_index == -1 && footer_index == -1, frame not found
+    // if start_index != -1 && footer_index == -1, incomplete frame
+    // if start_index != -1 && footer_index != -1, complete frame
+
+    *start_index = -1;
+
+    for (size_t i = 0; i < len; i++) {
+        int footer_index, payload_index;
+        uint16_t length;
+
+        if (buf[i] != ARES_FRAME_HEADER) {
+            continue;
+        }
+
+        *start_index = (int)i;
+
+        payload_index = *start_index + (int)ARES_FRAME_PAYLOAD_OFFSET;
+        if (payload_index >= (int)len) {
+            continue;
+        }
+
+        length = retrieve_payload_length(&buf[*start_index]);
+        footer_index = payload_index + length;
+
+        if (footer_index >= (int)len) {
+            continue;
+        }
+
+        if (buf[footer_index] != ARES_FRAME_FOOTER) {
+            *start_index = -1;
+            continue;
+        }
+
+        return footer_index;
+    }
+
+    return -1;
 }
 
 bool ares_check_if_frame(const uint8_t *buf, size_t len) {

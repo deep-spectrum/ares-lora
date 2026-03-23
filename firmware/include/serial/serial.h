@@ -67,7 +67,7 @@ struct ares_buf {
 
 struct ares_serial_command {
     enum ares_frame_type command;
-    void (*callback)(struct ares_serial *serial, struct ares_frame *frame);
+    void (*callback)(const struct ares_serial *serial, struct ares_frame *frame);
 };
 
 struct ares_serial_ctx {

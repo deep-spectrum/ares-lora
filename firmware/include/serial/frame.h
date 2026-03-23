@@ -13,6 +13,9 @@
 
 #include <zephyr/kernel.h>
 
+#define ARES_FRAME_HEADER          '^'
+#define ARES_FRAME_FOOTER          '@'
+
 enum ares_frame_type {
     ARES_FRAME_WHOAMI,
     ARES_FRAME_START,
@@ -36,6 +39,7 @@ int ares_serialize_frame(uint8_t *buf, size_t len,
                          const struct ares_frame *frame);
 int ares_deserialize_frame(struct ares_frame *frame, const uint8_t *buf,
                            size_t len);
+int ares_serial_frame_present(const uint8_t *buf, size_t len, int *start_index);
 bool ares_check_if_frame(const uint8_t *buf, size_t len);
 
 #endif // ARES_FRAME_H

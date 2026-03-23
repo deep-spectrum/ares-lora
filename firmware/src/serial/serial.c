@@ -18,7 +18,7 @@ LOG_MODULE_REGISTER(ares_serial);
 
 typedef void (*serial_signal_handler_t)(const struct ares_serial *serial);
 
-void ares_serial_process(const struct ares_serial *serial);
+static void ares_serial_process(const struct ares_serial *serial);
 
 static void serial_signal_handle(const struct ares_serial *serial, enum ares_serial_signal signal, serial_signal_handler_t handler) {
     struct k_poll_signal *sig = &serial->ctx->signals[signal];
@@ -116,4 +116,77 @@ int ares_serial_register_command_callbacks(const struct ares_serial *serial, con
     serial->ctx->num_commands = num_commands;
 
     return 0;
+}
+
+static void dispatch(const struct ares_serial *serial, int start_index, int stop_index) {
+    struct ares_frame frame;
+    size_t length = stop_index - start_index;
+    int ret;
+
+    ret = ares_deserialize_frame(&frame, &serial->ctx->rx_buf.buf[start_index], length);
+    if (ret < 0) {
+        // todo report bad frame
+        return;
+    }
+
+    for (size_t i = 0; i < serial->ctx->num_commands; i++) {
+        if (serial->ctx->commands[i].command != frame.type) {
+            continue;
+        }
+
+        if (serial->ctx->commands[i].callback != NULL) {
+            serial->ctx->commands[i].callback(serial, &frame);
+        }
+        return;
+    }
+
+    // todo: report bad frame type
+}
+
+static void drop_data(const struct ares_serial *serial, struct ares_buf *buf) {
+    size_t count;
+
+    buf->len = 0;
+
+    do {
+        (void)SERIAL_API_CALL(serial, read, &buf->buf, sizeof(buf->buf), &count);
+    } while (count != 0);
+}
+
+static void ares_serial_process(const struct ares_serial *serial) {
+    __ASSERT_NO_MSG(serial);
+    __ASSERT_NO_MSG(serial->ctx);
+
+    size_t count = 0;
+    char data;
+    struct ares_buf *buf = &serial->ctx->rx_buf;
+
+    while (true) {
+        if (buf->len >= sizeof(buf->buf)) {
+            drop_data(serial, buf);
+            return;
+        }
+
+        (void)SERIAL_API_CALL(serial, read, &data, 1, &count);
+        if (count == 0) {
+            return;
+        }
+
+        buf->buf[buf->len] = data;
+        buf->len++;
+
+        if (data == ARES_FRAME_HEADER) {
+            int start_index, footer_index;
+
+            footer_index = ares_serial_frame_present(buf->buf, buf->len, &start_index);
+            if (footer_index <= start_index) {
+                continue;
+            }
+
+            dispatch(serial, start_index, footer_index);
+
+            (void)memset(buf->buf, 0, buf->len);
+            buf->len = 0;
+        }
+    }
 }
