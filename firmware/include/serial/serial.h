@@ -77,7 +77,7 @@ struct ares_serial_ctx {
     struct k_poll_signal signals[ARES_SIGNALS];
     struct k_poll_event events[ARES_SIGNALS];
 
-    struct ares_serial_command *commands;
+    const struct ares_serial_command *commands;
     size_t num_commands;
 
     struct k_mutex wr_mtx;

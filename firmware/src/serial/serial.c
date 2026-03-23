@@ -106,3 +106,14 @@ int ares_serial_init(const struct ares_serial *serial,
 
     return 0;
 }
+
+int ares_serial_register_command_callbacks(const struct ares_serial *serial, const struct ares_serial_command *commands, size_t num_commands) {
+    if (serial == NULL || serial->ctx == NULL || (commands == NULL && num_commands != 0)) {
+        return -EINVAL;
+    }
+
+    serial->ctx->commands = commands;
+    serial->ctx->num_commands = num_commands;
+
+    return 0;
+}
