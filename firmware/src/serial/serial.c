@@ -14,13 +14,18 @@
 
 LOG_MODULE_REGISTER(ares_serial);
 
-#define SERIAL_API_CALL(_serial, _api, ...) COND_CODE_1(IS_EMPTY(__VA_ARGS__), (_serial->iface->api->_api(_serial->iface)), (_serial->iface->api->_api(_serial->iface, __VA_ARGS__)))
+#define SERIAL_API_CALL(_serial, _api, ...)                                    \
+    COND_CODE_1(IS_EMPTY(__VA_ARGS__),                                         \
+                (_serial->iface->api->_api(_serial->iface)),                   \
+                (_serial->iface->api->_api(_serial->iface, __VA_ARGS__)))
 
 typedef void (*serial_signal_handler_t)(const struct ares_serial *serial);
 
 static void ares_serial_process(const struct ares_serial *serial);
 
-static void serial_signal_handle(const struct ares_serial *serial, enum ares_serial_signal signal, serial_signal_handler_t handler) {
+static void serial_signal_handle(const struct ares_serial *serial,
+                                 enum ares_serial_signal signal,
+                                 serial_signal_handler_t handler) {
     struct k_poll_signal *sig = &serial->ctx->signals[signal];
     int res;
     unsigned int set;
@@ -62,25 +67,31 @@ static void serial_thread(void *serial_handle, void *p2, void *p3) {
     __ASSERT(false, "serial_thread terminating");
 }
 
-static void transport_evt_handler(enum serial_transport_evt evt_type, void *ctx) {
+static void transport_evt_handler(enum serial_transport_evt evt_type,
+                                  void *ctx) {
     struct ares_serial *serial = ctx;
     struct k_poll_signal *signal;
 
-    signal = (evt_type == SERIAL_TRANSPORT_EVT_RX_RDY) ? &serial->ctx->signals[ARES_SIGNAL_RXRDY] : &serial->ctx->signals[ARES_SIGNAL_TXDONE];
+    signal = (evt_type == SERIAL_TRANSPORT_EVT_RX_RDY)
+                 ? &serial->ctx->signals[ARES_SIGNAL_RXRDY]
+                 : &serial->ctx->signals[ARES_SIGNAL_TXDONE];
     k_poll_signal_raise(signal, 0);
 }
 
-static int instance_init(const struct ares_serial *serial, const void *transport_config) {
+static int instance_init(const struct ares_serial *serial,
+                         const void *transport_config) {
     memset(serial->ctx, 0, sizeof(*serial->ctx));
 
     k_mutex_init(&serial->ctx->wr_mtx);
 
     for (size_t i = 0; i < ARES_SIGNALS; i++) {
         k_poll_signal_init(&serial->ctx->signals[i]);
-        k_poll_event_init(&serial->ctx->events[i], K_POLL_TYPE_SIGNAL, K_POLL_MODE_NOTIFY_ONLY, &serial->ctx->signals[i]);
+        k_poll_event_init(&serial->ctx->events[i], K_POLL_TYPE_SIGNAL,
+                          K_POLL_MODE_NOTIFY_ONLY, &serial->ctx->signals[i]);
     }
 
-    return SERIAL_API_CALL(serial, init, transport_config, transport_evt_handler, (void *)serial);
+    return SERIAL_API_CALL(serial, init, transport_config,
+                           transport_evt_handler, (void *)serial);
 }
 
 int ares_serial_init(const struct ares_serial *serial,
@@ -100,15 +111,21 @@ int ares_serial_init(const struct ares_serial *serial,
         return err;
     }
 
-    tid = k_thread_create(serial->thread, serial->stack, CONFIG_ARES_SERIAL_STACK_SIZE, serial_thread, (void *)serial, NULL, NULL, CONFIG_ARES_SERIAL_PRIO, K_ESSENTIAL, K_NO_WAIT);
+    tid = k_thread_create(serial->thread, serial->stack,
+                          CONFIG_ARES_SERIAL_STACK_SIZE, serial_thread,
+                          (void *)serial, NULL, NULL, CONFIG_ARES_SERIAL_PRIO,
+                          K_ESSENTIAL, K_NO_WAIT);
     k_thread_name_set(tid, serial->name);
     serial->ctx->tid = tid;
 
     return 0;
 }
 
-int ares_serial_register_command_callbacks(const struct ares_serial *serial, const struct ares_serial_command *commands, size_t num_commands) {
-    if (serial == NULL || serial->ctx == NULL || (commands == NULL && num_commands != 0)) {
+int ares_serial_register_command_callbacks(
+    const struct ares_serial *serial,
+    const struct ares_serial_command *commands, size_t num_commands) {
+    if (serial == NULL || serial->ctx == NULL ||
+        (commands == NULL && num_commands != 0)) {
         return -EINVAL;
     }
 
@@ -118,7 +135,8 @@ int ares_serial_register_command_callbacks(const struct ares_serial *serial, con
     return 0;
 }
 
-static void report_error(const struct ares_serial *serial, enum ares_frame_error error) {
+static void report_error(const struct ares_serial *serial,
+                         enum ares_frame_error error) {
     struct ares_frame frame = {
         .type = ARES_FRAME_FRAMING_ERROR,
         .payload.frame_error = error,
@@ -127,12 +145,14 @@ static void report_error(const struct ares_serial *serial, enum ares_frame_error
     ares_serial_write_frame(serial, &frame);
 }
 
-static void dispatch(const struct ares_serial *serial, int start_index, int stop_index) {
+static void dispatch(const struct ares_serial *serial, int start_index,
+                     int stop_index) {
     struct ares_frame frame;
     size_t length = stop_index - start_index;
     int ret;
 
-    ret = ares_deserialize_frame(&frame, &serial->ctx->rx_buf.buf[start_index], length);
+    ret = ares_deserialize_frame(&frame, &serial->ctx->rx_buf.buf[start_index],
+                                 length);
     if (ret < 0) {
         report_error(serial, ARES_FRAME_ERROR_BAD_FRAME);
         return;
@@ -159,7 +179,8 @@ static void drop_data(const struct ares_serial *serial, struct ares_buf *buf) {
     buf->len = 0;
 
     do {
-        (void)SERIAL_API_CALL(serial, read, &buf->buf, sizeof(buf->buf), &count);
+        (void)SERIAL_API_CALL(serial, read, &buf->buf, sizeof(buf->buf),
+                              &count);
     } while (count != 0);
 }
 
@@ -188,7 +209,8 @@ static void ares_serial_process(const struct ares_serial *serial) {
         if (data == ARES_FRAME_HEADER) {
             int start_index, footer_index;
 
-            footer_index = ares_serial_frame_present(buf->buf, buf->len, &start_index);
+            footer_index =
+                ares_serial_frame_present(buf->buf, buf->len, &start_index);
             if (footer_index <= start_index) {
                 continue;
             }
@@ -201,7 +223,8 @@ static void ares_serial_process(const struct ares_serial *serial) {
     }
 }
 
-static int ares_write(const struct ares_serial *serial, const void *data, size_t nbytes) {
+static int ares_write(const struct ares_serial *serial, const void *data,
+                      size_t nbytes) {
     __ASSERT_NO_MSG(serial);
     __ASSERT_NO_MSG(serial->ctx);
     __ASSERT_NO_MSG(data);
@@ -211,7 +234,8 @@ static int ares_write(const struct ares_serial *serial, const void *data, size_t
 
     (void)k_mutex_lock(&serial->ctx->wr_mtx, K_FOREVER);
     while (length != 0) {
-        int err = SERIAL_API_CALL(serial, write, &((const uint8_t *)data)[offset], length, &tmp_cnt);
+        int err = SERIAL_API_CALL(
+            serial, write, &((const uint8_t *)data)[offset], length, &tmp_cnt);
         ARG_UNUSED(err);
 
         __ASSERT_NO_MSG(err == 0);
@@ -225,7 +249,8 @@ static int ares_write(const struct ares_serial *serial, const void *data, size_t
     return (int)nbytes;
 }
 
-int ares_serial_write_frame(const struct ares_serial *serial, const struct ares_frame *frame) {
+int ares_serial_write_frame(const struct ares_serial *serial,
+                            const struct ares_frame *frame) {
     uint8_t buffer[ARES_FRAME_OVERHEAD + sizeof(frame->payload) + 1];
     int len;
 
@@ -243,11 +268,12 @@ int ares_serial_write_frame(const struct ares_serial *serial, const struct ares_
     return 0;
 }
 
-void ares_serial_flush_out(const struct ares_serial *serial, k_timeout_t timeout) {
+void ares_serial_flush_out(const struct ares_serial *serial,
+                           k_timeout_t timeout) {
     unsigned int set;
     int res;
     struct k_poll_signal *sig;
-    const uint8_t data[] = { '\0' };
+    const uint8_t data[] = {'\0'};
 
     if (serial == NULL) {
         return;

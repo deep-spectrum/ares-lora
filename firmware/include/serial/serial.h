@@ -67,7 +67,8 @@ struct ares_buf {
 
 struct ares_serial_command {
     enum ares_frame_type command;
-    void (*callback)(const struct ares_serial *serial, struct ares_frame *frame);
+    void (*callback)(const struct ares_serial *serial,
+                     struct ares_frame *frame);
 };
 
 struct ares_serial_ctx {
@@ -107,9 +108,13 @@ struct ares_serial {
 int ares_serial_init(const struct ares_serial *serial,
                      const void *transport_config);
 
-int ares_serial_register_command_callbacks(const struct ares_serial *serial, const struct ares_serial_command *commands, size_t num_commands);
-int ares_serial_write_frame(const struct ares_serial *serial, const struct ares_frame *frame);
-void ares_serial_flush_out(const struct ares_serial *serial, k_timeout_t timeout);
+int ares_serial_register_command_callbacks(
+    const struct ares_serial *serial,
+    const struct ares_serial_command *commands, size_t num_commands);
+int ares_serial_write_frame(const struct ares_serial *serial,
+                            const struct ares_frame *frame);
+void ares_serial_flush_out(const struct ares_serial *serial,
+                           k_timeout_t timeout);
 int wait_serial_ready(const struct ares_serial *serial);
 int set_wait_usb_host(const struct ares_serial *serial, bool block);
 bool ares_serial_check_rx_error(const struct ares_serial *serial);

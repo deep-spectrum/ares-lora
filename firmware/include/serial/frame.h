@@ -21,8 +21,8 @@
 #define ARES_FRAME_LEN_OVERHEAD    UINT32_C(2)
 #define ARES_FRAME_FOOTER_OVERHEAD UINT32_C(1)
 #define ARES_FRAME_OVERHEAD                                                    \
-(uint64_t)(ARES_FRAME_HEADER_OVERHEAD + ARES_FRAME_TYPE_OVERHEAD +         \
-ARES_FRAME_LEN_OVERHEAD + ARES_FRAME_FOOTER_OVERHEAD)
+    (uint64_t)(ARES_FRAME_HEADER_OVERHEAD + ARES_FRAME_TYPE_OVERHEAD +         \
+               ARES_FRAME_LEN_OVERHEAD + ARES_FRAME_FOOTER_OVERHEAD)
 
 enum ares_frame_error {
     ARES_FRAME_ERROR_BAD_FRAME = 0,
@@ -31,8 +31,8 @@ enum ares_frame_error {
 };
 
 enum ares_frame_type {
-    ARES_FRAME_WHOAMI, ///< Who am I frame. No receive payload.
-    ARES_FRAME_START, ///< Start time frame.
+    ARES_FRAME_WHOAMI,        ///< Who am I frame. No receive payload.
+    ARES_FRAME_START,         ///< Start time frame.
     ARES_FRAME_FRAMING_ERROR, ///< Framing error frame. TX only.
 
     ARES_FRAME_TYPE_INVALID,
@@ -47,7 +47,8 @@ struct ares_frame {
             int64_t sec;
             uint64_t ns;
         } timespec; /// < ARES_FRAME_START (RX/TX)
-        enum ares_frame_error frame_error; ///< ARES_FRAME_FRAMING_ERROR (TX only)
+        enum ares_frame_error
+            frame_error; ///< ARES_FRAME_FRAMING_ERROR (TX only)
     } payload;
 };
 

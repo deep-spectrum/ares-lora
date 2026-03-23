@@ -70,16 +70,14 @@ static void serialize(uint8_t *buf, const struct ares_frame *frame,
 
     switch (frame->type) {
     case ARES_FRAME_WHOAMI: {
-        (void)memcpy(payload, frame->payload.id,
-                     payload_len);
+        (void)memcpy(payload, frame->payload.id, payload_len);
         break;
     }
     case ARES_FRAME_START: {
-        (void)memcpy(payload, &frame->payload.timespec,
-                     payload_len);
+        (void)memcpy(payload, &frame->payload.timespec, payload_len);
         break;
     }
-        case ARES_FRAME_FRAMING_ERROR: {
+    case ARES_FRAME_FRAMING_ERROR: {
         uint32_t error_code = frame->payload.frame_error;
         (void)memcpy(payload, &error_code, sizeof(error_code));
         break;
@@ -129,7 +127,7 @@ static void deserialize(struct ares_frame *frame, const uint8_t *buf) {
                      payload_len);
         break;
     }
-        case ARES_FRAME_WHOAMI: {
+    case ARES_FRAME_WHOAMI: {
         // nop
         break;
     }
@@ -156,7 +154,8 @@ int ares_deserialize_frame(struct ares_frame *frame, const uint8_t *buf,
     return 0;
 }
 
-int ares_serial_frame_present(const uint8_t *buf, size_t len, int *start_index) {
+int ares_serial_frame_present(const uint8_t *buf, size_t len,
+                              int *start_index) {
     if (buf == NULL || len < ARES_FRAME_OVERHEAD || start_index == NULL) {
         return -EINVAL;
     }
