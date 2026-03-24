@@ -3,13 +3,17 @@
  *
  * @brief
  *
+ * | Field | Header | Length  | Type   | Payload       | Footer |
+ * | Size  | 1 byte | 2 bytes | 1 byte | 0-65535 bytes | 1 byte |
+ * | Value | ^      |         |        |               | @      |
+ *
  * @date 3/19/26
  *
  * @author Tom Schmitz \<tschmitz@andrew.cmu.edu\>
  */
 
-#ifndef ARES_FRAME_H
-#define ARES_FRAME_H
+#ifndef ARES_SERIAL_FRAME_H
+#define ARES_SERIAL_FRAME_H
 
 #include <zephyr/kernel.h>
 
@@ -66,4 +70,4 @@ int ares_serial_frame_present(const uint8_t *buf, size_t len,
                               struct ares_frame_info *info);
 bool ares_check_if_frame(const uint8_t *buf, size_t len);
 
-#endif // ARES_FRAME_H
+#endif // ARES_SERIAL_FRAME_H
