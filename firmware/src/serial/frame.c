@@ -12,12 +12,11 @@
 #include <zephyr/kernel.h>
 
 #define ARES_FRAME_HEADER_OFFSET UINT32_C(0)
-#define ARES_FRAME_TYPE_OFFSET                                                 \
-    (ARES_FRAME_HEADER_OFFSET + ARES_FRAME_HEADER_OVERHEAD)
 #define ARES_FRAME_LEN_OFFSET                                                  \
-    (ARES_FRAME_TYPE_OFFSET + ARES_FRAME_TYPE_OVERHEAD)
+    (ARES_FRAME_HEADER_OFFSET + ARES_FRAME_HEADER_OVERHEAD)
+#define ARES_FRAME_TYPE_OFFSET (ARES_FRAME_LEN_OFFSET + ARES_FRAME_LEN_OVERHEAD)
 #define ARES_FRAME_PAYLOAD_OFFSET                                              \
-    (ARES_FRAME_LEN_OFFSET + ARES_FRAME_LEN_OVERHEAD)
+    (ARES_FRAME_TYPE_OFFSET + ARES_FRAME_TYPE_OVERHEAD)
 #define ARES_FRAME_FOOTER_OFFSET(payload_len)                                  \
     (ARES_FRAME_PAYLOAD_OFFSET + (uint64_t)(payload_len))
 
@@ -155,49 +154,56 @@ int ares_deserialize_frame(struct ares_frame *frame, const uint8_t *buf,
 }
 
 int ares_serial_frame_present(const uint8_t *buf, size_t len,
-                              int *start_index) {
-    if (buf == NULL || len < ARES_FRAME_OVERHEAD || start_index == NULL) {
+                              struct ares_frame_info *info) {
+    int *start, *length, *remaining;
+    size_t type_index, payload_length, footer_index;
+
+    if (buf == NULL || info == NULL) {
         return -EINVAL;
     }
 
     // if -EINVAL, invalid parameters
-    // if start_index == -1 && footer_index == -1, frame not found
-    // if start_index != -1 && footer_index == -1, incomplete frame
-    // if start_index != -1 && footer_index != -1, complete frame
+    // if 0, no complete frame found
+    // if 1, complete frame found
 
-    *start_index = -1;
+    start = &info->start_index;
+    length = &info->frame_size;
+    remaining = &info->bytes_left;
 
     for (size_t i = 0; i < len; i++) {
-        int footer_index, payload_index;
-        uint16_t length;
 
         if (buf[i] != ARES_FRAME_HEADER) {
             continue;
         }
 
-        *start_index = (int)i;
+        *start = (int)i;
 
-        payload_index = *start_index + (int)ARES_FRAME_PAYLOAD_OFFSET;
-        if (payload_index >= (int)len) {
+        type_index = *start + ARES_FRAME_TYPE_OFFSET;
+        if (type_index > len) {
+            // cannot extract the length
             continue;
         }
 
-        length = retrieve_payload_length(&buf[*start_index]);
-        footer_index = payload_index + length;
+        payload_length = retrieve_payload_length(&buf[*start]);
 
-        if (footer_index >= (int)len) {
+        footer_index = *start + ARES_FRAME_PAYLOAD_OFFSET + payload_length;
+        if (footer_index >= len) {
+            *remaining = (int)footer_index - ((int)len - *start) + 1;
             continue;
         }
 
         if (buf[footer_index] != ARES_FRAME_FOOTER) {
-            *start_index = -1;
+            // Not a frame
             continue;
         }
 
-        return footer_index;
+        *length = ARES_FRAME_OVERHEAD + payload_length;
+        *remaining = 0;
+
+        return 1;
     }
 
-    return -1;
+    return 0;
 }
 
 bool ares_check_if_frame(const uint8_t *buf, size_t len) {

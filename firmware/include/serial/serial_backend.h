@@ -14,7 +14,7 @@
 #include <serial/serial.h>
 #include <zephyr/sys/ring_buffer.h>
 
-extern const struct ares_serial_transport_api serial_uart_transport_api;
+extern const struct ares_serial_transport_api ares_serial_uart_transport_api;
 
 #define SERIAL_BACKEND_TX_RINGBUF_SIZE 256
 #define SERIAL_BACKEND_RX_RINGBUF_SIZE 256
@@ -42,7 +42,7 @@ struct serial_uart_int_driven {
 #define SERIAL_UART_DEFINE(_name)                                              \
     static SERIAL_UART_STRUCT _name##_backend_uart;                            \
     static struct ares_serial_transport _name = {                              \
-        .api = &serial_uart_transport_api, .ctx = &_name##_backend_uart}
+        .api = &ares_serial_uart_transport_api, .ctx = &_name##_backend_uart}
 
 const struct ares_serial *ares_serial_backend_uart_get_ptr(void);
 

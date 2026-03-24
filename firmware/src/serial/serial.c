@@ -146,9 +146,8 @@ static void report_error(const struct ares_serial *serial,
 }
 
 static void dispatch(const struct ares_serial *serial, int start_index,
-                     int stop_index) {
+                     size_t length) {
     struct ares_frame frame;
-    size_t length = stop_index - start_index;
     int ret;
 
     ret = ares_deserialize_frame(&frame, &serial->ctx->rx_buf.buf[start_index],
@@ -165,8 +164,9 @@ static void dispatch(const struct ares_serial *serial, int start_index,
 
         if (serial->ctx->commands[i].callback != NULL) {
             serial->ctx->commands[i].callback(serial, &frame);
+        } else {
+            report_error(serial, ARES_FRAME_ERROR_NOT_IMPLEMENTED);
         }
-        report_error(serial, ARES_FRAME_ERROR_NOT_IMPLEMENTED);
         return;
     }
 
@@ -191,9 +191,11 @@ static void ares_serial_process(const struct ares_serial *serial) {
     size_t count = 0;
     char data;
     struct ares_buf *buf = &serial->ctx->rx_buf;
+    struct ares_frame_info info = {-1, -1, -1};
 
     while (true) {
         if (buf->len >= sizeof(buf->buf)) {
+            LOG_ERR("Dropping data");
             drop_data(serial, buf);
             return;
         }
@@ -202,23 +204,33 @@ static void ares_serial_process(const struct ares_serial *serial) {
         if (count == 0) {
             return;
         }
+        LOG_DBG("Read byte: %d | 0x%X | '%c'", (int)data, (uint16_t)data,
+                (char)data);
 
         buf->buf[buf->len] = data;
         buf->len++;
 
-        if (data == ARES_FRAME_HEADER) {
-            int start_index, footer_index;
+        if (data == ARES_FRAME_FOOTER || info.start_index >= 0) {
+            int result;
 
-            footer_index =
-                ares_serial_frame_present(buf->buf, buf->len, &start_index);
-            if (footer_index <= start_index) {
+            result = ares_serial_frame_present(buf->buf, buf->len, &info);
+            __ASSERT_NO_MSG(result != -EINVAL);
+
+            if (result == 0) {
+                LOG_DBG(
+                    "Frame info states: {start: %d, length: %d, remaining: %d}",
+                    info.start_index, info.frame_size, info.bytes_left);
                 continue;
             }
 
-            dispatch(serial, start_index, footer_index);
+            LOG_DBG("Frame found. Frame length: %d", info.frame_size);
+            dispatch(serial, info.start_index, info.frame_size);
 
             (void)memset(buf->buf, 0, buf->len);
             buf->len = 0;
+            info.start_index = -1;
+            info.frame_size = -1;
+            info.bytes_left = -1;
         }
     }
 }

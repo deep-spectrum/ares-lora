@@ -34,7 +34,7 @@ static void ares_uart_rx_handle(const struct device *dev,
             ring_buf_put_claim(&uart->rx_ringbuf, &data, uart->rx_ringbuf.size);
 
         if (len > 0) {
-            rd_len = uart_fifo_read(dev, data, len);
+            rd_len = uart_fifo_read(dev, data, (int)len);
 
             if (rd_len > 0) {
                 new_data = true;
@@ -50,7 +50,7 @@ static void ares_uart_rx_handle(const struct device *dev,
 
             rd_len = uart_fifo_read(dev, &dummy, 1);
         }
-    } while (rd_len && (rd_len == len));
+    } while (rd_len != 0);
 
     if (new_data) {
         uart->common.handler(SERIAL_TRANSPORT_EVT_RX_RDY, uart->common.context);
@@ -94,7 +94,7 @@ static void ares_uart_tx_handle(const struct device *dev,
     len = ring_buf_get_claim(&uart->tx_ringbuf, (uint8_t **)&data,
                              uart->tx_ringbuf.size);
 
-    if (len) {
+    if (len != 0) {
         int err;
 
         len = uart_fifo_fill(dev, data, len);
@@ -114,11 +114,11 @@ static void uart_callback(const struct device *dev, void *user_data) {
 
     uart_irq_update(dev);
 
-    if (uart_irq_rx_ready(dev)) {
+    if (uart_irq_rx_ready(dev) != 0) {
         ares_uart_rx_handle(dev, uart);
     }
 
-    if (uart_irq_tx_ready(dev)) {
+    if (uart_irq_tx_ready(dev) != 0) {
         ares_uart_tx_handle(dev, uart);
     }
 }
@@ -229,15 +229,15 @@ static int read_uart(const struct ares_serial_transport *transport, void *data,
     return irq_read(transport->ctx, data, length, cnt);
 }
 
-static void wait_dtr(const struct ares_serial_transport *transport) {
-    const struct serial_uart_common *uart = transport->ctx;
-    uint32_t dtr = 0;
-
-    while (!dtr) {
-        uart_line_ctrl_get(uart->dev, UART_LINE_CTRL_DTR, &dtr);
-        k_sleep(K_MSEC(100));
-    }
-}
+// static void wait_dtr(const struct ares_serial_transport *transport) {
+//     const struct serial_uart_common *uart = transport->ctx;
+//     uint32_t dtr = 0;
+//
+//     while (!dtr) {
+//         uart_line_ctrl_get(uart->dev, UART_LINE_CTRL_DTR, &dtr);
+//         k_sleep(K_MSEC(100));
+//     }
+// }
 
 static bool check_uart_error(const struct ares_serial_transport *transport) {
     const struct serial_uart_common *uart = transport->ctx;
@@ -247,16 +247,17 @@ static bool check_uart_error(const struct ares_serial_transport *transport) {
     return (err != 0 && (err != -ENOSYS));
 }
 
-static void set_block_no_usb_host(const struct ares_serial_transport *transport,
-                                  bool block) {
-    struct serial_uart_common *uart = transport->ctx;
-
-    if (block) {
-        atomic_set_bit(&uart->block_no_usb, BLOCK_NO_USB_HOST);
-    } else {
-        atomic_clear_bit(&uart->block_no_usb, BLOCK_NO_USB_HOST);
-    }
-}
+// static void set_block_no_usb_host(const struct ares_serial_transport
+// *transport,
+//                                   bool block) {
+//     struct serial_uart_common *uart = transport->ctx;
+//
+//     if (block) {
+//         atomic_set_bit(&uart->block_no_usb, BLOCK_NO_USB_HOST);
+//     } else {
+//         atomic_clear_bit(&uart->block_no_usb, BLOCK_NO_USB_HOST);
+//     }
+// }
 
 const struct ares_serial_transport_api ares_serial_uart_transport_api = {
     .init = init,
@@ -264,13 +265,10 @@ const struct ares_serial_transport_api ares_serial_uart_transport_api = {
     .enable = enable,
     .write = write_uart,
     .read = read_uart,
-    .wait_dtr = wait_dtr,
+    .wait_dtr = NULL,
     .rx_error = check_uart_error,
-    .block_no_usb_host = set_block_no_usb_host,
+    .block_no_usb_host = NULL,
 };
-
-// todo
-#define CONFIG_ARES_SERIAL_STACK_SIZE 4096
 
 SERIAL_UART_DEFINE(ares_serial_transport_uart);
 ARES_SERIAL_DEFINE(ares_uart, &ares_serial_transport_uart);
@@ -283,10 +281,10 @@ static int enable_ares_serial_uart(void) {
         return -ENODEV;
     }
 
-    ret = usb_enable(NULL);
-    if (ret) {
-        return ret;
-    }
+    // ret = usb_enable(NULL);
+    // if (ret) {
+    //     return ret;
+    // }
 
     return ares_serial_init(&ares_uart, dev);
 }
