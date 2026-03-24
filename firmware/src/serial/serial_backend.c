@@ -14,7 +14,6 @@
 #include <zephyr/logging/log.h>
 #include <zephyr/sys/atomic.h>
 #include <zephyr/sys/ring_buffer.h>
-#include <zephyr/usb/usb_device.h>
 
 LOG_MODULE_REGISTER(backend_uart);
 
@@ -229,15 +228,15 @@ static int read_uart(const struct ares_serial_transport *transport, void *data,
     return irq_read(transport->ctx, data, length, cnt);
 }
 
-// static void wait_dtr(const struct ares_serial_transport *transport) {
-//     const struct serial_uart_common *uart = transport->ctx;
-//     uint32_t dtr = 0;
-//
-//     while (!dtr) {
-//         uart_line_ctrl_get(uart->dev, UART_LINE_CTRL_DTR, &dtr);
-//         k_sleep(K_MSEC(100));
-//     }
-// }
+static void wait_dtr(const struct ares_serial_transport *transport) {
+    const struct serial_uart_common *uart = transport->ctx;
+    uint32_t dtr = 0;
+
+    while (!dtr) {
+        uart_line_ctrl_get(uart->dev, UART_LINE_CTRL_DTR, &dtr);
+        k_sleep(K_MSEC(100));
+    }
+}
 
 static bool check_uart_error(const struct ares_serial_transport *transport) {
     const struct serial_uart_common *uart = transport->ctx;
@@ -247,17 +246,16 @@ static bool check_uart_error(const struct ares_serial_transport *transport) {
     return (err != 0 && (err != -ENOSYS));
 }
 
-// static void set_block_no_usb_host(const struct ares_serial_transport
-// *transport,
-//                                   bool block) {
-//     struct serial_uart_common *uart = transport->ctx;
-//
-//     if (block) {
-//         atomic_set_bit(&uart->block_no_usb, BLOCK_NO_USB_HOST);
-//     } else {
-//         atomic_clear_bit(&uart->block_no_usb, BLOCK_NO_USB_HOST);
-//     }
-// }
+static void set_block_no_usb_host(const struct ares_serial_transport *transport,
+                                  bool block) {
+    struct serial_uart_common *uart = transport->ctx;
+
+    if (block) {
+        atomic_set_bit(&uart->block_no_usb, BLOCK_NO_USB_HOST);
+    } else {
+        atomic_clear_bit(&uart->block_no_usb, BLOCK_NO_USB_HOST);
+    }
+}
 
 const struct ares_serial_transport_api ares_serial_uart_transport_api = {
     .init = init,
@@ -265,9 +263,9 @@ const struct ares_serial_transport_api ares_serial_uart_transport_api = {
     .enable = enable,
     .write = write_uart,
     .read = read_uart,
-    .wait_dtr = NULL,
+    .wait_dtr = wait_dtr,
     .rx_error = check_uart_error,
-    .block_no_usb_host = NULL,
+    .block_no_usb_host = set_block_no_usb_host,
 };
 
 SERIAL_UART_DEFINE(ares_serial_transport_uart);
@@ -275,16 +273,10 @@ ARES_SERIAL_DEFINE(ares_uart, &ares_serial_transport_uart);
 
 static int enable_ares_serial_uart(void) {
     const struct device *const dev = DEVICE_DT_GET(DT_CHOSEN(zephyr_console));
-    int ret;
 
     if (!device_is_ready(dev)) {
         return -ENODEV;
     }
-
-    // ret = usb_enable(NULL);
-    // if (ret) {
-    //     return ret;
-    // }
 
     return ares_serial_init(&ares_uart, dev);
 }
