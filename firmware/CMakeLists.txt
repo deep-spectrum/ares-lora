@@ -7,8 +7,6 @@ include_directories(include)
 
 set(SRC
         src/main.c
-        src/lora.c
-        src/lora_frame.c
 )
 
 set(SERIAL_SRC
@@ -17,4 +15,10 @@ set(SERIAL_SRC
         src/serial/serial_backend.c
 )
 
-target_sources(app PRIVATE ${SRC} ${SERIAL_SRC})
+set(LORA_SRC
+        src/lora/lora.c
+        src/lora/lora_backend.c
+        src/lora/packet.c
+)
+
+target_sources(app PRIVATE ${SRC} ${SERIAL_SRC} ${LORA_SRC})
