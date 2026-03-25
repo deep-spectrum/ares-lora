@@ -29,6 +29,8 @@ struct ares_lora_transport;
 struct ares_lora_transport_api {
     int (*init)(const struct ares_lora_transport *transport, const void *config,
                 lora_transport_handler_t evt_handler, void *context);
+    int (*uninit)(const struct ares_lora_transport *transport);
+    int (*enable)(const struct ares_lora_transport *transport, bool block_tx);
 };
 
 struct ares_lora_transport {

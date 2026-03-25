@@ -68,8 +68,30 @@ static int init(const struct ares_lora_transport *transport, const void *config,
     return 0;
 }
 
+static void async_uninit(struct lora_async_driven *lora) {
+    const struct device *dev = lora->common.dev;
+
+    lora_recv_async(dev, NULL, NULL);
+    // todo: tx stuff
+}
+
+static int uninit(const struct ares_lora_transport *transport) {
+    async_uninit(transport->ctx);
+    return 0;
+}
+
+static int enable(const struct ares_lora_transport *transport, bool block_tx) {
+    struct lora_common *lora = transport->ctx;
+
+    lora->block_tx = block_tx;
+    // todo: figure out what to do for tx
+    return 0;
+}
+
 const struct ares_lora_transport_api ares_lora_transport_api = {
     .init = init,
+    .uninit = uninit,
+    .enable = enable,
 };
 
 #define CONFIG_ARES_LORA_STACK_SIZE 4096 // todo
