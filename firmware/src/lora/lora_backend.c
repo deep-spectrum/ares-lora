@@ -37,11 +37,6 @@ static void ares_lora_rx_handle(const struct device *dev, uint8_t *rx_data,
     lora->common.handler(LORA_TRANSPORT_EVT_RX_RDY, lora->common.context);
 }
 
-static void ares_lora_transmit_handle(struct k_work *work) {
-    // todo: implement this
-}
-// todo: create work queue for lora. Set to a lower prio
-
 static void async_init(struct lora_async_driven *lora) {
     const struct device *dev = lora->common.dev;
 
@@ -51,17 +46,31 @@ static void async_init(struct lora_async_driven *lora) {
                   lora->tx_buf);
     atomic_clear(&lora->tx_busy);
     lora_recv_async(dev, ares_lora_rx_handle, lora);
-    // todo: tx stuff
+}
+
+static int configure_modem(struct lora_common *lora) {
+    return lora_config(lora->dev, &lora->config);
 }
 
 static int init(const struct ares_lora_transport *transport, const void *config,
                 lora_transport_handler_t evt_handler, void *context) {
     struct lora_common *common = transport->ctx;
+    struct lora_modem_config *modem_config = &common->config;
 
-    // todo: configure lora
     common->dev = (const struct device *)config;
     common->handler = evt_handler;
     common->context = context;
+
+    modem_config->frequency = 915000000;
+    modem_config->bandwidth = BW_125_KHZ;
+    modem_config->datarate = SF_12;
+    modem_config->preamble_len = 8;
+    modem_config->coding_rate = CR_4_5;
+    modem_config->iq_inverted = false;
+    modem_config->public_network = false;
+    modem_config->tx_power = 4;
+    modem_config->tx = false;
+    (void)configure_modem(common);
 
     async_init(transport->ctx);
 
@@ -72,7 +81,6 @@ static void async_uninit(struct lora_async_driven *lora) {
     const struct device *dev = lora->common.dev;
 
     lora_recv_async(dev, NULL, NULL);
-    // todo: tx stuff
 }
 
 static int uninit(const struct ares_lora_transport *transport) {
@@ -81,11 +89,19 @@ static int uninit(const struct ares_lora_transport *transport) {
 }
 
 static int enable(const struct ares_lora_transport *transport, bool block_tx) {
+    ARG_UNUSED(transport);
+    ARG_UNUSED(block_tx);
+    return 0;
+}
+
+static int configure_modem_api(const struct ares_lora_transport *transport,
+                               const struct lora_modem_config *config) {
     struct lora_common *lora = transport->ctx;
 
-    lora->block_tx = block_tx;
-    // todo: figure out what to do for tx
-    return 0;
+    lora->config = *config;
+    lora->config.tx = false;
+
+    return configure_modem(lora);
 }
 
 static int polling_write(struct lora_common *lora, const void *data,
@@ -104,26 +120,27 @@ static int polling_write(struct lora_common *lora, const void *data,
     return 0;
 }
 
-static int async_write(struct lora_async_driven *lora, const void *data,
-                       size_t length, size_t *cnt) {
-    *cnt = ring_buf_put(&lora->tx_ringbuf, data, length);
-
-    if (atomic_set(&lora->tx_busy, 1) == 0) {
-        // todo
-    }
-
-    return 0;
-}
-
 static int lora_write(const struct ares_lora_transport *transport,
                       const void *data, size_t length, size_t *cnt) {
     struct lora_common *lora = transport->ctx;
+    int ret;
 
-    if (lora->block_tx) {
-        return polling_write(lora, data, length, cnt);
+    // set modem to TX mode for this message
+    lora->config.tx = true;
+    ret = configure_modem(lora);
+    if (ret < 0) {
+        return ret;
     }
 
-    return async_write(transport->ctx, data, length, cnt);
+    ret = polling_write(lora, data, length, cnt);
+
+    if (ret < 0) {
+        return ret;
+    }
+
+    // Leave the modem in receive mode whenever not transmitting...
+    lora->config.tx = false;
+    return configure_modem(lora);
 }
 
 static int async_read(struct lora_async_driven *lora, void *data, size_t length,
@@ -143,6 +160,7 @@ const struct ares_lora_transport_api ares_lora_transport_api = {
     .enable = enable,
     .write = lora_write,
     .read = lora_read,
+    .configure = configure_modem_api,
 };
 
 #define CONFIG_ARES_LORA_STACK_SIZE 4096 // todo

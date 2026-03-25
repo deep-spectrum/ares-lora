@@ -11,6 +11,7 @@
 #ifndef ARES_LORA_H
 #define ARES_LORA_H
 
+#include <zephyr/drivers/lora.h>
 #include <zephyr/kernel.h>
 
 enum lora_transport_evt {
@@ -35,6 +36,8 @@ struct ares_lora_transport_api {
                  size_t length, size_t *cnt);
     int (*read)(const struct ares_lora_transport *transport, void *data,
                 size_t length, size_t *cnt);
+    int (*configure)(const struct ares_lora_transport *transport,
+                     const struct lora_modem_config *config);
 };
 
 struct ares_lora_transport {

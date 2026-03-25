@@ -12,6 +12,7 @@
 #define ARES_LORA_BACKEND_H
 
 #include <lora/lora.h>
+#include <zephyr/drivers/lora.h>
 #include <zephyr/kernel.h>
 
 extern const struct ares_lora_transport_api ares_lora_transport_api;
@@ -23,7 +24,7 @@ struct lora_common {
     const struct device *dev;
     lora_transport_handler_t handler;
     void *context;
-    bool block_tx;
+    struct lora_modem_config config;
 };
 
 struct lora_async_driven {
