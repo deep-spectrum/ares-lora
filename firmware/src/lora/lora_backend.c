@@ -67,3 +67,27 @@ static int init(const struct ares_lora_transport *transport, const void *config,
 
     return 0;
 }
+
+const struct ares_lora_transport_api ares_lora_transport_api = {
+    .init = init,
+};
+
+#define CONFIG_ARES_LORA_STACK_SIZE 4096 // todo
+
+LORA_DEFINE(ares_lora_transport_);
+ARES_LORA_DEFINE(ares_lora, &ares_lora_transport_);
+
+static int enable_ares_lora(void) {
+    const struct device *const dev = DEVICE_DT_GET_OR_NULL(DT_ALIAS(lora0));
+
+    if (!device_is_ready(dev)) {
+        return -ENODEV;
+    }
+
+    return ares_lora_init(&ares_lora, dev);
+}
+SYS_INIT(enable_ares_lora, POST_KERNEL, 91);
+
+const struct ares_lora *ares_lora_backend_lora_get_ptr(void) {
+    return &ares_lora;
+}

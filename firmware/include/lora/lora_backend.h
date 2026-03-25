@@ -14,6 +14,8 @@
 #include <lora/lora.h>
 #include <zephyr/kernel.h>
 
+extern const struct ares_lora_transport_api ares_lora_transport_api;
+
 #define LORA_BACKEND_TX_RINGBUF_SIZE 256
 #define LORA_BACKEND_RX_RINGBUF_SIZE 256
 
@@ -40,5 +42,7 @@ struct lora_async_driven {
     static struct ares_lora_transport _name = {                                \
         .api = &ares_lora_transport_api,                                       \
         .ctx = &UTIL_CAT(_name, _backend_lora)}
+
+const struct ares_lora *ares_lora_backend_lora_get_ptr(void);
 
 #endif // ARES_LORA_BACKEND_H
