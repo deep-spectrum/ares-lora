@@ -126,11 +126,23 @@ static int lora_write(const struct ares_lora_transport *transport,
     return async_write(transport->ctx, data, length, cnt);
 }
 
+static int async_read(struct lora_async_driven *lora, void *data, size_t length,
+                      size_t *cnt) {
+    *cnt = ring_buf_get(&lora->rx_ringbuf, data, length);
+    return 0;
+}
+
+static int lora_read(const struct ares_lora_transport *transport, void *data,
+                     size_t length, size_t *cnt) {
+    return async_read(transport->ctx, data, length, cnt);
+}
+
 const struct ares_lora_transport_api ares_lora_transport_api = {
     .init = init,
     .uninit = uninit,
     .enable = enable,
     .write = lora_write,
+    .read = lora_read,
 };
 
 #define CONFIG_ARES_LORA_STACK_SIZE 4096 // todo

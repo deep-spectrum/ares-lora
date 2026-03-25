@@ -33,6 +33,8 @@ struct ares_lora_transport_api {
     int (*enable)(const struct ares_lora_transport *transport, bool block_tx);
     int (*write)(const struct ares_lora_transport *transport, const void *data,
                  size_t length, size_t *cnt);
+    int (*read)(const struct ares_lora_transport *transport, void *data,
+                size_t length, size_t *cnt);
 };
 
 struct ares_lora_transport {
