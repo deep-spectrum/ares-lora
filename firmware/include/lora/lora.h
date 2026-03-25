@@ -31,6 +31,8 @@ struct ares_lora_transport_api {
                 lora_transport_handler_t evt_handler, void *context);
     int (*uninit)(const struct ares_lora_transport *transport);
     int (*enable)(const struct ares_lora_transport *transport, bool block_tx);
+    int (*write)(const struct ares_lora_transport *transport, const void *data,
+                 size_t length, size_t *cnt);
 };
 
 struct ares_lora_transport {

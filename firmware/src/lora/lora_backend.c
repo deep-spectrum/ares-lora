@@ -88,10 +88,49 @@ static int enable(const struct ares_lora_transport *transport, bool block_tx) {
     return 0;
 }
 
+static int polling_write(struct lora_common *lora, const void *data,
+                         size_t length, size_t *cnt) {
+    uint8_t *data8 = (uint8_t *)data;
+
+    int ret = lora_send(lora->dev, data8, length);
+    if (ret < 0) {
+        *cnt = 0;
+        return ret;
+    }
+
+    *cnt = length;
+    lora->handler(LORA_TRANSPORT_EVT_TX_RDY, lora->context);
+
+    return 0;
+}
+
+static int async_write(struct lora_async_driven *lora, const void *data,
+                       size_t length, size_t *cnt) {
+    *cnt = ring_buf_put(&lora->tx_ringbuf, data, length);
+
+    if (atomic_set(&lora->tx_busy, 1) == 0) {
+        // todo
+    }
+
+    return 0;
+}
+
+static int lora_write(const struct ares_lora_transport *transport,
+                      const void *data, size_t length, size_t *cnt) {
+    struct lora_common *lora = transport->ctx;
+
+    if (lora->block_tx) {
+        return polling_write(lora, data, length, cnt);
+    }
+
+    return async_write(transport->ctx, data, length, cnt);
+}
+
 const struct ares_lora_transport_api ares_lora_transport_api = {
     .init = init,
     .uninit = uninit,
     .enable = enable,
+    .write = lora_write,
 };
 
 #define CONFIG_ARES_LORA_STACK_SIZE 4096 // todo
