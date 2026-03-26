@@ -161,51 +161,33 @@ int serialize_ares_packet(uint8_t *buf, size_t len,
     return (int)packet_len;
 }
 
-static size_t deserialize(struct ares_packet *packet, const uint8_t *buf,
-                          size_t len) {
+static void deserialize(struct ares_packet *packet, const uint8_t *buf) {
     size_t payload_len;
+    const uint8_t *payload;
 
     (void)memcpy(&payload_len, &buf[ARES_PACKET_LEN_OFFSET],
                  ARES_PACKET_LEN_OVERHEAD);
+    packet->type = buf[ARES_PACKET_TYPE_OFFSET];
     packet->sequence_cnt = buf[ARES_PACKET_SEQ_CNT_OFFSET];
     (void)memcpy(&packet->pan_id, &buf[ARES_PACKET_PAN_ID_OFFSET],
                  ARES_PACKET_PAN_ID_OVERHEAD);
     (void)memcpy(&packet->source_id, &buf[ARES_PACKET_SRC_ID_OFFSET],
                  ARES_PACKET_SRC_ID_OVERHEAD);
 
-    return payload_len;
-}
+    if (packet->type == ARES_PKT_TYPE_DIRECT) {
+        (void)memcpy(&packet->destination_id, &buf[ARES_PACKET_DST_ID_OFFSET],
+                     ARES_PACKET_DST_ID_OVERHEAD);
+    }
 
-static void deserialize_payload(struct ares_packet *packet,
-                                const uint8_t *payload, size_t payload_len) {
+    payload = &buf[ARES_PACKET_PAYLOAD_OFFSET(packet->type)];
+    packet->payload.type = buf[ARES_PACKET_PAYLOAD_TYPE_OFFSET(packet->type)];
+
     switch (packet->payload.type) {
     case ARES_PKT_PAYLOAD_START: {
         (void)memcpy(&packet->payload.payload.timespec, payload, payload_len);
         break;
     }
     }
-}
-
-static void deserialize_broadcast(struct ares_packet *packet,
-                                  const uint8_t *buf, size_t len) {
-    size_t payload_len = deserialize(packet, buf, len);
-    const uint8_t *payload = &buf[ARES_PACKET_PAYLOAD_OFFSET(1)];
-
-    packet->payload.type = buf[ARES_PACKET_PAYLOAD_TYPE_OFFSET(1)];
-
-    deserialize_payload(packet, payload, payload_len);
-}
-
-static void deserialize_direct(struct ares_packet *packet, const uint8_t *buf,
-                               size_t len) {
-    size_t payload_len = deserialize(packet, buf, len);
-    const uint8_t *payload = &buf[ARES_PACKET_PAYLOAD_OFFSET(0)];
-
-    (void)memcpy(&packet->destination_id, &buf[ARES_PACKET_DST_ID_OFFSET],
-                 ARES_PACKET_DST_ID_OVERHEAD);
-    packet->payload.type = buf[ARES_PACKET_PAYLOAD_TYPE_OFFSET(0)];
-
-    deserialize_payload(packet, payload, payload_len);
 }
 
 int deserialize_ares_packet(struct ares_packet *packet, const uint8_t *buf,
@@ -219,20 +201,7 @@ int deserialize_ares_packet(struct ares_packet *packet, const uint8_t *buf,
         return -EINVAL;
     }
 
-    packet->type = buf[ARES_PACKET_TYPE_OFFSET];
-    switch (packet->type) {
-    case ARES_PKT_TYPE_BROADCAST: {
-        deserialize_broadcast(packet, buf, len);
-        break;
-    }
-    case ARES_PKT_TYPE_DIRECT: {
-        deserialize_direct(packet, buf, len);
-        break;
-    }
-    default: {
-        return -EBADMSG;
-    }
-    }
+    deserialize(packet, buf);
 
     return 0;
 }
