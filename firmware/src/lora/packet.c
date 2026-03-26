@@ -191,6 +191,9 @@ static void deserialize(struct ares_packet *packet, const uint8_t *buf) {
         (void)memcpy(&packet->payload.payload.timespec, payload, payload_len);
         break;
     }
+    default: {
+        __ASSERT_NO_MSG(false);
+    }
     }
 }
 
@@ -259,4 +262,62 @@ bool ares_packet_valid(const uint8_t *buf, size_t len) {
     }
 
     return true;
+}
+
+int ares_packet_present(const uint8_t *buf, size_t len,
+                        struct ares_packet_info *info) {
+    int *start, *length, *remaining;
+    size_t seq_cnt_index, payload_len, footer_index;
+    enum ares_packet_type type;
+
+    if (buf == NULL || info == NULL) {
+        return -EINVAL;
+    }
+
+    start = &info->start;
+    length = &info->size;
+    remaining = &info->bytes_left;
+
+    for (size_t i = 0; i < len; i++) {
+        if (buf[i] != ARES_PACKET_HEADER_0 || (i + 1) >= len ||
+            buf[i + 1] != ARES_PACKET_HEADER_1) {
+            continue;
+        }
+
+        *start = (int)i;
+
+        seq_cnt_index = *start + ARES_PACKET_SEQ_CNT_OFFSET;
+        if (seq_cnt_index > len) {
+            // cannot extract packet length
+            continue;
+        }
+
+        (void)memcpy(&payload_len, &buf[ARES_PACKET_LEN_OFFSET],
+                     ARES_PACKET_LEN_OVERHEAD);
+        type = buf[ARES_PACKET_TYPE_OFFSET];
+
+        footer_index = *start + ARES_PACKET_FOOTER_OFFSET(type, payload_len);
+        if (footer_index >= len) {
+            *remaining = (int)footer_index - ((int)len - *start) + 1;
+            continue;
+        }
+
+        if ((footer_index + 1) >= len) {
+            *remaining = 1;
+            continue;
+        }
+
+        if (memcmp(&buf[footer_index], &footer, ARES_PACKET_FOOTER_OVERHEAD) !=
+            0) {
+            // Not a packet
+            continue;
+        }
+
+        *length = (int)payload_len + ARES_PACKET_OVERHEAD(type);
+        *remaining = 0;
+
+        return 1;
+    }
+
+    return 0;
 }

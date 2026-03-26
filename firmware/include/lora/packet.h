@@ -80,8 +80,8 @@ int serialize_ares_packet(uint8_t *buf, size_t len,
                           const struct ares_packet *packet);
 int deserialize_ares_packet(struct ares_packet *packet, const uint8_t *buf,
                             size_t len);
+bool ares_packet_valid(const uint8_t *buf, size_t len);
 int ares_packet_present(const uint8_t *buf, size_t len,
                         struct ares_packet_info *info);
-bool ares_packet_valid(const uint8_t *buf, size_t len);
 
 #endif // ARES_PACKET_H
