@@ -9,6 +9,10 @@
  */
 
 #include <lora/packet.h>
+#include <zephyr/kernel.h>
+#include <zephyr/sys/crc.h>
+
+typedef uint16_t crc16_t;
 
 #define ARES_PACKET_HEADER_OFFSET 0
 #define ARES_PACKET_LEN_OFFSET                                                 \
@@ -37,6 +41,25 @@
 
 #define ARES_PACKET_MIN_OVERHEAD                                               \
     MIN(ARES_PACKET_BROADCAST_OVERHEAD, ARES_PACKET_DIRECT_OVERHEAD)
+#define ARES_PACKET_MAX_OVERHEAD                                               \
+    MAX(ARES_PACKET_BROADCAST_OVERHEAD, ARES_PACKET_DIRECT_OVERHEAD)
+
+#define REVERSE_2(x)  ((((x)&1) << 1) | (((x) >> 1) & 1))
+#define REVERSE_4(x)  ((REVERSE_2(x) << 2) | (REVERSE_2(x) >> 2))
+#define REVERSE_8(x)  ((REVERSE_4(x) << 4) | (REVERSE_4(x) >> 4))
+#define REVERSE_16(x) ((REVERSE_8(x) << 8) | (REVERSE_8(x) >> 8))
+
+static const uint16_t header = (uint16_t)ARES_PACKET_HEADER_0 |
+                               ((uint16_t)ARES_PACKET_HEADER_1 << CHAR_BIT);
+static const uint16_t footer = (uint16_t)ARES_PACKET_FOOTER_0 |
+                               ((uint16_t)ARES_PACKET_FOOTER_1 << CHAR_BIT);
+
+BUILD_ASSERT(
+    sizeof(header) == ARES_PACKET_HEADER_OVERHEAD,
+    "Mismatch between specified header overhead and the actual header type");
+BUILD_ASSERT(
+    sizeof(footer) == ARES_PACKET_FOOTER_OVERHEAD,
+    "Mismatch between specified footer overhead and the actual footer type");
 
 static size_t calculate_packet_size(const struct ares_packet *packet) {
     __ASSERT_NO_MSG(packet != NULL);
@@ -57,11 +80,92 @@ static size_t calculate_packet_size(const struct ares_packet *packet) {
     return overhead;
 }
 
+static void serialize_header(uint8_t *buf, size_t len,
+                             const struct ares_packet *packet,
+                             size_t payload_len) {
+    uint16_t su_payload_len = (uint16_t)payload_len;
+
+    __ASSERT_NO_MSG(payload_len < (size_t)UINT16_MAX);
+    memset(buf, 0, len);
+
+    (void)memcpy(&buf[ARES_PACKET_HEADER_OFFSET], &header,
+                 ARES_PACKET_HEADER_OVERHEAD);
+    (void)memcpy(&buf[ARES_PACKET_LEN_OFFSET], &su_payload_len,
+                 ARES_PACKET_LEN_OVERHEAD);
+    buf[ARES_PACKET_TYPE_OFFSET] = packet->type;
+    buf[ARES_PACKET_SEQ_CNT_OFFSET] = packet->sequence_cnt;
+    (void)memcpy(&buf[ARES_PACKET_PAN_ID_OFFSET], &packet->pan_id,
+                 ARES_PACKET_PAN_ID_OVERHEAD);
+    (void)memcpy(&buf[ARES_PACKET_SRC_ID_OFFSET], &packet->source_id,
+                 ARES_PACKET_SRC_ID_OVERHEAD);
+}
+
+static void serialize_payload(uint8_t *payload, size_t payload_len,
+                              const struct ares_packet *packet) {
+    switch (packet->payload.type) {
+    case ARES_PKT_PAYLOAD_START: {
+        (void)memcpy(payload, &packet->payload.payload.timespec, payload_len);
+        break;
+    }
+    default: {
+        __ASSERT_NO_MSG(false);
+    }
+    }
+}
+
+static crc16_t compute_crc(const uint8_t *buf, size_t len) {
+    crc16_t crc;
+    crc = crc16(CONFIG_LORA_CRC_POLYNOMIAL, CONFIG_LORA_CRC_SEED, buf, len);
+
+#if !IS_ENABLED(CONFIG_LORA_REFLECT_CRC_OUTPUT)
+    crc = REVERSE_16(crc);
+#endif // !IS_ENABLED(CONFIG_LORA_REFLECT_CRC_OUTPUT)
+
+    return crc ^ CONFIG_LORA_CRC_XOR_OUTPUT;
+}
+
+static void serialize_footer(uint8_t *buf, size_t crc_offset,
+                             size_t footer_offset) {
+    // crc offset is also the number of bytes written to the buffer...
+    crc16_t crc = compute_crc(buf, crc_offset);
+
+    (void)memcpy(&buf[crc_offset], &crc, ARES_PACKET_CRC_OVERHEAD);
+    (void)memcpy(&buf[footer_offset], &footer, ARES_PACKET_FOOTER_OVERHEAD);
+}
+
 static void serialize_broadcast(uint8_t *buf, size_t len,
-                                const struct ares_packet *packet) {}
+                                const struct ares_packet *packet,
+                                size_t packet_length) {
+    __ASSERT_NO_MSG(buf != NULL);
+    __ASSERT_NO_MSG(packet != NULL);
+    size_t payload_len = packet_length - ARES_PACKET_BROADCAST_OVERHEAD;
+    uint8_t *payload = &buf[ARES_PACKET_PAYLOAD_OFFSET(1)];
+
+    serialize_header(buf, len, packet, payload_len);
+    buf[ARES_PACKET_PAYLOAD_TYPE_OFFSET(1)] = packet->payload.type;
+
+    serialize_payload(payload, payload_len, packet);
+    serialize_footer(buf, ARES_PACKET_CRC_OFFSET(1, payload_len),
+                     ARES_PACKET_FOOTER_OFFSET(1, payload_len));
+}
 
 static void serialize_direct(uint8_t *buf, size_t len,
-                             const struct ares_packet *packet) {}
+                             const struct ares_packet *packet,
+                             size_t packet_length) {
+    __ASSERT_NO_MSG(buf != NULL);
+    __ASSERT_NO_MSG(packet != NULL);
+    size_t payload_len = packet_length - ARES_PACKET_DIRECT_OVERHEAD;
+    uint8_t *payload = &buf[ARES_PACKET_PAYLOAD_OFFSET(0)];
+
+    serialize_header(buf, len, packet, payload_len);
+    (void)memcpy(&buf[ARES_PACKET_DST_ID_OFFSET], &packet->destination_id,
+                 ARES_PACKET_DST_ID_OVERHEAD);
+    buf[ARES_PACKET_PAYLOAD_TYPE_OFFSET(0)] = packet->payload.type;
+
+    serialize_payload(payload, payload_len, packet);
+    serialize_footer(buf, ARES_PACKET_CRC_OFFSET(0, payload_len),
+                     ARES_PACKET_FOOTER_OFFSET(0, payload_len));
+}
 
 int serialize_ares_packet(uint8_t *buf, size_t len,
                           const struct ares_packet *packet) {
@@ -82,11 +186,11 @@ int serialize_ares_packet(uint8_t *buf, size_t len,
 
     switch (packet->type) {
     case ARES_PKT_TYPE_BROADCAST: {
-        serialize_broadcast(buf, len, packet);
+        serialize_broadcast(buf, len, packet, packet_len);
         break;
     }
     case ARES_PKT_TYPE_DIRECT: {
-        serialize_direct(buf, len, packet);
+        serialize_direct(buf, len, packet, packet_len);
         break;
     }
     default: {
