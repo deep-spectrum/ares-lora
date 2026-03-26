@@ -40,6 +40,8 @@
 
 enum ares_packet_payload_type {
     ARES_PKT_PAYLOAD_START = 0,
+
+    ARES_PKT_PAYLOAD_INVALID,
 };
 
 struct ares_packet_payload {
@@ -55,6 +57,8 @@ struct ares_packet_payload {
 enum ares_packet_type {
     ARES_PKT_TYPE_BROADCAST = 0,
     ARES_PKT_TYPE_DIRECT = 1,
+
+    ARES_PKT_TYPE_INVALID,
 };
 
 struct ares_packet {

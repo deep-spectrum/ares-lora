@@ -43,6 +43,10 @@ typedef uint16_t crc16_t;
     MIN(ARES_PACKET_BROADCAST_OVERHEAD, ARES_PACKET_DIRECT_OVERHEAD)
 #define ARES_PACKET_MAX_OVERHEAD                                               \
     MAX(ARES_PACKET_BROADCAST_OVERHEAD, ARES_PACKET_DIRECT_OVERHEAD)
+#define ARES_PACKET_OVERHEAD(packet_type)                                      \
+    ((packet_type == ARES_PKT_TYPE_BROADCAST)                                  \
+         ? (ARES_PACKET_BROADCAST_OVERHEAD)                                    \
+         : (ARES_PACKET_DIRECT_OVERHEAD))
 
 #define REVERSE_2(x)  ((((x)&1) << 1) | (((x) >> 1) & 1))
 #define REVERSE_4(x)  ((REVERSE_2(x) << 2) | (REVERSE_2(x) >> 2))
@@ -204,4 +208,55 @@ int deserialize_ares_packet(struct ares_packet *packet, const uint8_t *buf,
     deserialize(packet, buf);
 
     return 0;
+}
+
+bool ares_packet_valid(const uint8_t *buf, size_t len) {
+    enum ares_packet_type type;
+    enum ares_packet_payload_type ptype;
+    size_t payload_len;
+    crc16_t crc;
+
+    if (buf == NULL || len < ARES_PACKET_MIN_OVERHEAD) {
+        return false;
+    }
+
+    if (memcmp(&buf[ARES_PACKET_HEADER_OFFSET], &header,
+               ARES_PACKET_HEADER_OVERHEAD) != 0) {
+        // invalid header
+        return false;
+    }
+
+    type = buf[ARES_PACKET_TYPE_OFFSET];
+    if (type >= ARES_PKT_TYPE_INVALID) {
+        // invalid type
+        return false;
+    }
+
+    ptype = buf[ARES_PACKET_PAYLOAD_TYPE_OFFSET(type)];
+    if (ptype >= ARES_PKT_PAYLOAD_INVALID) {
+        // invalid packet type
+        return false;
+    }
+
+    (void)memcpy(&payload_len, &buf[ARES_PACKET_LEN_OFFSET],
+                 ARES_PACKET_LEN_OVERHEAD);
+    if ((payload_len + ARES_PACKET_OVERHEAD(type)) > len) {
+        // invalid length (avoid accessing memory we are not supposed to access)
+        return false;
+    }
+
+    if (memcmp(&buf[ARES_PACKET_FOOTER_OFFSET(type, payload_len)], &footer,
+               ARES_PACKET_FOOTER_OVERHEAD) != 0) {
+        // invalid footer
+        return false;
+    }
+
+    crc = compute_crc(buf, ARES_PACKET_CRC_OFFSET(type, payload_len));
+    if (memcmp(&crc, &buf[ARES_PACKET_CRC_OFFSET(type, payload_len)],
+               ARES_PACKET_CRC_OVERHEAD) != 0) {
+        // invalid crc
+        return false;
+    }
+
+    return true;
 }
