@@ -163,8 +163,6 @@ const struct ares_lora_transport_api ares_lora_transport_api = {
     .configure = configure_modem_api,
 };
 
-#define CONFIG_ARES_LORA_STACK_SIZE 4096 // todo
-
 LORA_DEFINE(ares_lora_transport_);
 ARES_LORA_DEFINE(ares_lora, &ares_lora_transport_);
 

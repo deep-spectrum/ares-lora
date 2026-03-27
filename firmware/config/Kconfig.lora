@@ -1,0 +1,11 @@
+menu "LoRa Configurations"
+
+config ARES_LORA_STACK_SIZE
+    int "LoRa task stack size"
+    default 4096
+
+config ARES_LORA_PRIO
+    int "LoEa task priority"
+    default 1
+
+endmenu

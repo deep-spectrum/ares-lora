@@ -11,6 +11,7 @@
 #ifndef ARES_LORA_H
 #define ARES_LORA_H
 
+#include <lora/packet.h>
 #include <zephyr/drivers/lora.h>
 #include <zephyr/kernel.h>
 
@@ -59,8 +60,9 @@ struct ares_lora_buf {
 };
 
 struct ares_lora_command {
-    // todo: packet type
-    // todo: handler
+    enum ares_packet_payload_type type;
+    void (*handler)(const struct ares_lora *lora,
+                    const struct ares_packet *packet);
 };
 
 struct ares_lora_ctx {
@@ -98,5 +100,12 @@ struct ares_lora {
                                            .stack = UTIL_CAT(_name, _stack)}
 
 int ares_lora_init(const struct ares_lora *lora, const void *transport_config);
+int ares_lora_register_command_callbacks(
+    const struct ares_lora *lora, const struct ares_lora_command *commands,
+    size_t num_commands);
+int ares_lora_write_packet(const struct ares_lora *lora,
+                           const struct ares_packet *packet);
+int ares_lora_configure_lora(const struct ares_lora *lora,
+                             const struct lora_modem_config *config);
 
 #endif // ARES_LORA_H
