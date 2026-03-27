@@ -220,3 +220,52 @@ static void ares_lora_process(const struct ares_lora *lora) {
         }
     }
 }
+
+static int ares_lora_write(const struct ares_lora *lora, const void *data,
+                           size_t nbytes) {
+    __ASSERT_NO_MSG(lora);
+    __ASSERT_NO_MSG(lora->ctx);
+    __ASSERT_NO_MSG(data);
+    __ASSERT_NO_MSG(nbytes);
+
+    size_t offset = 0u, temp_cnt, length = nbytes;
+
+    (void)k_mutex_lock(&lora->ctx->wr_mtx, K_FOREVER);
+    while (length != 0) {
+        int err = LORA_API_CALL(lora, write, &((const uint8_t *)data)[offset],
+                                length, &temp_cnt);
+        ARG_UNUSED(err);
+
+        __ASSERT_NO_MSG(err == 0);
+        __ASSERT_NO_MSG(nbytes >= length);
+
+        offset += temp_cnt;
+        length -= temp_cnt;
+    }
+    (void)k_mutex_unlock(&lora->ctx->wr_mtx);
+
+    return (int)nbytes;
+}
+
+static int ares_lora_write_txbuf(const struct ares_lora *lora) {
+    return ares_lora_write(lora, lora->ctx->tx_buf.buf, lora->ctx->tx_buf.len);
+}
+
+int ares_lora_write_packet(const struct ares_lora *lora,
+                           const struct ares_packet *packet) {
+    int ret;
+    if (lora == NULL || packet == NULL) {
+        return -EINVAL;
+    }
+
+    ret = serialize_ares_packet(lora->ctx->tx_buf.buf,
+                                sizeof(lora->ctx->tx_buf.buf), packet);
+
+    if (ret < 0) {
+        return ret;
+    }
+    lora->ctx->tx_buf.len = ret;
+
+    (void)ares_lora_write_txbuf(lora);
+    return 0;
+}
