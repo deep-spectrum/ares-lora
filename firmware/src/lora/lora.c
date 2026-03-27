@@ -269,3 +269,18 @@ int ares_lora_write_packet(const struct ares_lora *lora,
     (void)ares_lora_write_txbuf(lora);
     return 0;
 }
+
+int ares_lora_configure_lora(const struct ares_lora *lora,
+                             const struct lora_modem_config *config) {
+    int ret;
+
+    if (lora == NULL || config == NULL) {
+        return -EINVAL;
+    }
+
+    (void)k_mutex_lock(&lora->ctx->wr_mtx, K_FOREVER);
+    ret = LORA_API_CALL(lora, configure, config);
+    (void)k_mutex_unlock(&lora->ctx->wr_mtx);
+
+    return ret;
+}
