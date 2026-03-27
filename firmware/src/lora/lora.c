@@ -116,3 +116,107 @@ int ares_lora_init(const struct ares_lora *lora, const void *transport_config) {
 
     return 0;
 }
+
+int ares_lora_register_command_callbacks(
+    const struct ares_lora *lora, const struct ares_lora_command *commands,
+    size_t num_commands) {
+    if (lora == NULL || lora->ctx == NULL ||
+        (commands == NULL && num_commands != 0)) {
+        return -EINVAL;
+    }
+
+    lora->ctx->commands = commands;
+    lora->ctx->num_commands = num_commands;
+
+    return 0;
+}
+
+static void dispatch(const struct ares_lora *lora, int start_index,
+                     size_t length) {
+    struct ares_packet packet;
+    int ret;
+
+    ret = deserialize_ares_packet(&packet, &lora->ctx->tx_buf.buf[start_index],
+                                  length);
+
+    if (ret < 0) {
+        LOG_ERR("Unable to deserialize frame");
+        return;
+    }
+
+    for (size_t i = 0; i < lora->ctx->num_commands; i++) {
+        if (lora->ctx->commands[i].type != packet.payload.type) {
+            continue;
+        }
+
+        if (lora->ctx->commands[i].handler != NULL) {
+            lora->ctx->commands[i].handler(lora, &packet);
+        } else {
+            LOG_WRN("LoRa command not implemented: %d",
+                    lora->ctx->commands[i].type);
+        }
+
+        return;
+    }
+
+    LOG_ERR("LoRa command not found: %d", packet.payload.type);
+}
+
+static void drop_data(const struct ares_lora *lora, struct ares_lora_buf *buf) {
+    size_t count;
+
+    buf->len = 0;
+
+    do {
+        (void)LORA_API_CALL(lora, read, &buf->buf, sizeof(buf->buf), &count);
+    } while (count != 0);
+}
+
+static void ares_lora_process(const struct ares_lora *lora) {
+    __ASSERT_NO_MSG(lora);
+    __ASSERT_NO_MSG(lora->ctx);
+
+    size_t count = 0;
+    char data;
+    struct ares_lora_buf *buf = &lora->ctx->rx_buf;
+    struct ares_packet_info info = {-1, -1, -1};
+
+    while (true) {
+        if (buf->len >= sizeof(buf->buf)) {
+            LOG_ERR("Dropping data");
+            drop_data(lora, buf);
+            return;
+        }
+
+        (void)LORA_API_CALL(lora, read, &data, 1, &count);
+        if (count == 0) {
+            return;
+        }
+        LOG_DBG("Read byte: %d | 0x%X | '%c'", (int)data, (uint16_t)data, data);
+
+        buf->buf[buf->len] = data;
+        buf->len++;
+
+        if (data == ARES_PACKET_FOOTER_1 &&
+            buf->len >= ARES_PACKET_BROADCAST_OVERHEAD) {
+            int result = ares_packet_present(buf->buf, buf->len, &info);
+            __ASSERT_NO_MSG(result != -EINVAL);
+
+            if (result == 0) {
+                LOG_DBG(
+                    "Frame info states: {start: %d, length: %d, remaining: %d}",
+                    info.start, info.size, info.bytes_left);
+                continue;
+            }
+
+            LOG_DBG("Packet found, Packet Length: %d", info.size);
+            dispatch(lora, info.start, info.size);
+
+            (void)memset(buf->buf, 0, buf->len);
+            buf->len = 0;
+            info.start = -1;
+            info.size = -1;
+            info.bytes_left = -1;
+        }
+    }
+}
