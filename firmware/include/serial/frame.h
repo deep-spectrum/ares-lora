@@ -35,7 +35,7 @@ enum ares_frame_error {
 };
 
 enum ares_frame_type {
-    ARES_FRAME_WHOAMI,        ///< Who am I frame. No receive payload.
+    ARES_FRAME_ID,            ///< ID frame.
     ARES_FRAME_START,         ///< Start time frame.
     ARES_FRAME_FRAMING_ERROR, ///< Framing error frame. TX only.
 
@@ -45,14 +45,19 @@ enum ares_frame_type {
 struct ares_frame {
     enum ares_frame_type type;
     union {
-        const char
-            *id; ///< ARES_FRAME_WHOAMI (TX only), NULL terminated string.
+        struct {
+            uint16_t id;
+            bool set;
+        } ID; ///< ARES_FRAME_ID
+
         struct {
             int64_t sec;
             uint64_t ns;
-        } timespec; /// < ARES_FRAME_START (RX/TX)
-        enum ares_frame_error
-            frame_error; ///< ARES_FRAME_FRAMING_ERROR (TX only)
+            uint16_t destination;
+            bool broadcast;
+        } START; /// < ARES_FRAME_START
+
+        enum ares_frame_error FRAMING_ERROR; ///< ARES_FRAME_FRAMING_ERROR
     } payload;
 };
 

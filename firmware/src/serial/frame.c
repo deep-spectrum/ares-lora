@@ -43,12 +43,16 @@ static size_t calculate_frame_length(const struct ares_frame *frame) {
     __ASSERT_NO_MSG(frame != NULL);
 
     switch (frame->type) {
-    case ARES_FRAME_WHOAMI: {
-        payload_len = ares_strlen(frame->payload.id, 0);
+    case ARES_FRAME_ID: {
+        payload_len = SIZEOF_FIELD(struct ares_frame, payload.ID.id);
         break;
     }
     case ARES_FRAME_START: {
-        payload_len = sizeof(frame->payload.timespec);
+        payload_len =
+            SIZEOF_FIELD(struct ares_frame, payload.START.sec) +
+            SIZEOF_FIELD(struct ares_frame, payload.START.ns) +
+            SIZEOF_FIELD(struct ares_frame, payload.START.destination) +
+            SIZEOF_FIELD(struct ares_frame, payload.START.broadcast);
         break;
     default:
         __ASSERT(false, "Invalid frame type received");
@@ -68,16 +72,32 @@ static void serialize(uint8_t *buf, const struct ares_frame *frame,
                  ARES_FRAME_LEN_OVERHEAD);
 
     switch (frame->type) {
-    case ARES_FRAME_WHOAMI: {
-        (void)memcpy(payload, frame->payload.id, payload_len);
+    case ARES_FRAME_ID: {
+        (void)memcpy(payload, &frame->payload.ID.id, payload_len);
         break;
     }
     case ARES_FRAME_START: {
-        (void)memcpy(payload, &frame->payload.timespec, payload_len);
+        (void)memcpy(payload, &frame->payload.START.sec,
+                     SIZEOF_FIELD(struct ares_frame, payload.START.sec));
+        (void)memcpy(payload +
+                         SIZEOF_FIELD(struct ares_frame, payload.START.sec),
+                     &frame->payload.START.ns,
+                     SIZEOF_FIELD(struct ares_frame, payload.START.ns));
+        (void)memcpy(
+            payload + SIZEOF_FIELD(struct ares_frame, payload.START.sec) +
+                SIZEOF_FIELD(struct ares_frame, payload.START.ns),
+            &frame->payload.START.destination,
+            SIZEOF_FIELD(struct ares_frame, payload.START.destination));
+        (void)memcpy(
+            payload + SIZEOF_FIELD(struct ares_frame, payload.START.sec) +
+                SIZEOF_FIELD(struct ares_frame, payload.START.ns) +
+                SIZEOF_FIELD(struct ares_frame, payload.START.destination),
+            &frame->payload.START.broadcast,
+            SIZEOF_FIELD(struct ares_frame, payload.START.broadcast));
         break;
     }
     case ARES_FRAME_FRAMING_ERROR: {
-        uint32_t error_code = frame->payload.frame_error;
+        uint32_t error_code = frame->payload.FRAMING_ERROR;
         (void)memcpy(payload, &error_code, sizeof(error_code));
         break;
     }
@@ -116,18 +136,39 @@ static uint16_t retrieve_payload_length(const uint8_t *buf) {
 
 static void deserialize(struct ares_frame *frame, const uint8_t *buf) {
     __ASSERT_NO_MSG(buf != NULL);
+    const uint8_t *payload = &buf[ARES_FRAME_PAYLOAD_OFFSET];
     uint64_t payload_len = retrieve_payload_length(buf);
 
     frame->type = (enum ares_frame_type)buf[ARES_FRAME_TYPE_OFFSET];
 
     switch (frame->type) {
-    case ARES_FRAME_START: {
-        (void)memcpy(&frame->payload.timespec, &buf[ARES_FRAME_PAYLOAD_OFFSET],
-                     payload_len);
+    case ARES_FRAME_ID: {
+        if (payload_len == 0) {
+            frame->payload.ID.set = false;
+        } else {
+            frame->payload.ID.set = true;
+            (void)memcpy(&frame->payload.ID.id, payload, payload_len);
+        }
         break;
     }
-    case ARES_FRAME_WHOAMI: {
-        // nop
+    case ARES_FRAME_START: {
+        (void)memcpy(&frame->payload.START.sec, payload,
+                     SIZEOF_FIELD(struct ares_frame, payload.START.sec));
+        (void)memcpy(&frame->payload.START.ns,
+                     payload +
+                         SIZEOF_FIELD(struct ares_frame, payload.START.sec),
+                     SIZEOF_FIELD(struct ares_frame, payload.START.ns));
+        (void)memcpy(
+            &frame->payload.START.destination,
+            payload + SIZEOF_FIELD(struct ares_frame, payload.START.sec) +
+                SIZEOF_FIELD(struct ares_frame, payload.START.ns),
+            SIZEOF_FIELD(struct ares_frame, payload.START.destination));
+        (void)memcpy(
+            &frame->payload.START.broadcast,
+            payload + SIZEOF_FIELD(struct ares_frame, payload.START.sec) +
+                SIZEOF_FIELD(struct ares_frame, payload.START.ns) +
+                SIZEOF_FIELD(struct ares_frame, payload.START.destination),
+            SIZEOF_FIELD(struct ares_frame, payload.START.broadcast));
         break;
     }
     default: {
