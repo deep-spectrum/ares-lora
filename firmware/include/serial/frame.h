@@ -37,6 +37,7 @@ enum ares_frame_error {
 enum ares_frame_type {
     ARES_FRAME_ID,            ///< ID frame.
     ARES_FRAME_START,         ///< Start time frame.
+    ARES_FRAME_ACK,           ///< ACK frame.
     ARES_FRAME_FRAMING_ERROR, ///< Framing error frame. TX only.
 
     ARES_FRAME_TYPE_INVALID,
@@ -56,6 +57,8 @@ struct ares_frame {
             uint16_t destination;
             bool broadcast;
         } START; /// < ARES_FRAME_START
+
+        int ACK; /// ARES_FRAME_ACK
 
         enum ares_frame_error FRAMING_ERROR; ///< ARES_FRAME_FRAMING_ERROR
     } payload;

@@ -54,8 +54,14 @@ static size_t calculate_frame_length(const struct ares_frame *frame) {
             SIZEOF_FIELD(struct ares_frame, payload.START.destination) +
             SIZEOF_FIELD(struct ares_frame, payload.START.broadcast);
         break;
-    default:
+    }
+    case ARES_FRAME_ACK: {
+        payload_len = SIZEOF_FIELD(struct ares_frame, payload.ACK);
+        break;
+    }
+    default: {
         __ASSERT(false, "Invalid frame type received");
+        break;
     }
     }
 
@@ -94,6 +100,11 @@ static void serialize(uint8_t *buf, const struct ares_frame *frame,
                 SIZEOF_FIELD(struct ares_frame, payload.START.destination),
             &frame->payload.START.broadcast,
             SIZEOF_FIELD(struct ares_frame, payload.START.broadcast));
+        break;
+    }
+    case ARES_FRAME_ACK: {
+        (void)memcpy(payload, &frame->payload.ACK,
+                     SIZEOF_FIELD(struct ares_frame, payload.ACK));
         break;
     }
     case ARES_FRAME_FRAMING_ERROR: {
