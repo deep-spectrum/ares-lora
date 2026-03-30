@@ -8,6 +8,7 @@ include_directories(include)
 set(SRC
         src/main.c
         src/settings.c
+        src/serial_commands.c
 )
 
 set(SERIAL_SRC

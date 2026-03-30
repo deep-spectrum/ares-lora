@@ -9,6 +9,7 @@
  */
 
 #include <settings.h>
+#include <stdio.h>
 #include <zephyr/init.h>
 #include <zephyr/kernel.h>
 #include <zephyr/settings/settings.h>
