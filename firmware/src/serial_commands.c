@@ -17,13 +17,22 @@
 #include <zephyr/init.h>
 #include <zephyr/kernel.h>
 
+static void send_ack_frame(const struct ares_serial *serial,
+                           struct ares_frame *frame, int code) {
+    frame->type = ARES_FRAME_ACK;
+    frame->payload.ACK = -code;
+    ares_serial_write_frame(serial, frame);
+}
+
 static void handle_id(const struct ares_serial *serial,
                       struct ares_frame *frame) {
     int32_t setting;
-    if (!frame->payload.ID.set) {
+    int ret;
 
-        if (retrieve_setting(ARES_SETTING_ID, &setting) < 0) {
-            // todo
+    if (!frame->payload.ID.set) {
+        ret = retrieve_setting(ARES_SETTING_ID, &setting);
+        if (ret < 0) {
+            send_ack_frame(serial, frame, ret);
             return;
         }
 
@@ -34,15 +43,19 @@ static void handle_id(const struct ares_serial *serial,
 
     setting = frame->payload.ID.id;
 
-    if (update_setting(ARES_SETTING_ID, setting) < 0) {
-        // todo
+    ret = update_setting(ARES_SETTING_ID, setting);
+    if (ret < 0) {
+        send_ack_frame(serial, frame, ret);
     }
+
+    send_ack_frame(serial, frame, 0);
 }
 
 static void handle_start(const struct ares_serial *serial,
                          struct ares_frame *frame) {
     int32_t id, pan, rep_cnt;
     const struct ares_lora *lora = ares_lora_backend_lora_get_ptr();
+    int ret;
 
     struct ares_packet packet = {
         .payload = {.type = ARES_PKT_PAYLOAD_START,
@@ -56,18 +69,21 @@ static void handle_start(const struct ares_serial *serial,
                                                  : ARES_PKT_TYPE_DIRECT,
     };
 
+    ret = retrieve_setting(ARES_SETTING_ID, &id);
     if (retrieve_setting(ARES_SETTING_ID, &id) < 0) {
-        // todo
+        send_ack_frame(serial, frame, ret);
         return;
     }
 
-    if (retrieve_setting(ARES_SETTING_PANID, &pan) < 0) {
-        // todo
+    ret = retrieve_setting(ARES_SETTING_PANID, &pan);
+    if (ret < 0) {
+        send_ack_frame(serial, frame, ret);
         return;
     }
 
-    if (retrieve_setting(ARES_SETTING_REPCNT, &rep_cnt) < 0) {
-        // todo
+    ret = retrieve_setting(ARES_SETTING_REPCNT, &rep_cnt);
+    if (ret < 0) {
+        send_ack_frame(serial, frame, ret);
         return;
     }
 
@@ -79,7 +95,7 @@ static void handle_start(const struct ares_serial *serial,
         ares_lora_write_packet(lora, &packet);
     }
 
-    // todo: ACK
+    send_ack_frame(serial, frame, 0);
 }
 
 static struct ares_serial_command commands[] = {
