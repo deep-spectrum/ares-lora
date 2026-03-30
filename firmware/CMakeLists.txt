@@ -9,6 +9,7 @@ set(SRC
         src/main.c
         src/settings.c
         src/serial_commands.c
+        src/lora_handlers.c
 )
 
 set(SERIAL_SRC
