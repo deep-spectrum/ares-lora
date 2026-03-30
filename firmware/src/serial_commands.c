@@ -90,7 +90,7 @@ static void handle_start(const struct ares_serial *serial,
     packet.pan_id = (uint16_t)pan;
     packet.source_id = (uint16_t)id;
 
-    for (size_t i = 0; i < (size_t)rep_cnt; i++) {
+    for (size_t i = 0; i < rep_cnt; i++) {
         packet.sequence_cnt = (uint8_t)i;
         ares_lora_write_packet(lora, &packet);
     }

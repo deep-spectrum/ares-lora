@@ -14,10 +14,10 @@
 #include <zephyr/kernel.h>
 
 #define FOREACH_ARES_SETTING(FUNC)                                             \
-    FUNC(ID, 0)                                                                \
-    FUNC(WAIT_USB_HOST, 0)                                                     \
-    FUNC(PANID, 0)                                                             \
-    FUNC(REPCNT, 10)
+    FUNC(ID, 0, 1, 0xFFFF)                                                     \
+    FUNC(WAIT_USB_HOST, 0, 0, 1)                                               \
+    FUNC(PANID, 0, 0, 0xFFFF)                                                  \
+    FUNC(REPCNT, 10, 1, 0xFFFFFFFF)
 
 #define GENERATE_ENUM(setting_, ...) UTIL_CAT(ARES_SETTING_, setting_),
 

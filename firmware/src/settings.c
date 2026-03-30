@@ -26,14 +26,20 @@ struct ares_settings_dict {
     uint32_t value;
 };
 
-#define GENERATE_ARES_DEFAULTS(name_, value_) value_,
+struct ares_settings_meta {
+    uint32_t default_val;
+    uint32_t min_val;
+    uint32_t max_val;
+};
 
-static const uint32_t defaults[] = {
+#define GENERATE_ARES_DEFAULTS(name_, value_, min_, max_) {value_, min_, max_},
+
+static const struct ares_settings_meta meta[] = {
     FOREACH_ARES_SETTING(GENERATE_ARES_DEFAULTS)};
 
 #undef GENERATE_ARES_DEFAULTS
 
-#define GENERATE_ARES_SETTINGS(name_, value_) {#name_, value_},
+#define GENERATE_ARES_SETTINGS(name_, value_, ...) {#name_, value_},
 
 static struct ares_settings_dict settings[] = {
     FOREACH_ARES_SETTING(GENERATE_ARES_SETTINGS)};
@@ -100,6 +106,10 @@ int update_setting(enum ares_setting setting, uint32_t value) {
         return -EINVAL;
     }
 
+    if (value < meta[setting].min_val || value > meta[setting].max_val) {
+        return -ERANGE;
+    }
+
     snprintf(name, MAX_NAME_LENGTH, "ares/%s", settings[setting].key);
 
     rc = settings_save_one(name, &value, sizeof(value));
@@ -122,7 +132,7 @@ int retrieve_setting(enum ares_setting setting, uint32_t *value) {
 
 void reset_settings(void) {
     for (size_t i = 0; i < ARRAY_SIZE(settings); i++) {
-        settings[i].value = defaults[i];
+        settings[i].value = meta[i].default_val;
     }
 
     settings_save();
