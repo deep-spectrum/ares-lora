@@ -11,6 +11,7 @@
 #include <lora/lora.h>
 #include <lora/lora_backend.h>
 #include <lora/packet.h>
+#include <lora_handlers.h>
 #include <serial/frame.h>
 #include <serial/serial.h>
 #include <settings.h>
@@ -46,6 +47,11 @@ static void handle_setting(const struct ares_serial *serial,
     ret = update_setting(frame->payload.SETTING.setting, setting);
     if (ret < 0) {
         send_ack_frame(serial, frame, ret);
+    }
+
+    if (frame->payload.SETTING.setting == ARES_SETTING_ID ||
+        frame->payload.SETTING.setting == ARES_SETTING_PANID) {
+        refresh_modem_id();
     }
 
     send_ack_frame(serial, frame, 0);
