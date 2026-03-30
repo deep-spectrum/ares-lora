@@ -70,7 +70,7 @@ static void handle_start(const struct ares_serial *serial,
                             .sec = frame->payload.START.sec,
                             .nsec = frame->payload.START.ns,
                         }},
-        .destination_id = frame->payload.START.destination,
+        .destination_id = frame->payload.START.id,
         .type = (frame->payload.START.broadcast) ? ARES_PKT_TYPE_BROADCAST
                                                  : ARES_PKT_TYPE_DIRECT,
     };

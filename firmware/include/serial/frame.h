@@ -55,8 +55,9 @@ struct ares_frame {
         struct {
             int64_t sec;
             uint64_t ns;
-            uint16_t destination;
+            uint16_t id;
             bool broadcast;
+            uint8_t seq_cnt;
         } START; /// < ARES_FRAME_START
 
         int ACK; /// ARES_FRAME_ACK
