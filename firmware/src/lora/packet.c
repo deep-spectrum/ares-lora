@@ -48,11 +48,6 @@ typedef uint16_t crc16_t;
          ? (ARES_PACKET_BROADCAST_OVERHEAD)                                    \
          : (ARES_PACKET_DIRECT_OVERHEAD))
 
-#define REVERSE_2(x)  ((((x)&1) << 1) | (((x) >> 1) & 1))
-#define REVERSE_4(x)  ((REVERSE_2(x) << 2) | (REVERSE_2(x) >> 2))
-#define REVERSE_8(x)  ((REVERSE_4(x) << 4) | (REVERSE_4(x) >> 4))
-#define REVERSE_16(x) ((REVERSE_8(x) << 8) | (REVERSE_8(x) >> 8))
-
 static const uint16_t header = (uint16_t)ARES_PACKET_HEADER_0 |
                                ((uint16_t)ARES_PACKET_HEADER_1 << CHAR_BIT);
 static const uint16_t footer = (uint16_t)ARES_PACKET_FOOTER_0 |
@@ -64,6 +59,52 @@ BUILD_ASSERT(
 BUILD_ASSERT(
     sizeof(footer) == ARES_PACKET_FOOTER_OVERHEAD,
     "Mismatch between specified footer overhead and the actual footer type");
+
+#if IS_ENABLED(CONFIG_LORA_REFLECT_CRC_OUTPUT)
+static uint8_t reverse_byte(uint8_t byte) {
+    uint8_t n0 = byte & 0xF;
+    uint8_t n1 = (byte >> 4) & 0xF;
+
+    uint8_t h0n0 = n0 & 0x3;
+    uint8_t h1n0 = (n0 >> 2) & 0x3;
+    uint8_t h0n1 = n1 & 0x3;
+    uint8_t h1n1 = (n1 >> 2) & 0x3;
+
+    h0n0 = ((h0n0 & 0x1) << 1) | ((h0n0 >> 1) & 0x1);
+    h1n0 = ((h1n0 & 0x1) << 1) | ((h1n0 >> 1) & 0x1);
+
+    n0 = (h0n0 << 2) | h1n0;
+
+    h0n1 = ((h0n1 & 0x1) << 1) | ((h0n1 >> 1) & 0x1);
+    h1n1 = ((h1n1 & 0x1) << 1) | ((h1n1 >> 1) & 0x1);
+
+    n1 = (h0n1 << 2) | h1n1;
+
+    return (n0 << 4) | n1;
+}
+
+static void reflect(void *data, size_t size) {
+    __ASSERT_NO_MSG(data);
+    __ASSERT_NO_MSG(size);
+    uint8_t *buf = data;
+
+    if (size == 1) {
+        reverse_byte(*buf);
+        return;
+    }
+
+    for (size_t i = 0, j = (size - 1); i <= j; i++, j--) {
+        uint8_t end = buf[j];
+        uint8_t start = buf[i];
+
+        end = reverse_byte(end);
+        start = reverse_byte(start);
+
+        buf[i] = end;
+        buf[j] = start;
+    }
+}
+#endif // IS_ENABLED(CONFIG_LORA_REFLECT_CRC_OUTPUT)
 
 static size_t calculate_packet_size(const struct ares_packet *packet) {
     __ASSERT_NO_MSG(packet != NULL);
@@ -88,8 +129,8 @@ static crc16_t compute_crc(const uint8_t *buf, size_t len) {
     crc16_t crc;
     crc = crc16(CONFIG_LORA_CRC_POLYNOMIAL, CONFIG_LORA_CRC_SEED, buf, len);
 
-#if !IS_ENABLED(CONFIG_LORA_REFLECT_CRC_OUTPUT)
-    crc = REVERSE_16(crc);
+#if IS_ENABLED(CONFIG_LORA_REFLECT_CRC_OUTPUT)
+    reflect(&crc, sizeof(crc));
 #endif // !IS_ENABLED(CONFIG_LORA_REFLECT_CRC_OUTPUT)
 
     return crc ^ CONFIG_LORA_CRC_XOR_OUTPUT;
