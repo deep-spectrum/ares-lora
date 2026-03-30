@@ -203,6 +203,10 @@ static void deserialize(struct ares_frame *frame, const uint8_t *buf) {
         // receive side: we don't care about the seq_cnt...
         break;
     }
+    case ARES_FRAME_LORA_CONFIG: {
+        (void)memcpy(&frame->payload.LORA_CONFIG, payload, payload_len);
+        break;
+    }
     default: {
         __ASSERT(false, "Invalid frame type for deserialization.");
         break;

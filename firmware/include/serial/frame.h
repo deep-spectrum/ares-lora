@@ -37,6 +37,7 @@ enum ares_frame_error {
 enum ares_frame_type {
     ARES_FRAME_SETTING,       ///< SETTING frame.
     ARES_FRAME_START,         ///< Start time frame.
+    ARES_FRAME_LORA_CONFIG,   ///< LoRa configuration frame.
     ARES_FRAME_ACK,           ///< ACK frame.
     ARES_FRAME_FRAMING_ERROR, ///< Framing error frame. TX only.
 
@@ -58,9 +59,18 @@ struct ares_frame {
             uint16_t id;
             bool broadcast;
             uint8_t seq_cnt;
-        } START; /// < ARES_FRAME_START
+        } START; ///< ARES_FRAME_START
 
-        int ACK; /// ARES_FRAME_ACK
+        struct {
+            uint32_t freq_hz;
+            uint16_t preamble_len;
+            uint8_t bandwidth;
+            uint8_t data_rate;
+            uint8_t coding_rate;
+            int8_t tx_pow_dbm;
+        } LORA_CONFIG; ///< ARES_FRAME_LORA_CONFIG
+
+        int ACK; ///< ARES_FRAME_ACK
 
         enum ares_frame_error FRAMING_ERROR; ///< ARES_FRAME_FRAMING_ERROR
     } payload;

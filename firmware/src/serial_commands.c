@@ -104,9 +104,27 @@ static void handle_start(const struct ares_serial *serial,
     send_ack_frame(serial, frame, 0);
 }
 
+static void handle_lora_config(const struct ares_serial *serial,
+                               struct ares_frame *frame) {
+    const struct ares_lora *lora = ares_lora_backend_lora_get_ptr();
+    struct lora_modem_config config = {
+        .frequency = frame->payload.LORA_CONFIG.freq_hz,
+        .bandwidth = frame->payload.LORA_CONFIG.bandwidth,
+        .coding_rate = frame->payload.LORA_CONFIG.coding_rate,
+        .datarate = frame->payload.LORA_CONFIG.data_rate,
+        .preamble_len = frame->payload.LORA_CONFIG.preamble_len,
+        .tx_power = frame->payload.LORA_CONFIG.tx_pow_dbm};
+    int ret;
+
+    ret = ares_lora_configure_lora(lora, &config);
+
+    send_ack_frame(serial, frame, ret);
+}
+
 static struct ares_serial_command commands[] = {
     {ARES_FRAME_SETTING, handle_setting},
     {ARES_FRAME_START, handle_start},
+    {ARES_FRAME_LORA_CONFIG, handle_lora_config},
 };
 
 static int init_serial_handlers(void) {

@@ -100,6 +100,8 @@ static int configure_modem_api(const struct ares_lora_transport *transport,
 
     lora->config = *config;
     lora->config.tx = false;
+    lora->config.public_network = false;
+    lora->config.iq_inverted = false;
 
     return configure_modem(lora);
 }
