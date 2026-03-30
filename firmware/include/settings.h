@@ -14,7 +14,7 @@
 #include <zephyr/kernel.h>
 
 #define FOREACH_ARES_SETTING(FUNC)                                             \
-    FUNC(ID, -1)                                                               \
+    FUNC(ID, 0)                                                                \
     FUNC(WAIT_USB_HOST, 0)                                                     \
     FUNC(PANID, 0)                                                             \
     FUNC(REPCNT, 10)
@@ -25,8 +25,8 @@ enum ares_setting { FOREACH_ARES_SETTING(GENERATE_ENUM) ARES_SETTING_RESERVED };
 
 #undef GENERATE_ENUM
 
-int update_setting(enum ares_setting setting, int32_t value);
-int retrieve_setting(enum ares_setting setting, int32_t *value);
+int update_setting(enum ares_setting setting, uint32_t value);
+int retrieve_setting(enum ares_setting setting, uint32_t *value);
 void reset_settings(void);
 
 #endif // ARES_SETTINGS_H

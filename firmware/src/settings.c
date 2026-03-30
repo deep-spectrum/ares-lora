@@ -23,12 +23,12 @@
 
 struct ares_settings_dict {
     const char *key;
-    int32_t value;
+    uint32_t value;
 };
 
 #define GENERATE_ARES_DEFAULTS(name_, value_) value_,
 
-static const int32_t defaults[] = {
+static const uint32_t defaults[] = {
     FOREACH_ARES_SETTING(GENERATE_ARES_DEFAULTS)};
 
 #undef GENERATE_ARES_DEFAULTS
@@ -92,7 +92,7 @@ static int handle_export(int (*cb)(const char *name, const void *value,
 SETTINGS_STATIC_HANDLER_DEFINE(ares_settings, "ares", handle_get, handle_set,
                                handle_commit, handle_export);
 
-int update_setting(enum ares_setting setting, int32_t value) {
+int update_setting(enum ares_setting setting, uint32_t value) {
     char name[MAX_NAME_LENGTH + 1];
     int rc;
 
@@ -111,7 +111,7 @@ int update_setting(enum ares_setting setting, int32_t value) {
     return 0;
 }
 
-int retrieve_setting(enum ares_setting setting, int32_t *value) {
+int retrieve_setting(enum ares_setting setting, uint32_t *value) {
     if (setting >= ARES_SETTING_RESERVED || value == NULL) {
         return -EINVAL;
     }

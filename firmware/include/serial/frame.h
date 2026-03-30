@@ -35,7 +35,7 @@ enum ares_frame_error {
 };
 
 enum ares_frame_type {
-    ARES_FRAME_ID,            ///< ID frame.
+    ARES_FRAME_SETTING,       ///< SETTING frame.
     ARES_FRAME_START,         ///< Start time frame.
     ARES_FRAME_ACK,           ///< ACK frame.
     ARES_FRAME_FRAMING_ERROR, ///< Framing error frame. TX only.
@@ -47,9 +47,10 @@ struct ares_frame {
     enum ares_frame_type type;
     union {
         struct {
-            uint16_t id;
+            uint16_t setting;
+            uint32_t value;
             bool set;
-        } ID; ///< ARES_FRAME_ID
+        } SETTING; ///< ARES_FRAME_SETTING
 
         struct {
             int64_t sec;

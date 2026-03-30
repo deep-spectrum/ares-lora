@@ -24,26 +24,26 @@ static void send_ack_frame(const struct ares_serial *serial,
     ares_serial_write_frame(serial, frame);
 }
 
-static void handle_id(const struct ares_serial *serial,
-                      struct ares_frame *frame) {
-    int32_t setting;
+static void handle_setting(const struct ares_serial *serial,
+                           struct ares_frame *frame) {
+    uint32_t setting;
     int ret;
 
-    if (!frame->payload.ID.set) {
-        ret = retrieve_setting(ARES_SETTING_ID, &setting);
+    if (!frame->payload.SETTING.set) {
+        ret = retrieve_setting(frame->payload.SETTING.setting, &setting);
         if (ret < 0) {
             send_ack_frame(serial, frame, ret);
             return;
         }
 
-        frame->payload.ID.id = (uint16_t)setting;
+        frame->payload.SETTING.value = setting;
         ares_serial_write_frame(serial, frame);
         return;
     }
 
-    setting = frame->payload.ID.id;
+    setting = frame->payload.SETTING.value;
 
-    ret = update_setting(ARES_SETTING_ID, setting);
+    ret = update_setting(frame->payload.SETTING.setting, setting);
     if (ret < 0) {
         send_ack_frame(serial, frame, ret);
     }
@@ -53,7 +53,7 @@ static void handle_id(const struct ares_serial *serial,
 
 static void handle_start(const struct ares_serial *serial,
                          struct ares_frame *frame) {
-    int32_t id, pan, rep_cnt;
+    uint32_t id, pan, rep_cnt;
     const struct ares_lora *lora = ares_lora_backend_lora_get_ptr();
     int ret;
 
@@ -99,7 +99,7 @@ static void handle_start(const struct ares_serial *serial,
 }
 
 static struct ares_serial_command commands[] = {
-    {ARES_FRAME_ID, handle_id},
+    {ARES_FRAME_SETTING, handle_setting},
     {ARES_FRAME_START, handle_start},
 };
 

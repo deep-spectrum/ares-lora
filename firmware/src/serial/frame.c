@@ -43,8 +43,9 @@ static size_t calculate_frame_length(const struct ares_frame *frame) {
     __ASSERT_NO_MSG(frame != NULL);
 
     switch (frame->type) {
-    case ARES_FRAME_ID: {
-        payload_len = SIZEOF_FIELD(struct ares_frame, payload.ID.id);
+    case ARES_FRAME_SETTING: {
+        payload_len = SIZEOF_FIELD(struct ares_frame, payload.SETTING.setting) +
+                      SIZEOF_FIELD(struct ares_frame, payload.SETTING.value);
         break;
     }
     case ARES_FRAME_START: {
@@ -78,8 +79,13 @@ static void serialize(uint8_t *buf, const struct ares_frame *frame,
                  ARES_FRAME_LEN_OVERHEAD);
 
     switch (frame->type) {
-    case ARES_FRAME_ID: {
-        (void)memcpy(payload, &frame->payload.ID.id, payload_len);
+    case ARES_FRAME_SETTING: {
+        (void)memcpy(payload, &frame->payload.SETTING.setting,
+                     SIZEOF_FIELD(struct ares_frame, payload.SETTING.setting));
+        (void)memcpy(
+            payload + SIZEOF_FIELD(struct ares_frame, payload.SETTING.setting),
+            &frame->payload.SETTING.value,
+            SIZEOF_FIELD(struct ares_frame, payload.SETTING.value));
         break;
     }
     case ARES_FRAME_START: {
@@ -153,12 +159,19 @@ static void deserialize(struct ares_frame *frame, const uint8_t *buf) {
     frame->type = (enum ares_frame_type)buf[ARES_FRAME_TYPE_OFFSET];
 
     switch (frame->type) {
-    case ARES_FRAME_ID: {
-        if (payload_len == 0) {
-            frame->payload.ID.set = false;
+    case ARES_FRAME_SETTING: {
+        if (payload_len == 2) {
+            frame->payload.SETTING.set = false;
         } else {
-            frame->payload.ID.set = true;
-            (void)memcpy(&frame->payload.ID.id, payload, payload_len);
+            frame->payload.SETTING.set = true;
+            (void)memcpy(
+                &frame->payload.SETTING.setting, payload,
+                SIZEOF_FIELD(struct ares_frame, payload.SETTING.setting));
+            (void)memcpy(
+                &frame->payload.SETTING.value,
+                payload +
+                    SIZEOF_FIELD(struct ares_frame, payload.SETTING.setting),
+                SIZEOF_FIELD(struct ares_frame, payload.SETTING.value));
         }
         break;
     }
