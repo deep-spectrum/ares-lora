@@ -1,0 +1,21 @@
+[build-system]
+requires = ["scikit-build-core", "pybind11"]
+build-backend = "scikit_build_core.build"
+
+[project]
+name = "ares-lora-serial-core"
+version = "0.0.0"
+description = "Ares LoRa serial driver core library"
+authors = [
+    { name = "Tom Schmitz", email = "tschmitz@andrew.cmu.edu" },
+]
+requires-python = ">=3.10"
+classifiers = [
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+
+[tool.scikit-build]
+minimum-version = "build-system.requires"
+cmake.args = []
