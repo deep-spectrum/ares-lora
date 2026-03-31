@@ -35,8 +35,10 @@ enum ares_frame_error {
 };
 
 enum ares_frame_type {
-    ARES_FRAME_WHOAMI,        ///< Who am I frame. No receive payload.
+    ARES_FRAME_SETTING,       ///< SETTING frame.
     ARES_FRAME_START,         ///< Start time frame.
+    ARES_FRAME_LORA_CONFIG,   ///< LoRa configuration frame.
+    ARES_FRAME_ACK,           ///< ACK frame.
     ARES_FRAME_FRAMING_ERROR, ///< Framing error frame. TX only.
 
     ARES_FRAME_TYPE_INVALID,
@@ -45,14 +47,32 @@ enum ares_frame_type {
 struct ares_frame {
     enum ares_frame_type type;
     union {
-        const char
-            *id; ///< ARES_FRAME_WHOAMI (TX only), NULL terminated string.
+        struct {
+            uint16_t setting;
+            uint32_t value;
+            bool set;
+        } SETTING; ///< ARES_FRAME_SETTING
+
         struct {
             int64_t sec;
             uint64_t ns;
-        } timespec; /// < ARES_FRAME_START (RX/TX)
-        enum ares_frame_error
-            frame_error; ///< ARES_FRAME_FRAMING_ERROR (TX only)
+            uint16_t id;
+            bool broadcast;
+            uint8_t seq_cnt;
+        } START; ///< ARES_FRAME_START
+
+        struct {
+            uint32_t freq_hz;
+            uint16_t preamble_len;
+            uint8_t bandwidth;
+            uint8_t data_rate;
+            uint8_t coding_rate;
+            int8_t tx_pow_dbm;
+        } LORA_CONFIG; ///< ARES_FRAME_LORA_CONFIG
+
+        int ACK; ///< ARES_FRAME_ACK
+
+        enum ares_frame_error FRAMING_ERROR; ///< ARES_FRAME_FRAMING_ERROR
     } payload;
 };
 
