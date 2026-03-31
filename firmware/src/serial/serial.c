@@ -139,7 +139,7 @@ static void report_error(const struct ares_serial *serial,
                          enum ares_frame_error error) {
     struct ares_frame frame = {
         .type = ARES_FRAME_FRAMING_ERROR,
-        .payload.frame_error = error,
+        .payload.FRAMING_ERROR = error,
     };
 
     ares_serial_write_frame(serial, &frame);

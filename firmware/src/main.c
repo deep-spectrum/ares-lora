@@ -1,79 +1,47 @@
-#include <lora/packet.h>
-#include <serial/serial.h>
-#include <serial/serial_backend.h>
 #include <zephyr/drivers/gpio.h>
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
 
-LOG_MODULE_REGISTER(main, LOG_LEVEL_DBG);
+LOG_MODULE_REGISTER(main);
 
 #define LED0_NODE     DT_ALIAS(led0)
 #define SLEEP_TIME_MS 1000
 
-static void whoami(const struct ares_serial *serial, struct ares_frame *frame) {
-    struct ares_frame tx_frame = {
-        .type = ARES_FRAME_WHOAMI,
-        .payload.id = "Transmitter",
-    };
+static const struct gpio_dt_spec led = GPIO_DT_SPEC_GET(LED0_NODE, gpios);
+static bool led_active = true;
 
-    uint8_t test_buf[256];
-    struct ares_packet packet = {
-        .type = ARES_PKT_TYPE_BROADCAST,
-        .sequence_cnt = 0,
-        .pan_id = 0x1234,
-        .source_id = 0x1234,
-        .payload = {.type = ARES_PKT_PAYLOAD_START,
-                    .payload.timespec = {.nsec = 100, .sec = 100}}};
+static void blink_work(struct k_work *work) {
+    struct k_work_delayable *dwork = CONTAINER_OF(work, struct k_work_delayable, work);
 
-    int ret = serialize_ares_packet(test_buf, 256, &packet);
+    if (!led_active) {
+        (void)gpio_pin_set_dt(&led, 0);
+        return;
+    }
 
-    LOG_HEXDUMP_INF(test_buf, ret, "Packet: ");
-    LOG_INF("Packet valid: %d", ares_packet_valid(test_buf, ret));
-
-    ares_serial_write_frame(serial, &tx_frame);
+    (void)gpio_pin_toggle_dt(&led);
+    k_work_schedule(dwork, K_MSEC(SLEEP_TIME_MS));
 }
+K_WORK_DELAYABLE_DEFINE(blink, blink_work);
 
-static struct ares_serial_command commands[] = {
-    {
-        .command = ARES_FRAME_WHOAMI,
-        .callback = whoami,
-    },
-
-    {
-        .command = ARES_FRAME_START,
-        .callback = NULL,
-    }};
-
-static void led_status(void) {
+static void start_led(void) {
     int ret;
-    static const struct gpio_dt_spec led = GPIO_DT_SPEC_GET(LED0_NODE, gpios);
 
     if (!gpio_is_ready_dt(&led)) {
+        LOG_ERR("LED GPIO not ready");
         return;
     }
 
     ret = gpio_pin_configure_dt(&led, GPIO_OUTPUT_ACTIVE);
     if (ret < 0) {
+        LOG_ERR("Failed to configure LED pin");
         return;
     }
 
-    while (1) {
-        ret = gpio_pin_toggle_dt(&led);
-        if (ret < 0) {
-            return;
-        }
-
-        k_msleep(SLEEP_TIME_MS);
-    }
+    k_work_schedule(&blink, K_NO_WAIT);
 }
 
 int main(void) {
-    const struct ares_serial *serial = ares_serial_backend_uart_get_ptr();
-
-    ares_serial_register_command_callbacks(serial, commands,
-                                           ARRAY_SIZE(commands));
-
-    led_status();
+    start_led();
 
     return 0;
 }
