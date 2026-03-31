@@ -18,6 +18,7 @@ extern "C" {
 
 #define STRINGIFY(x)       #x
 #define MACRO_STRINGIFY(x) STRINGIFY(x)
+#define ARG_UNUSED(x) (void)x
 
 #if __cplusplus
 }
