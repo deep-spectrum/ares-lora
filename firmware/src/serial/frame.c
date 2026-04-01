@@ -167,13 +167,11 @@ static void deserialize(struct ares_frame *frame, const uint8_t *buf) {
 
     switch (frame->type) {
     case ARES_FRAME_SETTING: {
-        if (payload_len == 2) {
+        (void)memcpy(&frame->payload.SETTING.setting, payload, SIZEOF_FIELD(struct ares_frame, payload.SETTING.setting));
+        if (payload_len == SIZEOF_FIELD(struct ares_frame, payload.SETTING.setting)) {
             frame->payload.SETTING.set = false;
         } else {
             frame->payload.SETTING.set = true;
-            (void)memcpy(
-                &frame->payload.SETTING.setting, payload,
-                SIZEOF_FIELD(struct ares_frame, payload.SETTING.setting));
             (void)memcpy(
                 &frame->payload.SETTING.value,
                 payload +
