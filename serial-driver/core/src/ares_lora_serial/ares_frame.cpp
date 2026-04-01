@@ -54,6 +54,10 @@ AresFrame::AresFrame(const std::vector<uint8_t> &bytearray) : _direction(RX) {
     throw AresFrameError("Not an Ares frame");
 }
 
+AresFrame::AresFrame() : _type(UNKNOWN), _direction(UNSPECIFIED) {}
+
+AresFrame::AresFrame(const AresFrame &other) = default;
+
 std::tuple<ssize_t, ssize_t, ssize_t>
 AresFrame::frame_present(const uint8_t *serial_data, size_t len,
                          bool error_no_footer) {

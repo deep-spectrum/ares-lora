@@ -40,6 +40,7 @@ class AresFrame {
         LORA_CONFIG = 2,
         ACK = 3,
         FRAMING_ERROR = 4,
+        UNKNOWN,
     };
 
     struct AresFrameSetting {
@@ -93,6 +94,8 @@ class AresFrame {
 
     explicit AresFrame(AresFrameType type, AresFrameTxTypes payload);
     explicit AresFrame(const std::vector<uint8_t> &bytearray);
+    AresFrame();
+    AresFrame(const AresFrame &other);
     ~AresFrame() = default;
 
     static std::tuple<ssize_t, ssize_t, ssize_t>
@@ -109,7 +112,7 @@ class AresFrame {
     [[nodiscard]] AresFrameDecoded get_parsed_frame() const;
 
   private:
-    enum FrameDirection { TX, RX };
+    enum FrameDirection { TX, RX, UNSPECIFIED };
 
     FrameDirection _direction;
     AresFrameType _type;
