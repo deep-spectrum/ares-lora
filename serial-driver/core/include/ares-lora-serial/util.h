@@ -7,7 +7,6 @@
  *
  * @author Tom Schmitz \<tschmitz@andrew.cmu.edu\>
  */
- 
 
 #ifndef ARES_UTIL_H
 #define ARES_UTIL_H
@@ -18,10 +17,10 @@ extern "C" {
 
 #define STRINGIFY(x)       #x
 #define MACRO_STRINGIFY(x) STRINGIFY(x)
-#define ARG_UNUSED(x) (void)x
+#define ARG_UNUSED(x)      (void)x
 
 #if __cplusplus
 }
 #endif
 
-#endif //ARES_UTIL_H
+#endif // ARES_UTIL_H

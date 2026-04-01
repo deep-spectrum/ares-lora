@@ -16,6 +16,5 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
 ]
 
-#[tool.scikit-build]
-#minimum-version = "build-system.requires"
-#cmake.args = []
+[tool.scikit-build]
+cmake.args = ["-DCMAKE_BUILD_TYPE=Debug"]

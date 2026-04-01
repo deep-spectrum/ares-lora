@@ -7,34 +7,33 @@
  *
  * @author Tom Schmitz \<tschmitz@andrew.cmu.edu\>
  */
- 
 
 #ifndef ARES_ARES_FRAME_HPP
 #define ARES_ARES_FRAME_HPP
 
 #include <cstdint>
-#include <utility>
-#include <vector>
-#include <variant>
-#include <tuple>
-#include <sys/types.h>
 #include <exception>
 #include <string>
+#include <sys/types.h>
+#include <tuple>
+#include <utility>
+#include <variant>
+#include <vector>
 
 class AresFrameError : public std::exception {
-public:
+  public:
     explicit AresFrameError(std::string msg) : msg_(std::move(msg)) {}
 
     [[nodiscard]] const char *what() const noexcept override {
         return msg_.c_str();
     }
 
-private:
+  private:
     std::string msg_;
 };
 
 class AresFrame {
-public:
+  public:
     enum AresFrameType : unsigned int {
         SETTING = 0,
         START = 1,
@@ -81,8 +80,11 @@ public:
         NOT_IMPLEMENTED = 2,
     };
 
-    using AresFrameTxTypes = std::variant<std::monostate, AresFrameSetting, AresFrameStart, AresFrameLoraConfig>;
-    using AresFrameRxTypes = std::variant<std::monostate, AresFrameSetting, AresFrameStart, AresFrameAckErrorCode, AresFrameFramingError>;
+    using AresFrameTxTypes = std::variant<std::monostate, AresFrameSetting,
+                                          AresFrameStart, AresFrameLoraConfig>;
+    using AresFrameRxTypes =
+        std::variant<std::monostate, AresFrameSetting, AresFrameStart,
+                     AresFrameAckErrorCode, AresFrameFramingError>;
 
     struct AresFrameDecoded {
         AresFrameType type;
@@ -93,8 +95,12 @@ public:
     explicit AresFrame(const std::vector<uint8_t> &bytearray);
     ~AresFrame() = default;
 
-    static std::tuple<ssize_t, ssize_t, ssize_t> frame_present(const uint8_t *serial_data, size_t len, bool error_no_footer = true);
-    static std::tuple<ssize_t, ssize_t, ssize_t> frame_present(const std::vector<uint8_t> &bytearray, bool error_no_footer = true);
+    static std::tuple<ssize_t, ssize_t, ssize_t>
+    frame_present(const uint8_t *serial_data, size_t len,
+                  bool error_no_footer = true);
+    static std::tuple<ssize_t, ssize_t, ssize_t>
+    frame_present(const std::vector<uint8_t> &bytearray,
+                  bool error_no_footer = true);
 
     void serialize(std::vector<uint8_t> &bytearray);
     void parse(const uint8_t *serial_data, size_t start_index, size_t len);
@@ -102,11 +108,8 @@ public:
 
     [[nodiscard]] AresFrameDecoded get_parsed_frame() const;
 
-private:
-    enum FrameDirection {
-        TX,
-        RX
-    };
+  private:
+    enum FrameDirection { TX, RX };
 
     FrameDirection _direction;
     AresFrameType _type;
@@ -115,9 +118,12 @@ private:
 
     [[nodiscard]] uint16_t _payload_size() const;
 
-    static void _serialize_setting(const AresFrameSetting &payload, std::vector<uint8_t> &buffer);
-    static void _serialize_start(const AresFrameStart &payload, std::vector<uint8_t> &buffer);
-    static void _serialize_lora_config(const AresFrameLoraConfig &payload, std::vector<uint8_t> &buffer);
+    static void _serialize_setting(const AresFrameSetting &payload,
+                                   std::vector<uint8_t> &buffer);
+    static void _serialize_start(const AresFrameStart &payload,
+                                 std::vector<uint8_t> &buffer);
+    static void _serialize_lora_config(const AresFrameLoraConfig &payload,
+                                       std::vector<uint8_t> &buffer);
 
     void _deserialize_setting(const uint8_t *buf, size_t len);
     void _deserialize_start(const uint8_t *buf, size_t len);
@@ -125,4 +131,4 @@ private:
     void _deserialize_framing_error(const uint8_t *buf, size_t len);
 };
 
-#endif //ARES_ARES_FRAME_HPP
+#endif // ARES_ARES_FRAME_HPP

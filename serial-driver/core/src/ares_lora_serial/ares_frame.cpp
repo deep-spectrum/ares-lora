@@ -9,8 +9,8 @@
  */
 
 #include <ares-lora-serial/ares_frame.hpp>
-#include <cstring>
 #include <ares-lora-serial/util.h>
+#include <cstring>
 
 constexpr uint8_t header = '^';
 constexpr uint8_t footer = '@';
@@ -19,7 +19,8 @@ constexpr size_t header_size = sizeof(header);
 constexpr size_t len_size = sizeof(uint16_t);
 constexpr size_t type_size = sizeof(uint8_t);
 constexpr size_t footer_size = sizeof(footer);
-constexpr size_t frame_overhead = header_size + len_size + type_size + footer_size;
+constexpr size_t frame_overhead =
+    header_size + len_size + type_size + footer_size;
 constexpr size_t head_overhead = header_size + len_size + type_size;
 
 constexpr size_t header_offset = 0;
@@ -37,7 +38,8 @@ static size_t retrieve_payload_len(const uint8_t *data) {
     return len;
 }
 
-AresFrame::AresFrame(AresFrameType type, AresFrameTxTypes payload) : _direction(TX), _type(type) {
+AresFrame::AresFrame(AresFrameType type, AresFrameTxTypes payload)
+    : _direction(TX), _type(type) {
     _tx_payload = payload;
 }
 
@@ -52,12 +54,16 @@ AresFrame::AresFrame(const std::vector<uint8_t> &bytearray) : _direction(RX) {
     throw AresFrameError("Not an Ares frame");
 }
 
-std::tuple<ssize_t, ssize_t, ssize_t> AresFrame::
-frame_present(const uint8_t *serial_data, size_t len, bool error_no_footer) {
-    return frame_present(std::vector(serial_data, serial_data + len), error_no_footer);
+std::tuple<ssize_t, ssize_t, ssize_t>
+AresFrame::frame_present(const uint8_t *serial_data, size_t len,
+                         bool error_no_footer) {
+    return frame_present(std::vector(serial_data, serial_data + len),
+                         error_no_footer);
 }
 
-std::tuple<ssize_t, ssize_t, ssize_t> AresFrame::frame_present(const std::vector<uint8_t> &bytearray, bool error_no_footer) {
+std::tuple<ssize_t, ssize_t, ssize_t>
+AresFrame::frame_present(const std::vector<uint8_t> &bytearray,
+                         bool error_no_footer) {
     size_t len = bytearray.size();
     size_t header_idx, type_idx, frame_size, payload_len, footer_idx;
 
@@ -104,27 +110,29 @@ void AresFrame::serialize(std::vector<uint8_t> &bytearray) {
     bytearray[type_offset] = static_cast<uint8_t>(_type);
 
     switch (_type) {
-        case SETTING: {
-            _serialize_setting(std::get<AresFrameSetting>(_tx_payload), bytearray);
-            break;
-        }
-        case START: {
-            _serialize_start(std::get<AresFrameStart>(_tx_payload), bytearray);
-            break;
-        }
-        case LORA_CONFIG: {
-            _serialize_lora_config(std::get<AresFrameLoraConfig>(_tx_payload), bytearray);
-            break;
-        }
-        default: {
-            throw AresFrameError("Invalid type for TX");
-        }
+    case SETTING: {
+        _serialize_setting(std::get<AresFrameSetting>(_tx_payload), bytearray);
+        break;
+    }
+    case START: {
+        _serialize_start(std::get<AresFrameStart>(_tx_payload), bytearray);
+        break;
+    }
+    case LORA_CONFIG: {
+        _serialize_lora_config(std::get<AresFrameLoraConfig>(_tx_payload),
+                               bytearray);
+        break;
+    }
+    default: {
+        throw AresFrameError("Invalid type for TX");
+    }
     }
 
     bytearray.emplace_back(footer);
 }
 
-void AresFrame::parse(const uint8_t *serial_data, size_t start_index, size_t len) {
+void AresFrame::parse(const uint8_t *serial_data, size_t start_index,
+                      size_t len) {
     parse(std::vector(serial_data, serial_data + len), start_index);
 }
 
@@ -134,39 +142,40 @@ static size_t extract_payload_len(const uint8_t *buf) {
     return payload_len;
 }
 
-void AresFrame::parse(const std::vector<uint8_t> &bytearray, size_t start_index) {
+void AresFrame::parse(const std::vector<uint8_t> &bytearray,
+                      size_t start_index) {
     _direction = RX;
     size_t payload_len = extract_payload_len(&bytearray[start_index]);
     _type = static_cast<AresFrameType>(bytearray[start_index + type_offset]);
 
     switch (_type) {
-        case SETTING: {
-            _deserialize_setting(&bytearray[start_index + payload_offset], payload_len);
-            break;
-        }
-        case START: {
-            _deserialize_start(&bytearray[start_index + payload_offset], payload_len);
-            break;
-        }
-        case ACK: {
-            _deserialize_ack(&bytearray[start_index + payload_offset], payload_len);
-            break;
-        }
-        case FRAMING_ERROR: {
-            _deserialize_framing_error(&bytearray[start_index + payload_offset], payload_len);
-            break;
-        }
-            default: {
-            throw AresFrameError("Invalid RX type");
-        }
+    case SETTING: {
+        _deserialize_setting(&bytearray[start_index + payload_offset],
+                             payload_len);
+        break;
+    }
+    case START: {
+        _deserialize_start(&bytearray[start_index + payload_offset],
+                           payload_len);
+        break;
+    }
+    case ACK: {
+        _deserialize_ack(&bytearray[start_index + payload_offset], payload_len);
+        break;
+    }
+    case FRAMING_ERROR: {
+        _deserialize_framing_error(&bytearray[start_index + payload_offset],
+                                   payload_len);
+        break;
+    }
+    default: {
+        throw AresFrameError("Invalid RX type");
+    }
     }
 }
 
 AresFrame::AresFrameDecoded AresFrame::get_parsed_frame() const {
-    AresFrameDecoded decoded = {
-        .type = _type,
-        .payload = _rx_payload
-    };
+    AresFrameDecoded decoded = {.type = _type, .payload = _rx_payload};
     return decoded;
 }
 
@@ -174,33 +183,46 @@ uint16_t AresFrame::_payload_size() const {
     uint16_t ret = 0;
 
     switch (_type) {
-        case SETTING: {
-            auto [set, setting_id, value] = std::get<AresFrameSetting>(_tx_payload);
-            ret = sizeof(setting_id);
-            if (set) {
-                ret += sizeof(value);
-            }
-            break;
+    case SETTING: {
+        auto [set, setting_id, value] = std::get<AresFrameSetting>(_tx_payload);
+        ret = sizeof(setting_id);
+        if (set) {
+            ret += sizeof(value);
         }
-        case START: {
-            ret = sizeof(AresFrameStart::sec) + sizeof(AresFrameStart::nsec) + sizeof(AresFrameStart::id) + sizeof(AresFrameStart::broadcast) + sizeof(AresFrameStart::seq_cnt) + sizeof(AresFrameStart::packet_id);
-            break;
-        }
-        case LORA_CONFIG: {
-            ret = sizeof(AresFrameLoraConfig::frequency) + sizeof(AresFrameLoraConfig::preamble_length) + sizeof(AresFrameLoraConfig::bandwidth) + sizeof(AresFrameLoraConfig::data_rate) + sizeof(AresFrameLoraConfig::coding_rate) + sizeof(AresFrameLoraConfig::tx_power);
-            break;
-        }
-            default: {
-            throw AresFrameError("Invalid TX type");
-        }
+        break;
+    }
+    case START: {
+        ret = sizeof(AresFrameStart::sec) + sizeof(AresFrameStart::nsec) +
+              sizeof(AresFrameStart::id) + sizeof(AresFrameStart::broadcast) +
+              sizeof(AresFrameStart::seq_cnt) +
+              sizeof(AresFrameStart::packet_id);
+        break;
+    }
+    case LORA_CONFIG: {
+        ret = sizeof(AresFrameLoraConfig::frequency) +
+              sizeof(AresFrameLoraConfig::preamble_length) +
+              sizeof(AresFrameLoraConfig::bandwidth) +
+              sizeof(AresFrameLoraConfig::data_rate) +
+              sizeof(AresFrameLoraConfig::coding_rate) +
+              sizeof(AresFrameLoraConfig::tx_power);
+        break;
+    }
+    default: {
+        throw AresFrameError("Invalid TX type");
+    }
     }
 
     return ret;
 }
 
-#define SERIALIZE(field) do { const auto *val_ = reinterpret_cast<const uint8_t *>(payload.field); buffer.insert(buffer.end(), val_, val_ + sizeof(payload.field)); } while(false)
+#define SERIALIZE(field)                                                       \
+    do {                                                                       \
+        const auto *val_ = reinterpret_cast<const uint8_t *>(&payload.field);  \
+        buffer.insert(buffer.end(), val_, val_ + sizeof(payload.field));       \
+    } while (false)
 
-void AresFrame::_serialize_setting(const AresFrameSetting &payload, std::vector<uint8_t> &buffer) {
+void AresFrame::_serialize_setting(const AresFrameSetting &payload,
+                                   std::vector<uint8_t> &buffer) {
     SERIALIZE(setting_id);
 
     if (payload.set) {
@@ -208,7 +230,8 @@ void AresFrame::_serialize_setting(const AresFrameSetting &payload, std::vector<
     }
 }
 
-void AresFrame::_serialize_start(const AresFrameStart &payload, std::vector<uint8_t> &buffer) {
+void AresFrame::_serialize_start(const AresFrameStart &payload,
+                                 std::vector<uint8_t> &buffer) {
     SERIALIZE(sec);
     SERIALIZE(nsec);
     SERIALIZE(id);
@@ -217,7 +240,8 @@ void AresFrame::_serialize_start(const AresFrameStart &payload, std::vector<uint
     SERIALIZE(packet_id);
 }
 
-void AresFrame::_serialize_lora_config(const AresFrameLoraConfig &payload, std::vector<uint8_t> &buffer) {
+void AresFrame::_serialize_lora_config(const AresFrameLoraConfig &payload,
+                                       std::vector<uint8_t> &buffer) {
     SERIALIZE(frequency);
     SERIALIZE(preamble_length);
     SERIALIZE(bandwidth);
@@ -226,9 +250,12 @@ void AresFrame::_serialize_lora_config(const AresFrameLoraConfig &payload, std::
     SERIALIZE(tx_power);
 }
 
-
-#define DESERIALIZE_INIT(class_) class_ val_; size_t offset_ = 0
-#define DESERIALIZE(field) memcpy(&val_.field, buf + offset_, sizeof(val_.field)); offset_ += sizeof(val_.field)
+#define DESERIALIZE_INIT(class_)                                               \
+    class_ val_;                                                               \
+    size_t offset_ = 0
+#define DESERIALIZE(field)                                                     \
+    memcpy(&val_.field, buf + offset_, sizeof(val_.field));                    \
+    offset_ += sizeof(val_.field)
 #define DESERIALIZE_FINALIZE() _rx_payload = val_
 
 void AresFrame::_deserialize_setting(const uint8_t *buf, size_t len) {

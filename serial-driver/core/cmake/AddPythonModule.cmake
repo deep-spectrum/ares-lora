@@ -20,14 +20,14 @@
 
   Requires CMake >= 3.15
 ]]
-function(python_module name src_dir)
+function(python_module name)
     # Required arguments
     set(options)
     set(one_value_args DESTINATION)
     set(multi_value_args DEPENDENCIES LIBS DEFINITIONS INSTALL_LIBS PYBIND_LIBS)
     cmake_parse_arguments(MOD "${options}" "${one_value_args}" "${multi_value_args}" ${ARGN})
 
-    python_add_library(${name} MODULE ${src_dir} WITH_SOABI)
+    python_add_library(${name} MODULE ${MOD_UNPARSED_ARGUMENTS} WITH_SOABI)
 
     if(MOD_DEPENDENCIES)
         add_dependencies(${name} ${MOD_DEPENDENCIES})

@@ -27,3 +27,7 @@ python_package(src/${PACKAGE_NAME} DESTINATION ${PACKAGE_NAME})
 python_module(_core src/core.cpp
         DESTINATION ${PACKAGE_NAME}
         DEFINITIONS VERSION_INFO=${PROJECT_VERSION})
+python_module(_ares_lora_serial src/ares_lora_serial/ares_lora_serial.cpp src/ares_lora_serial/ares_frame.cpp
+        DESTINATION ${PACKAGE_NAME}
+        DEPENDENCIES serial
+        LIBS serial)
