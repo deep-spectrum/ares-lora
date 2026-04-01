@@ -11,7 +11,8 @@ static const struct gpio_dt_spec led = GPIO_DT_SPEC_GET(LED0_NODE, gpios);
 static bool led_active = true;
 
 static void blink_work(struct k_work *work) {
-    struct k_work_delayable *dwork = CONTAINER_OF(work, struct k_work_delayable, work);
+    struct k_work_delayable *dwork =
+        CONTAINER_OF(work, struct k_work_delayable, work);
 
     if (!led_active) {
         (void)gpio_pin_set_dt(&led, 0);
