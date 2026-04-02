@@ -52,11 +52,13 @@ def lora_serial_command(func):
             return func(args, kwargs)
         except AresTimeout as e:
             raise TimeoutError(str(e))
+
     return wrapper
 
 
 class LoraSerial:
-    def __init__(self, port: str, response_timeout: float = 2000.0, rx_period: float = 0.1, serial_timeout: float = 0.1, start_callback: Callable[[int, int], None] | None = None):
+    def __init__(self, port: str, response_timeout: float = 2000.0, rx_period: float = 0.1, serial_timeout: float = 0.1,
+                 start_callback: Callable[[int, int], None] | None = None):
         if not port:
             raise ValueError("Invalid port")
         configs = _SerialConfigs(
@@ -98,11 +100,11 @@ class LoraSerial:
         if value is None:
             ret, err_code = self._dev.setting_get(setting_id.value)
             if err_code != 0:
-                pass # TODO
+                pass  # TODO
             return ret
         err_code = self._dev.setting_set(setting_id.value, value)
         if err_code != 0:
-            pass # TODO
+            pass  # TODO
         return None
 
     @lora_serial_command
@@ -113,7 +115,7 @@ class LoraSerial:
             raise ValueError("Time must be positive")
         ret = self._dev.start(sec, nsec, destination_id, broadcast)
         if ret != 0:
-            pass # TODO
+            pass  # TODO
 
     @lora_serial_command
     def lora_config(self, config: LoraConfig):
