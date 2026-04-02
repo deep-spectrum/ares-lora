@@ -44,8 +44,11 @@ PYBIND11_MODULE(_ares_lora_serial, m, py::mod_gil_not_used()) {
         .def("setting_set", &AresSerial::setting_set, py::arg("setting_id"),
              py::arg("value"))
         .def("setting_get", &AresSerial::setting_get, py::arg("setting_id"))
-        .def("start", &AresSerial::start, "Start the serial driver")
-        .def("stop", &AresSerial::stop, "Stop the serial driver");
+        .def("start", &AresSerial::send_start, py::arg("sec"), py::arg("nsec"),
+             py::arg("id"), py::arg("broadcast"))
+        .def("lora_config", &AresSerial::lora_config, py::arg("config"))
+        .def("start_driver", &AresSerial::start, "Start the serial driver")
+        .def("stop_driver", &AresSerial::stop, "Stop the serial driver");
 
     py::register_local_exception<AresTimeoutError>(m, "AresTimeout",
                                                    PyExc_TimeoutError);
@@ -74,6 +77,13 @@ AresSerialConfigs::AresSerialConfigs(const py::kwargs &kwargs) {
 AresLoraConfig::AresLoraConfig(const py::kwargs &kwargs) {
     from_kwargs(kwargs, SP(frequency), SP(preamble_length), SP(bandwidth),
                 SP(datarate), SP(coding_rate), SP(tx_power));
+}
+
+AresFrame AresLoraConfig::generate_frame() const {
+    return AresFrame(AresFrame::LORA_CONFIG,
+                     AresFrame::AresFrameLoraConfig{frequency, preamble_length,
+                                                    bandwidth, datarate,
+                                                    coding_rate, tx_power});
 }
 
 AresSerial::AresSerial(const AresSerialConfigs &configs)
@@ -171,6 +181,54 @@ py::tuple AresSerial::setting_get(uint16_t id) {
     }
 
     return py::make_tuple(setting, ret);
+}
+
+int AresSerial::send_start(int64_t sec, uint64_t nsec, uint16_t id,
+                           bool broadcast) {
+    AresFrame frame(AresFrame::START,
+                    AresFrame::AresFrameStart{sec, nsec, id, 0, broadcast, 0});
+    AresResponse response = _send_frame(frame);
+
+    int ret = -1;
+
+    switch (response.type) {
+    case AresResponse::ACK: {
+        ret = std::get<AresFrame::AresFrameAckErrorCode>(response.payload);
+        break;
+    }
+    case AresResponse::BAD_FRAME: {
+        _handle_bad_frame(response);
+        break;
+    }
+    default: {
+        throw std::runtime_error("Received invalid response");
+    }
+    }
+
+    return ret;
+}
+
+int AresSerial::lora_config(const AresLoraConfig &config) {
+    AresFrame frame = config.generate_frame();
+    AresResponse response = _send_frame(frame);
+
+    int ret = -1;
+
+    switch (response.type) {
+    case AresResponse::ACK: {
+        ret = std::get<AresFrame::AresFrameAckErrorCode>(response.payload);
+        break;
+    }
+    case AresResponse::BAD_FRAME: {
+        _handle_bad_frame(response);
+        break;
+    }
+    default: {
+        throw std::runtime_error("Received invalid response");
+    }
+    }
+
+    return ret;
 }
 
 void AresSerial::start() {

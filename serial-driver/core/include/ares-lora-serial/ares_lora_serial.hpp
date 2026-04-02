@@ -58,6 +58,8 @@ struct AresLoraConfig {
     uint8_t datarate = 0;
     uint8_t coding_rate = 0;
     int8_t tx_power = 0;
+
+    AresFrame generate_frame() const;
 };
 
 class AresSerial {
