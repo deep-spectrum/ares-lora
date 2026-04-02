@@ -19,6 +19,9 @@
 #include <sstream>
 #include <stdexcept>
 #include <type_traits>
+#include <logging/log.hpp>
+
+LOG_MODULE_REGISTER(serial_logger);
 
 using namespace std::chrono_literals;
 
@@ -40,7 +43,9 @@ PYBIND11_MODULE(_ares_lora_serial, m, py::mod_gil_not_used()) {
         .def(py::init<const AresSerialConfigs &>())
         .def("setting_set", &AresSerial::setting_set, py::arg("setting_id"),
              py::arg("value"))
-        .def("setting_get", &AresSerial::setting_get, py::arg("setting_id"));
+        .def("setting_get", &AresSerial::setting_get, py::arg("setting_id"))
+        .def("start", &AresSerial::start, "Start the serial driver")
+        .def("stop", &AresSerial::stop, "Stop the serial driver");
 
     py::register_local_exception<AresTimeoutError>(m, "AresTimeout",
                                                    PyExc_TimeoutError);
@@ -65,7 +70,10 @@ AresSerial::AresSerial(const AresSerialConfigs &configs)
     _start_callback = configs.start_callback;
 }
 
-AresSerial::~AresSerial() { _serial.close(); }
+AresSerial::~AresSerial() {
+    stop();
+    _serial.close();
+}
 
 AresSerial::AresResponse AresSerial::_send_frame(AresFrame &frame) {
     std::vector<uint8_t> tx;
@@ -200,11 +208,15 @@ void AresSerial::stop() {
     if (retries >= max_attempts) {
         throw std::runtime_error("Failed to shut down processing task");
     }
+
+    _response_queue.clear();
+    _frame_q.clear();
 }
 
 void AresSerial::_process_frames_helper() {
     while (_tasks_running) {
         AresFrame::AresFrameDecoded frame = _frame_q.get();
+        LOG_INF("Received frame: %d", frame.type);
 
         switch (frame.type) {
         case AresFrame::ACK:
@@ -286,16 +298,20 @@ void AresSerial::_read_serial() {
 void AresSerial::_publish_response(const AresFrame::AresFrameDecoded &frame) {
     AresResponse response;
 
+
     switch (frame.type) {
     case AresFrame::ACK: {
         response.type = AresResponse::ACK;
+        LOG_DBG("ACK");
         break;
     }
-    case AresFrame::SETTING: {
+    case AresFrame::FRAMING_ERROR: {
         response.type = AresResponse::BAD_FRAME;
+        LOG_DBG("FRAMING ERROR");
         break;
     }
     default: {
+        LOG_DBG("COMMAND SPECIFIC");
         response.type = AresResponse::COMMAND_SPECIFIC;
     }
     }

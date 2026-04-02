@@ -16,6 +16,7 @@ endif()
 add_subdirectory(extern/pybind11)
 add_subdirectory(serial)
 add_subdirectory(data_structures)
+add_subdirectory(logging)
 
 include (AddPythonModule)
 
@@ -30,5 +31,5 @@ python_module(_core src/core.cpp
         DEFINITIONS VERSION_INFO=${PROJECT_VERSION})
 python_module(_ares_lora_serial src/ares_lora_serial/ares_lora_serial.cpp src/ares_lora_serial/ares_frame.cpp
         DESTINATION ${PACKAGE_NAME}
-        DEPENDENCIES serial ares_data_structures
-        LIBS serial ares_data_structures)
+        DEPENDENCIES serial ares_data_structures logging
+        LIBS serial ares_data_structures logging)
