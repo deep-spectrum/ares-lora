@@ -308,7 +308,7 @@ void AresSerial::_process_frames_helper() {
             break;
         }
         default: {
-            // todo: Invalid frame received
+            LOG_ERR("Invalid frame received: %d", static_cast<int>(frame.type));
             break;
         }
         }
@@ -366,6 +366,7 @@ void AresSerial::_read_serial() {
         } catch (const Serial::SerialException &exc) {
             _serial.close();
             // todo
+            std::abort();
         } catch (const std::exception &exc) {
             // todo
             std::abort();
