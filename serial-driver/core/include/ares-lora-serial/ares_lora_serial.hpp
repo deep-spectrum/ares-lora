@@ -11,21 +11,30 @@
 #ifndef ARES_ARES_LORA_SERIAL_HPP
 #define ARES_ARES_LORA_SERIAL_HPP
 
+#include <ares-lora-serial/ares_frame.hpp>
 #include <ares/queue.hpp>
 #include <atomic>
+#include <chrono>
 #include <functional>
 #include <future>
 #include <mutex>
+#include <pybind11/pybind11.h>
 #include <serial/serial.hpp>
 #include <string>
 
-struct AresSerialConfigs {
-    AresSerialConfigs(const char *port, uint32_t ack_timeout,
-                      uint32_t rx_period);
+namespace py = pybind11;
+using namespace std::chrono_literals;
 
-    std::string serial_port;
-    uint32_t timeout;
-    uint32_t rx_period;
+struct AresSerialConfigs {
+    AresSerialConfigs() = default;
+    explicit AresSerialConfigs(const py::kwargs &kwargs);
+
+    std::string port;
+    std::chrono::milliseconds serial_timeout = 100ms;
+    std::chrono::milliseconds response_timeout = 2000ms;
+    std::chrono::milliseconds rx_period = 100ms;
+    std::function<void(int64_t, uint64_t, uint16_t, bool, uint8_t, uint16_t)>
+        start_callback = nullptr;
 };
 
 class AresSerial {
@@ -36,8 +45,14 @@ class AresSerial {
     void setting_set(uint16_t id, uint32_t value);
     uint32_t setting_get(uint16_t id);
 
+    void start();
+    void stop();
+
   private:
     Serial::Serial _serial;
+
+    std::chrono::milliseconds _response_timeout;
+    std::chrono::milliseconds _rx_period;
 
     void _process_frames_helper();
     void _process_frames();
@@ -55,10 +70,7 @@ class AresSerial {
         };
 
         ResponseType type;
-        std::variant<std::monostate, AresFrame::AresFrameSetting,
-                     AresFrame::AresFrameAckErrorCode,
-                     AresFrame::AresFrameFramingError>
-            frame;
+        AresFrame::AresFrameResponseTypes payload;
     };
 
     void _publish_response(const AresFrame::AresFrameDecoded &frame);
@@ -80,7 +92,9 @@ class AresSerial {
 
     std::recursive_mutex _serial_lock;
 
-    // todo: event handler
+    std::function<void(int64_t, uint64_t, uint16_t, bool, uint8_t, uint16_t)>
+        _start_callback = nullptr;
+    void _start_event(const AresFrame::AresFrameStart &start_frame) const;
 };
 
 #endif // ARES_ARES_LORA_SERIAL_HPP

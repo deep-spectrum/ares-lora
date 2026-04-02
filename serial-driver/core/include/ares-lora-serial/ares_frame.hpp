@@ -87,6 +87,10 @@ class AresFrame {
         std::variant<std::monostate, AresFrameSetting, AresFrameStart,
                      AresFrameAckErrorCode, AresFrameFramingError>;
 
+    using AresFrameResponseTypes =
+        std::variant<std::monostate, AresFrameSetting, AresFrameAckErrorCode,
+                     AresFrameFramingError>;
+
     struct AresFrameDecoded {
         AresFrameType type;
         AresFrameRxTypes payload;
