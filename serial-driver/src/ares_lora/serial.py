@@ -49,7 +49,7 @@ def lora_serial_command(func):
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
         try:
-            return func(args, kwargs)
+            return func(*args, **kwargs)
         except AresTimeout as e:
             raise TimeoutError(str(e))
 
@@ -95,16 +95,17 @@ class LoraSerial:
             else:
                 pass
 
+    def _check_ret_code(self, code: int):
+        pass  # TODO
+
     @lora_serial_command
     def setting(self, setting_id: SettingId, value: int | None = None) -> int | None:
         if value is None:
             ret, err_code = self._dev.setting_get(setting_id.value)
-            if err_code != 0:
-                pass  # TODO
+            self._check_ret_code(err_code)
             return ret
         err_code = self._dev.setting_set(setting_id.value, value)
-        if err_code != 0:
-            pass  # TODO
+        self._check_ret_code(err_code)
         return None
 
     @lora_serial_command
@@ -114,8 +115,7 @@ class LoraSerial:
         if sec < 0:
             raise ValueError("Time must be positive")
         ret = self._dev.start(sec, nsec, destination_id, broadcast)
-        if ret != 0:
-            pass  # TODO
+        self._check_ret_code(ret)
 
     @lora_serial_command
     def lora_config(self, config: LoraConfig):
@@ -124,7 +124,8 @@ class LoraSerial:
             if not isinstance(args[key], int):
                 args[key] = args[key].value
         configs_ = _AresLoraConfig(**args)
-        self._dev.lora_config(configs_)
+        ret = self._dev.lora_config(configs_)
+        self._check_ret_code(ret)
 
     def start_driver(self):
         self._dev.start_driver()
