@@ -3,7 +3,7 @@ requires = ["scikit-build-core", "pybind11"]
 build-backend = "scikit_build_core.build"
 
 [project]
-name = "ares-lora-serial-core"
+name = "ares-lora-core"
 version = "0.0.0"
 description = "Ares LoRa serial driver core library"
 authors = [
