@@ -47,6 +47,7 @@ static void handle_setting(const struct ares_serial *serial,
     ret = update_setting(frame->payload.SETTING.setting, setting);
     if (ret < 0) {
         send_ack_frame(serial, frame, ret);
+        return;
     }
 
     if (frame->payload.SETTING.setting == ARES_SETTING_ID ||
