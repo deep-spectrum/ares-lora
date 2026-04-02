@@ -13,13 +13,13 @@
 #include <ares-lora-serial/util.hpp>
 #include <cassert>
 #include <chrono>
+#include <logging/log.hpp>
 #include <pybind11/chrono.h>
 #include <pybind11/functional.h>
 #include <pybind11/pybind11.h>
 #include <sstream>
 #include <stdexcept>
 #include <type_traits>
-#include <logging/log.hpp>
 
 LOG_MODULE_REGISTER(serial_logger);
 
@@ -49,11 +49,31 @@ PYBIND11_MODULE(_ares_lora_serial, m, py::mod_gil_not_used()) {
 
     py::register_local_exception<AresTimeoutError>(m, "AresTimeout",
                                                    PyExc_TimeoutError);
+
+    py::class_<AresLoraConfig>(m, "_AresLoraConfig",
+                               "LoRa configurations container")
+        .def(py::init<>())
+        .def(py::init<const py::kwargs>())
+        .def_readwrite("frequency", &AresLoraConfig::frequency,
+                       "LoRa center frequency in Hz")
+        .def_readwrite("preamble_length", &AresLoraConfig::preamble_length,
+                       "Preamble length")
+        .def_readwrite("bandwidth", &AresLoraConfig::bandwidth,
+                       "LoRa bandwidth")
+        .def_readwrite("datarate", &AresLoraConfig::datarate, "LoRa data rate")
+        .def_readwrite("coding_rate", &AresLoraConfig::coding_rate,
+                       "LoRa coding rate")
+        .def_readwrite("tx_power", &AresLoraConfig::tx_power, "LoRa tx power");
 }
 
 AresSerialConfigs::AresSerialConfigs(const py::kwargs &kwargs) {
     from_kwargs(kwargs, SP(port), SP(response_timeout), SP(rx_period),
                 SP(start_callback), SP(serial_timeout));
+}
+
+AresLoraConfig::AresLoraConfig(const py::kwargs &kwargs) {
+    from_kwargs(kwargs, SP(frequency), SP(preamble_length), SP(bandwidth),
+                SP(datarate), SP(coding_rate), SP(tx_power));
 }
 
 AresSerial::AresSerial(const AresSerialConfigs &configs)
@@ -297,7 +317,6 @@ void AresSerial::_read_serial() {
 
 void AresSerial::_publish_response(const AresFrame::AresFrameDecoded &frame) {
     AresResponse response;
-
 
     switch (frame.type) {
     case AresFrame::ACK: {

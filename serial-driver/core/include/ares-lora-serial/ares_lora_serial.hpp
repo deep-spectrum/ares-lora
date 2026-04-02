@@ -48,6 +48,18 @@ struct AresSerialConfigs {
         start_callback = nullptr;
 };
 
+struct AresLoraConfig {
+    AresLoraConfig() = default;
+    explicit AresLoraConfig(const py::kwargs &kwargs);
+
+    uint32_t frequency = 0;
+    uint16_t preamble_length = 0;
+    uint8_t bandwidth = 0;
+    uint8_t datarate = 0;
+    uint8_t coding_rate = 0;
+    int8_t tx_power = 0;
+};
+
 class AresSerial {
   public:
     explicit AresSerial(const AresSerialConfigs &configs);
@@ -57,6 +69,12 @@ class AresSerial {
     int setting_set(uint16_t id, uint32_t value);
     // returns (value, error code)
     py::tuple setting_get(uint16_t id);
+
+    // returns error code
+    int send_start(int64_t sec, uint64_t nsec, uint16_t id, bool broadcast);
+
+    // returns error code
+    int lora_config(const AresLoraConfig &config);
 
     void start();
     void stop();
