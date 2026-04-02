@@ -15,6 +15,7 @@
 #include <ares/queue.hpp>
 #include <atomic>
 #include <chrono>
+#include <exception>
 #include <functional>
 #include <future>
 #include <mutex>
@@ -24,6 +25,16 @@
 
 namespace py = pybind11;
 using namespace std::chrono_literals;
+
+class AresTimeoutError : public std::exception {
+  public:
+    explicit AresTimeoutError(const std::string &msg) : _msg(msg) {}
+
+    const char *what() const noexcept override { return _msg.c_str(); }
+
+  private:
+    std::string _msg;
+};
 
 struct AresSerialConfigs {
     AresSerialConfigs() = default;
@@ -42,8 +53,10 @@ class AresSerial {
     explicit AresSerial(const AresSerialConfigs &configs);
     ~AresSerial();
 
-    void setting_set(uint16_t id, uint32_t value);
-    uint32_t setting_get(uint16_t id);
+    // returns error code
+    int setting_set(uint16_t id, uint32_t value);
+    // returns (value, error code)
+    py::tuple setting_get(uint16_t id);
 
     void start();
     void stop();
@@ -95,6 +108,8 @@ class AresSerial {
     std::function<void(int64_t, uint64_t, uint16_t, bool, uint8_t, uint16_t)>
         _start_callback = nullptr;
     void _start_event(const AresFrame::AresFrameStart &start_frame) const;
+
+    static void _handle_bad_frame(const AresResponse &response);
 };
 
 #endif // ARES_ARES_LORA_SERIAL_HPP

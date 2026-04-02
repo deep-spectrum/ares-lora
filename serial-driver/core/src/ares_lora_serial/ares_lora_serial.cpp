@@ -16,6 +16,8 @@
 #include <pybind11/chrono.h>
 #include <pybind11/functional.h>
 #include <pybind11/pybind11.h>
+#include <sstream>
+#include <stdexcept>
 #include <type_traits>
 
 using namespace std::chrono_literals;
@@ -39,6 +41,9 @@ PYBIND11_MODULE(_ares_lora_serial, m, py::mod_gil_not_used()) {
         .def("setting_set", &AresSerial::setting_set, py::arg("setting_id"),
              py::arg("value"))
         .def("setting_get", &AresSerial::setting_get, py::arg("setting_id"));
+
+    py::register_local_exception<AresTimeoutError>(m, "AresTimeout",
+                                                   PyExc_TimeoutError);
 }
 
 AresSerialConfigs::AresSerialConfigs(const py::kwargs &kwargs) {
@@ -62,25 +67,82 @@ AresSerial::AresSerial(const AresSerialConfigs &configs)
 
 AresSerial::~AresSerial() { _serial.close(); }
 
-void AresSerial::setting_set(uint16_t id, uint32_t value) {
-    AresFrame frame(AresFrame::SETTING,
-                    AresFrame::AresFrameSetting{true, id, value});
-    std::vector<uint8_t> frame_buf;
+AresSerial::AresResponse AresSerial::_send_frame(AresFrame &frame) {
+    std::vector<uint8_t> tx;
+    frame.serialize(tx);
 
-    frame.serialize(frame_buf);
+    std::unique_lock lock(_serial_lock);
+    _serial.write(tx);
+    lock.unlock();
 
-    _serial.write(frame_buf);
+    AresResponse response;
+
+    try {
+        response = _response_queue.get(_response_timeout);
+    } catch (const ares::queue_exception &exc) {
+        if (exc.reason() == ares::queue_exception::QUEUE_EMPTY) {
+            throw AresTimeoutError(exc.what());
+        }
+        throw;
+    }
+
+    return response;
 }
 
-uint32_t AresSerial::setting_get(uint16_t id) {
+void AresSerial::_handle_bad_frame(const AresResponse &response) {
+    std::stringstream ss;
+    ss << "Internal error: Bad frame received (code: "
+       << std::get<AresFrame::AresFrameFramingError>(response.payload) << ")";
+    throw py::buffer_error(ss.str());
+}
+
+int AresSerial::setting_set(uint16_t id, uint32_t value) {
+    AresFrame frame(AresFrame::SETTING,
+                    AresFrame::AresFrameSetting{true, id, value});
+    AresResponse response = _send_frame(frame);
+
+    int ret = -1;
+    switch (response.type) {
+    case AresResponse::ACK: {
+        ret = std::get<AresFrame::AresFrameAckErrorCode>(response.payload);
+        break;
+    }
+    case AresResponse::BAD_FRAME: {
+        _handle_bad_frame(response);
+        break;
+    }
+    default: {
+        throw std::runtime_error("Received invalid response");
+    }
+    }
+
+    return ret;
+}
+
+py::tuple AresSerial::setting_get(uint16_t id) {
     AresFrame frame(AresFrame::SETTING, AresFrame::AresFrameSetting{false, id});
-    std::vector<uint8_t> frame_buf;
+    AresResponse response = _send_frame(frame);
 
-    frame.serialize(frame_buf);
+    int ret = 0;
+    uint32_t setting = 0;
 
-    _serial.write(frame_buf);
+    switch (response.type) {
+    case AresResponse::COMMAND_SPECIFIC: {
+        AresFrame::AresFrameSetting setting_ =
+            std::get<AresFrame::AresFrameSetting>(response.payload);
+        setting = setting_.value;
+        break;
+    }
+    case AresResponse::ACK: {
+        ret = std::get<AresFrame::AresFrameAckErrorCode>(response.payload);
+        break;
+    }
+    default: {
+        _handle_bad_frame(response);
+    }
+    }
 
-    return 0;
+    return py::make_tuple(setting, ret);
 }
 
 void AresSerial::start() {
@@ -251,17 +313,6 @@ void AresSerial::_publish_response(const AresFrame::AresFrameDecoded &frame) {
         frame.payload);
 
     _response_queue.put(response);
-}
-
-AresSerial::AresResponse AresSerial::_send_frame(AresFrame &frame) {
-    std::vector<uint8_t> tx;
-    frame.serialize(tx);
-
-    std::unique_lock lock(_serial_lock);
-    _serial.write(tx);
-    lock.unlock();
-
-    return _response_queue.get(_response_timeout);
 }
 
 void AresSerial::_start_event(
