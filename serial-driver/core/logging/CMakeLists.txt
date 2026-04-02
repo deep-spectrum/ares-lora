@@ -1,0 +1,43 @@
+cmake_minimum_required(VERSION 3.15)
+project(logging)
+
+set(CMAKE_CXX_STANDARD 17)
+
+option(USE_PYTHON_LOGGERS "Use Python logging library implementation" OFF)
+
+set(DEFAULT_LOG_LEVEL "off" CACHE STRING "Logging level: off, crit, err, wrn, inf, dbg")
+set_property(CACHE DEFAULT_LOG_LEVEL PROPERTY STRINGS off err wrn inf dbg)
+
+if (DEFAULT_LOG_LEVEL STREQUAL "off")
+    set(LOG_LEVEL_VAL 5)
+elseif(DEFAULT_LOG_LEVEL STREQUAL "crit")
+    set(LOG_LEVEL_VAL 4)
+elseif (DEFAULT_LOG_LEVEL STREQUAL "err")
+    set(LOG_LEVEL_VAL 3)
+elseif (DEFAULT_LOG_LEVEL STREQUAL "wrn")
+    set(LOG_LEVEL_VAL 2)
+elseif (DEFAULT_LOG_LEVEL STREQUAL "inf")
+    set(LOG_LEVEL_VAL 1)
+elseif (DEFAULT_LOG_LEVEL STREQUAL "dbg")
+    set(LOG_LEVEL_VAL 0)
+else ()
+    message(WARNING "Log level not set. Selecting inf level")
+    set(LOG_LEVEL_VAL 1)
+endif ()
+
+add_library(logging STATIC src/logger.cpp)
+set_target_properties(logging PROPERTIES POSITION_INDEPENDENT_CODE ON)
+target_include_directories(logging PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
+target_compile_definitions(logging PUBLIC LOG_LEVEL=${LOG_LEVEL_VAL})
+
+if (USE_PYTHON_LOGGERS)
+    find_package(pybind11 QUIET)
+
+    if (TARGET pybind11::embed)
+        message(STATUS "Found pybind11::embed")
+        target_link_libraries(logging PRIVATE pybind11::embed)
+        target_compile_definitions(logging PRIVATE USE_PYTHON_LOGGERS)
+    else()
+        message(WARNING "USE_PYTHON_LIB is ON but pybind11::embed is not available")
+    endif()
+endif ()
