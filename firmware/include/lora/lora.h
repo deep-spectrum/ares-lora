@@ -77,6 +77,8 @@ struct ares_lora_ctx {
 
     struct k_mutex wr_mtx;
     k_tid_t tid;
+
+    uint16_t packet_id;
 };
 
 struct ares_lora {
@@ -104,7 +106,7 @@ int ares_lora_register_command_callbacks(
     const struct ares_lora *lora, const struct ares_lora_command *commands,
     size_t num_commands);
 int ares_lora_write_packet(const struct ares_lora *lora,
-                           const struct ares_packet *packet);
+                           struct ares_packet *packet);
 int ares_lora_configure_lora(const struct ares_lora *lora,
                              const struct lora_modem_config *config);
 

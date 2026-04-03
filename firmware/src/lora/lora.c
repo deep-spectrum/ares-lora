@@ -252,11 +252,13 @@ static int ares_lora_write_txbuf(const struct ares_lora *lora) {
 }
 
 int ares_lora_write_packet(const struct ares_lora *lora,
-                           const struct ares_packet *packet) {
+                           struct ares_packet *packet) {
     int ret;
     if (lora == NULL || packet == NULL) {
         return -EINVAL;
     }
+
+    packet->packet_id = lora->ctx->packet_id;
 
     ret = serialize_ares_packet(lora->ctx->tx_buf.buf,
                                 sizeof(lora->ctx->tx_buf.buf), packet);
@@ -265,6 +267,7 @@ int ares_lora_write_packet(const struct ares_lora *lora,
         return ret;
     }
     lora->ctx->tx_buf.len = ret;
+    lora->ctx->packet_id++;
 
     (void)ares_lora_write_txbuf(lora);
     return 0;
