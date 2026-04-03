@@ -19,8 +19,10 @@ typedef uint16_t crc16_t;
     (ARES_PACKET_HEADER_OFFSET + ARES_PACKET_HEADER_OVERHEAD)
 #define ARES_PACKET_TYPE_OFFSET                                                \
     (ARES_PACKET_LEN_OFFSET + ARES_PACKET_LEN_OVERHEAD)
-#define ARES_PACKET_SEQ_CNT_OFFSET                                             \
+#define ARES_PACKET_ID_OFFSET                                                  \
     (ARES_PACKET_TYPE_OFFSET + ARES_PACKET_TYPE_OVERHEAD)
+#define ARES_PACKET_SEQ_CNT_OFFSET                                             \
+    (ARES_PACKET_ID_OFFSET + ARES_PACKET_ID_OVERHEAD)
 #define ARES_PACKET_PAN_ID_OFFSET                                              \
     (ARES_PACKET_SEQ_CNT_OFFSET + ARES_PACKET_SEQ_CNT_OVERHEAD)
 #define ARES_PACKET_SRC_ID_OFFSET                                              \
@@ -154,6 +156,8 @@ static void serialize(uint8_t *buf, size_t len,
     (void)memcpy(&buf[ARES_PACKET_LEN_OFFSET], &su_payload_len,
                  ARES_PACKET_LEN_OVERHEAD);
     buf[ARES_PACKET_TYPE_OFFSET] = packet->type;
+    (void)memcpy(&buf[ARES_PACKET_ID_OFFSET], &packet->packet_id,
+                 ARES_PACKET_ID_OVERHEAD);
     buf[ARES_PACKET_SEQ_CNT_OFFSET] = packet->sequence_cnt;
     (void)memcpy(&buf[ARES_PACKET_PAN_ID_OFFSET], &packet->pan_id,
                  ARES_PACKET_PAN_ID_OVERHEAD);
@@ -213,6 +217,8 @@ static void deserialize(struct ares_packet *packet, const uint8_t *buf) {
     (void)memcpy(&payload_len, &buf[ARES_PACKET_LEN_OFFSET],
                  ARES_PACKET_LEN_OVERHEAD);
     packet->type = buf[ARES_PACKET_TYPE_OFFSET];
+    (void)memcpy(&packet->packet_id, &buf[ARES_PACKET_ID_OFFSET],
+                 ARES_PACKET_ID_OVERHEAD);
     packet->sequence_cnt = buf[ARES_PACKET_SEQ_CNT_OFFSET];
     (void)memcpy(&packet->pan_id, &buf[ARES_PACKET_PAN_ID_OFFSET],
                  ARES_PACKET_PAN_ID_OVERHEAD);
@@ -308,7 +314,7 @@ bool ares_packet_valid(const uint8_t *buf, size_t len) {
 int ares_packet_present(const uint8_t *buf, size_t len,
                         struct ares_packet_info *info) {
     int *start, *length, *remaining;
-    size_t seq_cnt_index, payload_len, footer_index;
+    size_t packet_id_idx, payload_len, footer_index;
     enum ares_packet_type type;
 
     if (buf == NULL || info == NULL) {
@@ -327,8 +333,8 @@ int ares_packet_present(const uint8_t *buf, size_t len,
 
         *start = (int)i;
 
-        seq_cnt_index = *start + ARES_PACKET_SEQ_CNT_OFFSET;
-        if (seq_cnt_index > len) {
+        packet_id_idx = *start + ARES_PACKET_ID_OFFSET;
+        if (packet_id_idx > len) {
             // cannot extract packet length
             continue;
         }
