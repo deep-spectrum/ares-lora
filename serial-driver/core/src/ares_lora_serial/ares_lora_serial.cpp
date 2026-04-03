@@ -342,11 +342,14 @@ void AresSerial::_process_frames() {
 
 void AresSerial::_process_rx_buffer(std::vector<uint8_t> &buf) {
     while (true) {
+        LOG_DBG("Processing %u bytes", buf.size());
         auto [frame_start, frame_size, _] = AresFrame::frame_present(buf);
         if (frame_start < 0) {
+            LOG_DBG("Frame not found");
             return;
         }
 
+        LOG_INF("Frame found");
         AresFrame frame;
         frame.parse(buf, frame_start);
         _frame_q.put(frame.get_parsed_frame());
@@ -357,6 +360,8 @@ void AresSerial::_process_rx_buffer(std::vector<uint8_t> &buf) {
 void AresSerial::_read_serial_helper() {
     std::vector<uint8_t> rx;
     std::unique_lock lock(_serial_lock, std::defer_lock);
+
+    LOG_DBG("Starting RX task");
 
     while (_tasks_running) {
         lock.lock();
@@ -425,9 +430,17 @@ void AresSerial::_publish_response(const AresFrame::AresFrameDecoded &frame) {
 
 void AresSerial::_start_event(
     const AresFrame::AresFrameStart &start_frame) const {
+
+    LOG_INF("Start event received: (%ld, %lu, %u, %d, %d, %u)", start_frame.sec,
+            start_frame.nsec, start_frame.id, start_frame.broadcast,
+            start_frame.seq_cnt, start_frame.packet_id);
+
     if (_start_callback == nullptr) {
+        LOG_DBG("No callback registered");
         return;
     }
+
+    LOG_DBG("Calling registered callback for start event");
 
     _start_callback(start_frame.sec, start_frame.nsec, start_frame.id,
                     start_frame.broadcast, start_frame.seq_cnt,
