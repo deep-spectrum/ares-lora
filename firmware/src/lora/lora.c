@@ -136,7 +136,7 @@ static void dispatch(const struct ares_lora *lora, int start_index,
     struct ares_packet packet;
     int ret;
 
-    ret = deserialize_ares_packet(&packet, &lora->ctx->tx_buf.buf[start_index],
+    ret = deserialize_ares_packet(&packet, &lora->ctx->rx_buf.buf[start_index],
                                   length);
 
     if (ret < 0) {
@@ -268,7 +268,8 @@ int ares_lora_write_packet(const struct ares_lora *lora,
     }
 
     ret = serialize_ares_packet(lora->ctx->tx_buf.buf,
-                                sizeof(lora->ctx->tx_buf.buf), packet);
+                                sizeof(lora->ctx->tx_buf.buf), packet,
+                                lora->ctx->seq_num);
 
     if (ret < 0) {
         return ret;
@@ -276,7 +277,13 @@ int ares_lora_write_packet(const struct ares_lora *lora,
     lora->ctx->tx_buf.len = ret;
 
     ret = ares_lora_write_txbuf(lora);
-    return (ret < 0) ? ret : 0;
+    if (ret < 0) {
+        return ret;
+    }
+
+    lora->ctx->seq_num++;
+
+    return ret;
 }
 
 int ares_lora_configure_lora(const struct ares_lora *lora,

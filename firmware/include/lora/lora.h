@@ -79,6 +79,7 @@ struct ares_lora_ctx {
     k_tid_t tid;
 
     uint16_t packet_id;
+    uint8_t seq_num;
 };
 
 struct ares_lora {

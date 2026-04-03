@@ -6,6 +6,6 @@ config ARES_SERIAL_STACK_SIZE
 
 config ARES_SERIAL_PRIO
     int "Serial thread priority"
-    default 1
+    default 2
 
 endmenu  # Ares Serial

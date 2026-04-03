@@ -79,7 +79,7 @@ struct ares_packet_info {
 };
 
 int serialize_ares_packet(uint8_t *buf, size_t len,
-                          const struct ares_packet *packet);
+                          const struct ares_packet *packet, uint8_t seq_num);
 int deserialize_ares_packet(struct ares_packet *packet, const uint8_t *buf,
                             size_t len);
 bool ares_packet_valid(const uint8_t *buf, size_t len);
