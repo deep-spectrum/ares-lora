@@ -3,6 +3,12 @@ from typing import Callable
 from enum import IntEnum
 from dataclasses import dataclass, asdict
 import functools
+from .errno import strerror
+
+
+class LoraException(Exception):
+    def __init__(self, code: int):
+        super().__init__(strerror(code))
 
 
 class SettingId(IntEnum):
@@ -95,8 +101,10 @@ class LoraSerial:
             else:
                 pass
 
-    def _check_ret_code(self, code: int):
-        pass  # TODO
+    @staticmethod
+    def _check_ret_code(code: int):
+        if code != 0:
+            raise LoraException(code)
 
     @lora_serial_command
     def setting(self, setting_id: SettingId, value: int | None = None) -> int | None:
