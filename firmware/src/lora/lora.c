@@ -229,20 +229,29 @@ static int ares_lora_write(const struct ares_lora *lora, const void *data,
     __ASSERT_NO_MSG(nbytes);
 
     size_t offset = 0u, temp_cnt, length = nbytes;
+    int err = 0;
 
     (void)k_mutex_lock(&lora->ctx->wr_mtx, K_FOREVER);
     while (length != 0) {
-        int err = LORA_API_CALL(lora, write, &((const uint8_t *)data)[offset],
+        err = LORA_API_CALL(lora, write, &((const uint8_t *)data)[offset],
                                 length, &temp_cnt);
-        ARG_UNUSED(err);
+        if (err != 0) {
+            break;
+        }
 
-        __ASSERT_NO_MSG(err == 0);
         __ASSERT_NO_MSG(nbytes >= length);
 
         offset += temp_cnt;
         length -= temp_cnt;
     }
     (void)k_mutex_unlock(&lora->ctx->wr_mtx);
+
+    if (err != 0) {
+        if (length != nbytes) {
+            return offset;
+        }
+        return err;
+    }
 
     return (int)nbytes;
 }
@@ -266,8 +275,8 @@ int ares_lora_write_packet(const struct ares_lora *lora,
     }
     lora->ctx->tx_buf.len = ret;
 
-    (void)ares_lora_write_txbuf(lora);
-    return 0;
+    ret = ares_lora_write_txbuf(lora);
+    return (ret < 0) ? ret : 0;
 }
 
 int ares_lora_configure_lora(const struct ares_lora *lora,
