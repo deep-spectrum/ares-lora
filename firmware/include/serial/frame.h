@@ -57,6 +57,7 @@ struct ares_frame {
             int64_t sec;
             uint64_t ns;
             uint16_t id;
+            uint16_t packet_id;
             bool broadcast;
             uint8_t seq_cnt;
         } START; ///< ARES_FRAME_START

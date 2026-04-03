@@ -53,7 +53,8 @@ static size_t calculate_frame_length(const struct ares_frame *frame) {
                       SIZEOF_FIELD(struct ares_frame, payload.START.ns) +
                       SIZEOF_FIELD(struct ares_frame, payload.START.id) +
                       SIZEOF_FIELD(struct ares_frame, payload.START.broadcast) +
-                      SIZEOF_FIELD(struct ares_frame, payload.START.seq_cnt);
+                      SIZEOF_FIELD(struct ares_frame, payload.START.seq_cnt) +
+                      SIZEOF_FIELD(struct ares_frame, payload.START.packet_id);
         break;
     }
     case ARES_FRAME_ACK: {
@@ -113,6 +114,14 @@ static void serialize(uint8_t *buf, const struct ares_frame *frame,
                 SIZEOF_FIELD(struct ares_frame, payload.START.broadcast),
             &frame->payload.START.seq_cnt,
             SIZEOF_FIELD(struct ares_frame, payload.START.seq_cnt));
+        (void)memcpy(
+            payload + SIZEOF_FIELD(struct ares_frame, payload.START.sec) +
+                SIZEOF_FIELD(struct ares_frame, payload.START.ns) +
+                SIZEOF_FIELD(struct ares_frame, payload.START.id) +
+                SIZEOF_FIELD(struct ares_frame, payload.START.broadcast) +
+                SIZEOF_FIELD(struct ares_frame, payload.START.seq_cnt),
+            &frame->payload.START.packet_id,
+            SIZEOF_FIELD(struct ares_frame, payload.START.packet_id));
         break;
     }
     case ARES_FRAME_ACK: {
@@ -200,7 +209,7 @@ static void deserialize(struct ares_frame *frame, const uint8_t *buf) {
                          SIZEOF_FIELD(struct ares_frame, payload.START.ns) +
                          SIZEOF_FIELD(struct ares_frame, payload.START.id),
                      SIZEOF_FIELD(struct ares_frame, payload.START.broadcast));
-        // receive side: we don't care about the seq_cnt...
+        // receive side: we don't care about the seq_cnt or packet_id...
         break;
     }
     case ARES_FRAME_LORA_CONFIG: {
