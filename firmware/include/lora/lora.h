@@ -106,8 +106,9 @@ int ares_lora_register_command_callbacks(
     const struct ares_lora *lora, const struct ares_lora_command *commands,
     size_t num_commands);
 int ares_lora_write_packet(const struct ares_lora *lora,
-                           struct ares_packet *packet);
+                           const struct ares_packet *packet);
 int ares_lora_configure_lora(const struct ares_lora *lora,
                              const struct lora_modem_config *config);
+int ares_lora_get_new_packet_id(const struct ares_lora *lora, uint16_t *id);
 
 #endif // ARES_LORA_H
