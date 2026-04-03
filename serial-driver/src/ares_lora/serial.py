@@ -127,6 +127,8 @@ class LoraSerial:
             raise ValueError("Direct messages must have a valid destination specified")
         if sec < 0:
             raise ValueError("Time must be positive")
+        if destination_id is None:
+            destination_id = 0
         ret = self._dev.start(sec, nsec, destination_id, broadcast)
         self._check_ret_code(ret)
 
