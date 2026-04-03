@@ -67,7 +67,7 @@ def lora_serial_command(func):
 
 
 class LoraSerial:
-    def __init__(self, port: str, response_timeout: float = 2000.0, rx_period: float = 0.1, serial_timeout: float = 0.1,
+    def __init__(self, port: str, response_timeout: float = 2.0, rx_period: float = 0.1, serial_timeout: float = 0.1,
                  start_callback: Callable[[int, int], None] | None = None):
         if not port:
             raise ValueError("Invalid port")
@@ -122,14 +122,22 @@ class LoraSerial:
         return None
 
     @lora_serial_command
-    def start(self, sec: int, nsec: int, broadcast: bool = True, destination_id: int | None = None):
+    def start(self, sec: int, nsec: int, timeout: float = 20.0, broadcast: bool = True, destination_id: int | None = None):
         if not broadcast and (destination_id is None or destination_id <= 0):
             raise ValueError("Direct messages must have a valid destination specified")
         if sec < 0:
             raise ValueError("Time must be positive")
         if destination_id is None:
             destination_id = 0
-        ret = self._dev.start(sec, nsec, destination_id, broadcast)
+        prev_timeout = self._dev.get_response_timeout()
+        self._dev.set_response_timeout(timeout)
+        try:
+            ret = self._dev.start(sec, nsec, destination_id, broadcast)
+        except Exception:
+            self._dev.set_response_timeout(prev_timeout)
+            raise
+        else:
+            self._dev.set_response_timeout(prev_timeout)
         self._check_ret_code(ret)
 
     @lora_serial_command

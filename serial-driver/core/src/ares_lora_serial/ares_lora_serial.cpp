@@ -48,7 +48,10 @@ PYBIND11_MODULE(_ares_lora_serial, m, py::mod_gil_not_used()) {
              py::arg("id"), py::arg("broadcast"))
         .def("lora_config", &AresSerial::lora_config, py::arg("config"))
         .def("start_driver", &AresSerial::start, "Start the serial driver")
-        .def("stop_driver", &AresSerial::stop, "Stop the serial driver");
+        .def("stop_driver", &AresSerial::stop, "Stop the serial driver")
+        .def("set_response_timeout", &AresSerial::set_response_timeout,
+             py::arg("timeout"))
+        .def("get_response_timeout", &AresSerial::get_response_timeout);
 
     py::register_local_exception<AresTimeoutError>(m, "AresTimeout",
                                                    PyExc_TimeoutError);
@@ -108,6 +111,8 @@ AresSerial::~AresSerial() {
 AresSerial::AresResponse AresSerial::_send_frame(AresFrame &frame) {
     std::vector<uint8_t> tx;
     frame.serialize(tx);
+
+    _response_queue.clear();
 
     std::unique_lock lock(_serial_lock);
     _serial.write(tx);
@@ -229,6 +234,15 @@ int AresSerial::lora_config(const AresLoraConfig &config) {
     }
 
     return ret;
+}
+
+void AresSerial::set_response_timeout(
+    const std::chrono::milliseconds &timeout) {
+    _response_timeout = timeout;
+}
+
+std::chrono::milliseconds AresSerial::get_response_timeout() const {
+    return _response_timeout;
 }
 
 void AresSerial::start() {

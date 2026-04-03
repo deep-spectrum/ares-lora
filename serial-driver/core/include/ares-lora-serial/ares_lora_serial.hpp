@@ -78,6 +78,9 @@ class AresSerial {
     // returns error code
     int lora_config(const AresLoraConfig &config);
 
+    void set_response_timeout(const std::chrono::milliseconds &timeout);
+    std::chrono::milliseconds get_response_timeout() const;
+
     void start();
     void stop();
 
