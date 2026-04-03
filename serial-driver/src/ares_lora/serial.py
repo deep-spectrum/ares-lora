@@ -4,6 +4,10 @@ from enum import IntEnum
 from dataclasses import dataclass, asdict
 import functools
 from .errno import strerror
+import logging
+
+
+logger = logging.getLogger("ares_lora")
 
 
 class LoraException(Exception):
@@ -99,7 +103,8 @@ class LoraSerial:
             if self._start_cb is not None:
                 self._start_cb(sec, nsec)
             else:
-                pass
+                logger.info(f"Received start message (sec: {sec}, nsec: {nsec}, src: {src}, "
+                            f"broadcast: {broadcast}, sequence count: {seq_cnt}, packet id: {packet_id})")
 
     @staticmethod
     def _check_ret_code(code: int):
