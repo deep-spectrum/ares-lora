@@ -234,7 +234,7 @@ static int ares_lora_write(const struct ares_lora *lora, const void *data,
     (void)k_mutex_lock(&lora->ctx->wr_mtx, K_FOREVER);
     while (length != 0) {
         err = LORA_API_CALL(lora, write, &((const uint8_t *)data)[offset],
-                                length, &temp_cnt);
+                            length, &temp_cnt);
         if (err != 0) {
             break;
         }
