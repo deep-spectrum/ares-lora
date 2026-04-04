@@ -47,6 +47,7 @@ static void handle_setting(const struct ares_serial *serial,
     ret = update_setting(frame->payload.SETTING.setting, setting);
     if (ret < 0) {
         send_ack_frame(serial, frame, ret);
+        return;
     }
 
     if (frame->payload.SETTING.setting == ARES_SETTING_ID ||
@@ -95,10 +96,14 @@ static void handle_start(const struct ares_serial *serial,
 
     packet.pan_id = (uint16_t)pan;
     packet.source_id = (uint16_t)id;
+    (void)ares_lora_get_new_packet_id(lora, &packet.packet_id);
 
     for (size_t i = 0; i < rep_cnt; i++) {
-        packet.sequence_cnt = (uint8_t)i;
-        ares_lora_write_packet(lora, &packet);
+        ret = ares_lora_write_packet(lora, &packet);
+        if (ret < 0) {
+            send_ack_frame(serial, frame, ret);
+            return;
+        }
     }
 
     send_ack_frame(serial, frame, 0);

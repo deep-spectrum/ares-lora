@@ -136,7 +136,7 @@ static void dispatch(const struct ares_lora *lora, int start_index,
     struct ares_packet packet;
     int ret;
 
-    ret = deserialize_ares_packet(&packet, &lora->ctx->tx_buf.buf[start_index],
+    ret = deserialize_ares_packet(&packet, &lora->ctx->rx_buf.buf[start_index],
                                   length);
 
     if (ret < 0) {
@@ -229,20 +229,29 @@ static int ares_lora_write(const struct ares_lora *lora, const void *data,
     __ASSERT_NO_MSG(nbytes);
 
     size_t offset = 0u, temp_cnt, length = nbytes;
+    int err = 0;
 
     (void)k_mutex_lock(&lora->ctx->wr_mtx, K_FOREVER);
     while (length != 0) {
-        int err = LORA_API_CALL(lora, write, &((const uint8_t *)data)[offset],
-                                length, &temp_cnt);
-        ARG_UNUSED(err);
+        err = LORA_API_CALL(lora, write, &((const uint8_t *)data)[offset],
+                            length, &temp_cnt);
+        if (err != 0) {
+            break;
+        }
 
-        __ASSERT_NO_MSG(err == 0);
         __ASSERT_NO_MSG(nbytes >= length);
 
         offset += temp_cnt;
         length -= temp_cnt;
     }
     (void)k_mutex_unlock(&lora->ctx->wr_mtx);
+
+    if (err != 0) {
+        if (length != nbytes) {
+            return offset;
+        }
+        return err;
+    }
 
     return (int)nbytes;
 }
@@ -259,15 +268,22 @@ int ares_lora_write_packet(const struct ares_lora *lora,
     }
 
     ret = serialize_ares_packet(lora->ctx->tx_buf.buf,
-                                sizeof(lora->ctx->tx_buf.buf), packet);
+                                sizeof(lora->ctx->tx_buf.buf), packet,
+                                lora->ctx->seq_num);
 
     if (ret < 0) {
         return ret;
     }
     lora->ctx->tx_buf.len = ret;
 
-    (void)ares_lora_write_txbuf(lora);
-    return 0;
+    ret = ares_lora_write_txbuf(lora);
+    if (ret < 0) {
+        return ret;
+    }
+
+    lora->ctx->seq_num++;
+
+    return ret;
 }
 
 int ares_lora_configure_lora(const struct ares_lora *lora,
@@ -283,4 +299,15 @@ int ares_lora_configure_lora(const struct ares_lora *lora,
     (void)k_mutex_unlock(&lora->ctx->wr_mtx);
 
     return ret;
+}
+
+int ares_lora_get_new_packet_id(const struct ares_lora *lora, uint16_t *id) {
+    if (lora == NULL || id == NULL) {
+        return -EINVAL;
+    }
+
+    *id = lora->ctx->packet_id;
+    lora->ctx->packet_id++;
+
+    return 0;
 }

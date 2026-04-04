@@ -37,19 +37,44 @@ static void ares_lora_rx_handle(const struct device *dev, uint8_t *rx_data,
     lora->common.handler(LORA_TRANSPORT_EVT_RX_RDY, lora->common.context);
 }
 
-static void async_init(struct lora_async_driven *lora) {
-    const struct device *dev = lora->common.dev;
+static int configure_modem_tx(struct lora_common *lora) {
+    const struct device *dev = lora->dev;
+    int ret;
 
+    ret = lora_recv_async(dev, NULL, NULL);
+    if (ret < 0) {
+        return ret;
+    }
+
+    return lora_config(dev, &lora->config);
+}
+
+static int configure_modem_rx(struct lora_common *lora) {
+    const struct device *dev = lora->dev;
+    int ret;
+
+    ret = lora_config(dev, &lora->config);
+    if (ret < 0) {
+        return ret;
+    }
+
+    return lora_recv_async(dev, ares_lora_rx_handle, lora);
+}
+
+static int configure_modem(struct lora_common *lora) {
+    if (lora->config.tx) {
+        return configure_modem_tx(lora);
+    }
+
+    return configure_modem_rx(lora);
+}
+
+static void async_init(struct lora_async_driven *lora) {
     ring_buf_init(&lora->rx_ringbuf, LORA_BACKEND_RX_RINGBUF_SIZE,
                   lora->rx_buf);
     ring_buf_init(&lora->tx_ringbuf, LORA_BACKEND_TX_RINGBUF_SIZE,
                   lora->tx_buf);
     atomic_clear(&lora->tx_busy);
-    lora_recv_async(dev, ares_lora_rx_handle, lora);
-}
-
-static int configure_modem(struct lora_common *lora) {
-    return lora_config(lora->dev, &lora->config);
 }
 
 static int init(const struct ares_lora_transport *transport, const void *config,
@@ -70,11 +95,10 @@ static int init(const struct ares_lora_transport *transport, const void *config,
     modem_config->public_network = false;
     modem_config->tx_power = 4;
     modem_config->tx = false;
-    (void)configure_modem(common);
 
     async_init(transport->ctx);
 
-    return 0;
+    return configure_modem(common);
 }
 
 static void async_uninit(struct lora_async_driven *lora) {

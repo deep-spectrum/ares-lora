@@ -19,8 +19,10 @@ typedef uint16_t crc16_t;
     (ARES_PACKET_HEADER_OFFSET + ARES_PACKET_HEADER_OVERHEAD)
 #define ARES_PACKET_TYPE_OFFSET                                                \
     (ARES_PACKET_LEN_OFFSET + ARES_PACKET_LEN_OVERHEAD)
-#define ARES_PACKET_SEQ_CNT_OFFSET                                             \
+#define ARES_PACKET_ID_OFFSET                                                  \
     (ARES_PACKET_TYPE_OFFSET + ARES_PACKET_TYPE_OVERHEAD)
+#define ARES_PACKET_SEQ_CNT_OFFSET                                             \
+    (ARES_PACKET_ID_OFFSET + ARES_PACKET_ID_OVERHEAD)
 #define ARES_PACKET_PAN_ID_OFFSET                                              \
     (ARES_PACKET_SEQ_CNT_OFFSET + ARES_PACKET_SEQ_CNT_OVERHEAD)
 #define ARES_PACKET_SRC_ID_OFFSET                                              \
@@ -137,12 +139,13 @@ static crc16_t compute_crc(const uint8_t *buf, size_t len) {
 }
 
 static void serialize(uint8_t *buf, size_t len,
-                      const struct ares_packet *packet, size_t packet_length) {
+                      const struct ares_packet *packet, size_t packet_length,
+                      uint8_t seq_num) {
     __ASSERT_NO_MSG(buf != NULL);
     __ASSERT_NO_MSG(packet != NULL);
     crc16_t crc;
     size_t payload_len = packet_length - ARES_PACKET_BROADCAST_OVERHEAD;
-    uint8_t *payload = &buf[ARES_PACKET_PAYLOAD_OFFSET(1)];
+    uint8_t *payload = &buf[ARES_PACKET_PAYLOAD_OFFSET(packet->type)];
 
     uint16_t su_payload_len = (uint16_t)payload_len;
 
@@ -154,7 +157,9 @@ static void serialize(uint8_t *buf, size_t len,
     (void)memcpy(&buf[ARES_PACKET_LEN_OFFSET], &su_payload_len,
                  ARES_PACKET_LEN_OVERHEAD);
     buf[ARES_PACKET_TYPE_OFFSET] = packet->type;
-    buf[ARES_PACKET_SEQ_CNT_OFFSET] = packet->sequence_cnt;
+    (void)memcpy(&buf[ARES_PACKET_ID_OFFSET], &packet->packet_id,
+                 ARES_PACKET_ID_OVERHEAD);
+    buf[ARES_PACKET_SEQ_CNT_OFFSET] = seq_num;
     (void)memcpy(&buf[ARES_PACKET_PAN_ID_OFFSET], &packet->pan_id,
                  ARES_PACKET_PAN_ID_OVERHEAD);
     (void)memcpy(&buf[ARES_PACKET_SRC_ID_OFFSET], &packet->source_id,
@@ -185,7 +190,7 @@ static void serialize(uint8_t *buf, size_t len,
 }
 
 int serialize_ares_packet(uint8_t *buf, size_t len,
-                          const struct ares_packet *packet) {
+                          const struct ares_packet *packet, uint8_t seq_num) {
     size_t packet_len = 0;
 
     if (buf == NULL || packet == NULL) {
@@ -201,7 +206,7 @@ int serialize_ares_packet(uint8_t *buf, size_t len,
         return -ENOBUFS;
     }
 
-    serialize(buf, len, packet, packet_len);
+    serialize(buf, len, packet, packet_len, seq_num);
 
     return (int)packet_len;
 }
@@ -213,6 +218,8 @@ static void deserialize(struct ares_packet *packet, const uint8_t *buf) {
     (void)memcpy(&payload_len, &buf[ARES_PACKET_LEN_OFFSET],
                  ARES_PACKET_LEN_OVERHEAD);
     packet->type = buf[ARES_PACKET_TYPE_OFFSET];
+    (void)memcpy(&packet->packet_id, &buf[ARES_PACKET_ID_OFFSET],
+                 ARES_PACKET_ID_OVERHEAD);
     packet->sequence_cnt = buf[ARES_PACKET_SEQ_CNT_OFFSET];
     (void)memcpy(&packet->pan_id, &buf[ARES_PACKET_PAN_ID_OFFSET],
                  ARES_PACKET_PAN_ID_OVERHEAD);
@@ -308,7 +315,7 @@ bool ares_packet_valid(const uint8_t *buf, size_t len) {
 int ares_packet_present(const uint8_t *buf, size_t len,
                         struct ares_packet_info *info) {
     int *start, *length, *remaining;
-    size_t seq_cnt_index, payload_len, footer_index;
+    size_t packet_id_idx, payload_len, footer_index;
     enum ares_packet_type type;
 
     if (buf == NULL || info == NULL) {
@@ -327,8 +334,8 @@ int ares_packet_present(const uint8_t *buf, size_t len,
 
         *start = (int)i;
 
-        seq_cnt_index = *start + ARES_PACKET_SEQ_CNT_OFFSET;
-        if (seq_cnt_index > len) {
+        packet_id_idx = *start + ARES_PACKET_ID_OFFSET;
+        if (packet_id_idx > len) {
             // cannot extract packet length
             continue;
         }

@@ -21,6 +21,7 @@
 #define ARES_PACKET_HEADER_OVERHEAD       2
 #define ARES_PACKET_LEN_OVERHEAD          2
 #define ARES_PACKET_TYPE_OVERHEAD         1
+#define ARES_PACKET_ID_OVERHEAD           2
 #define ARES_PACKET_SEQ_CNT_OVERHEAD      1
 #define ARES_PACKET_PAN_ID_OVERHEAD       2
 #define ARES_PACKET_SRC_ID_OVERHEAD       2
@@ -31,10 +32,10 @@
 
 #define ARES_PACKET_BROADCAST_OVERHEAD                                         \
     (ARES_PACKET_HEADER_OVERHEAD + ARES_PACKET_LEN_OVERHEAD +                  \
-     ARES_PACKET_TYPE_OVERHEAD + ARES_PACKET_SEQ_CNT_OVERHEAD +                \
-     ARES_PACKET_PAN_ID_OVERHEAD + ARES_PACKET_SRC_ID_OVERHEAD +               \
-     ARES_PACKET_PAYLOAD_TYPE_OVERHEAD + ARES_PACKET_CRC_OVERHEAD +            \
-     ARES_PACKET_FOOTER_OVERHEAD)
+     ARES_PACKET_TYPE_OVERHEAD + ARES_PACKET_ID_OVERHEAD +                     \
+     ARES_PACKET_SEQ_CNT_OVERHEAD + ARES_PACKET_PAN_ID_OVERHEAD +              \
+     ARES_PACKET_SRC_ID_OVERHEAD + ARES_PACKET_PAYLOAD_TYPE_OVERHEAD +         \
+     ARES_PACKET_CRC_OVERHEAD + ARES_PACKET_FOOTER_OVERHEAD)
 #define ARES_PACKET_DIRECT_OVERHEAD                                            \
     (ARES_PACKET_BROADCAST_OVERHEAD + ARES_PACKET_DST_ID_OVERHEAD)
 
@@ -66,6 +67,7 @@ struct ares_packet {
     uint16_t pan_id;
     uint16_t source_id;
     uint16_t destination_id;
+    uint16_t packet_id;
     enum ares_packet_type type;
     struct ares_packet_payload payload;
 };
@@ -77,7 +79,7 @@ struct ares_packet_info {
 };
 
 int serialize_ares_packet(uint8_t *buf, size_t len,
-                          const struct ares_packet *packet);
+                          const struct ares_packet *packet, uint8_t seq_num);
 int deserialize_ares_packet(struct ares_packet *packet, const uint8_t *buf,
                             size_t len);
 bool ares_packet_valid(const uint8_t *buf, size_t len);
