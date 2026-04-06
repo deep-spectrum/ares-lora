@@ -65,6 +65,10 @@ static size_t calculate_frame_length(const struct ares_frame *frame) {
         payload_len = SIZEOF_FIELD(struct ares_frame, payload.LED);
         break;
     }
+        case ARES_FRAME_FRAMING_ERROR: {
+        payload_len = SIZEOF_FIELD(struct ares_frame, payload.FRAMING_ERROR);
+        break;
+    }
     default: {
         __ASSERT(false, "Invalid frame type received");
         break;
