@@ -8,6 +8,8 @@ LOG_MODULE_REGISTER(main);
 #define LED0_NODE     DT_ALIAS(led0)
 #define SLEEP_TIME_MS 1000
 #define TRY_AGAIN_MS  10
+#define LED_ON        0
+#define LED_OFF       1
 
 static const struct gpio_dt_spec led = GPIO_DT_SPEC_GET(LED0_NODE, gpios);
 
@@ -71,10 +73,10 @@ static int set_new_led_state(enum led_state new_state) {
 
     switch (new_state) {
     case OFF: {
-        return gpio_pin_set_dt(&led, 0);
+        return gpio_pin_set_dt(&led, LED_OFF);
     }
     case ON: {
-        return gpio_pin_set_dt(&led, 1);
+        return gpio_pin_set_dt(&led, LED_ON);
     }
     case BLINK: {
         ret = k_work_schedule(&blink, K_NO_WAIT);

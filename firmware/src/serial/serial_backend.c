@@ -15,6 +15,12 @@
 #include <zephyr/sys/atomic.h>
 #include <zephyr/sys/ring_buffer.h>
 
+#if IS_ENABLED(CONFIG_USB_DEVICE_STACK)
+#include <zephyr/usb/usb_device.h>
+#else
+#include <sample_usbd.h>
+#endif
+
 LOG_MODULE_REGISTER(backend_uart);
 
 enum {
@@ -271,12 +277,57 @@ const struct ares_serial_transport_api ares_serial_uart_transport_api = {
 SERIAL_UART_DEFINE(ares_serial_transport_uart);
 ARES_SERIAL_DEFINE(ares_uart, &ares_serial_transport_uart);
 
+#if !IS_ENABLED(CONFIG_USB_DEVICE_STACK)
+static struct usbd_context *sample_usbd;
+
+static void sample_msg_cb(struct usbd_context *const ctx,
+                          const struct usbd_msg *msg) {
+    LOG_INF("USBD message: %s", usbd_msg_type_string(msg->type));
+
+    if (usbd_can_detect_vbus(ctx)) {
+        if (msg->type == USBD_MSG_VBUS_READY) {
+            if (usbd_enable(ctx)) {
+                LOG_ERR("Failed to enable device support");
+            }
+        }
+
+        if (msg->type == USBD_MSG_VBUS_REMOVED) {
+            if (usbd_disable(ctx)) {
+                LOG_ERR("Failed to disable device support");
+            }
+        }
+    }
+}
+#endif
+
 static int enable_ares_serial_uart(void) {
     const struct device *const dev = DEVICE_DT_GET(DT_CHOSEN(zephyr_console));
+    int ret;
 
     if (!device_is_ready(dev)) {
         return -ENODEV;
     }
+
+#if IS_ENABLED(CONFIG_USB_DEVICE_STACK)
+    ret = usb_enable(NULL);
+    if (ret != 0) {
+        return ret;
+    }
+#else
+    sample_usbd = sample_usbd_init_device(sample_msg_cb);
+    if (sample_usbd == NULL) {
+        LOG_ERR("Failed to initialize USB device");
+        return -ENODEV;
+    }
+
+    if (!usbd_can_detect_vbus(sample_usbd)) {
+        ret = usbd_enable(sample_usbd);
+        if (ret != 0) {
+            LOG_ERR("Failed to enable device support");
+            return ret;
+        }
+    }
+#endif
 
     return ares_serial_init(&ares_uart, dev);
 }
