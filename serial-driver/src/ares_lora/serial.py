@@ -162,7 +162,7 @@ class LoraSerial:
         ret, err_code = self._dev.led(state.value)
         self._check_ret_code(err_code)
         if state == LoraLedState.FETCH:
-            return ret
+            return LoraLedState(ret)
         return None
 
     def start_driver(self):

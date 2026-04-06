@@ -137,7 +137,9 @@ AresSerial::AresResponse AresSerial::_send_frame(AresFrame &frame) {
 void AresSerial::_handle_bad_frame(const AresResponse &response) {
     std::stringstream ss;
     ss << "Internal error: Bad frame received (code: "
-       << static_cast<int>(std::get<AresFrame::AresFrameFramingError>(response.payload)) << ")";
+       << static_cast<int>(
+              std::get<AresFrame::AresFrameFramingError>(response.payload))
+       << ")";
     throw py::buffer_error(ss.str());
 }
 
@@ -345,7 +347,8 @@ void AresSerial::_process_frames_helper() {
         switch (frame.type) {
         case AresFrame::ACK:
         case AresFrame::FRAMING_ERROR:
-        case AresFrame::SETTING: {
+        case AresFrame::SETTING:
+        case AresFrame::LED: {
             _publish_response(frame);
             break;
         }
