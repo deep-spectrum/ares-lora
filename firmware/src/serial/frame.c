@@ -61,6 +61,10 @@ static size_t calculate_frame_length(const struct ares_frame *frame) {
         payload_len = SIZEOF_FIELD(struct ares_frame, payload.ACK);
         break;
     }
+    case ARES_FRAME_LED: {
+        payload_len = SIZEOF_FIELD(struct ares_frame, payload.LED);
+        break;
+    }
     default: {
         __ASSERT(false, "Invalid frame type received");
         break;
@@ -127,6 +131,11 @@ static void serialize(uint8_t *buf, const struct ares_frame *frame,
     case ARES_FRAME_ACK: {
         (void)memcpy(payload, &frame->payload.ACK,
                      SIZEOF_FIELD(struct ares_frame, payload.ACK));
+        break;
+    }
+    case ARES_FRAME_LED: {
+        (void)memcpy(payload, &frame->payload.LED,
+                     SIZEOF_FIELD(struct ares_frame, payload.LED));
         break;
     }
     case ARES_FRAME_FRAMING_ERROR: {
@@ -214,6 +223,10 @@ static void deserialize(struct ares_frame *frame, const uint8_t *buf) {
     }
     case ARES_FRAME_LORA_CONFIG: {
         (void)memcpy(&frame->payload.LORA_CONFIG, payload, payload_len);
+        break;
+    }
+    case ARES_FRAME_LED: {
+        (void)memcpy(&frame->payload.LED, payload, payload_len);
         break;
     }
     default: {
