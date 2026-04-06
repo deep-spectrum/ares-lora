@@ -79,14 +79,15 @@ class AresFrame {
             OFF = 0,
             ON = 1,
             BLINK = 2,
+            FETCH = 3,
         };
 
-        LedState state = OFF;
+        LedState state = FETCH;
     };
 
     using AresFrameAckErrorCode = int32_t;
 
-    enum AresFrameFramingError : uint32_t {
+    enum AresFrameFramingError : uint8_t {
         BAD_FRAME = 0,
         BAD_TYPE = 1,
         NOT_IMPLEMENTED = 2,
