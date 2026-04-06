@@ -54,7 +54,7 @@ AresFrame::AresFrame(const std::vector<uint8_t> &bytearray) : _direction(RX) {
     throw AresFrameError("Not an Ares frame");
 }
 
-AresFrame::AresFrame() : _type(UNKNOWN), _direction(UNSPECIFIED) {}
+AresFrame::AresFrame() : _direction(UNSPECIFIED), _type(UNKNOWN) {}
 
 AresFrame::AresFrame(const AresFrame &other) = default;
 
@@ -127,6 +127,10 @@ void AresFrame::serialize(std::vector<uint8_t> &bytearray) {
                                bytearray);
         break;
     }
+    case LED: {
+        _serialize_led(std::get<AresFrameLed>(_tx_payload), bytearray);
+        break;
+    }
     default: {
         throw AresFrameError("Invalid type for TX");
     }
@@ -172,6 +176,10 @@ void AresFrame::parse(const std::vector<uint8_t> &bytearray,
                                    payload_len);
         break;
     }
+    case LED: {
+        _deserialize_led(&bytearray[start_index + payload_offset], payload_len);
+        break;
+    }
     default: {
         throw AresFrameError("Invalid RX type");
     }
@@ -209,6 +217,10 @@ uint16_t AresFrame::_payload_size() const {
               sizeof(AresFrameLoraConfig::data_rate) +
               sizeof(AresFrameLoraConfig::coding_rate) +
               sizeof(AresFrameLoraConfig::tx_power);
+        break;
+    }
+    case LED: {
+        ret = sizeof(AresFrameLed::state);
         break;
     }
     default: {
@@ -254,6 +266,11 @@ void AresFrame::_serialize_lora_config(const AresFrameLoraConfig &payload,
     SERIALIZE(tx_power);
 }
 
+void AresFrame::_serialize_led(const AresFrameLed &payload,
+                               std::vector<uint8_t> &buffer) {
+    SERIALIZE(state);
+}
+
 #define DESERIALIZE_INIT(class_)                                               \
     class_ val_;                                                               \
     size_t offset_ = 0
@@ -267,6 +284,13 @@ void AresFrame::_deserialize_setting(const uint8_t *buf, size_t len) {
     DESERIALIZE_INIT(AresFrameSetting);
     DESERIALIZE(setting_id);
     DESERIALIZE(value);
+    DESERIALIZE_FINALIZE();
+}
+
+void AresFrame::_deserialize_led(const uint8_t *buf, size_t len) {
+    ARG_UNUSED(len);
+    DESERIALIZE_INIT(AresFrameLed);
+    DESERIALIZE(state);
     DESERIALIZE_FINALIZE();
 }
 
