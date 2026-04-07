@@ -3,6 +3,8 @@ on:
   push:
     tags:
       - 'v*'
+  workflow_dispatch:
+
 
 permissions:
   contents: write
@@ -44,3 +46,30 @@ jobs:
           mkdir -p raw-builds
           export cmd="west build --build-dir raw-builds/lora lora/firmware --pristine --board rak4631/nrf52840 --sysbuild -- -DCONF_FILE=prj.conf -DDTC_OVERLAY_FILE=overlay/rak4631_nrf52840.overlay -DCONFIG_SPEED_OPTIMIZATIONS=y"
           ./nrfutil sdk-manager toolchain launch --install-dir ./ncs --ncs-version ${NCS_VERSION} -- $cmd
+
+      - name: Prep Assets
+        run: |
+          mkdir -p gh_assets
+          find raw-builds/lora -type f \( -name "*.bin" -o -name "*.hex" -o -name "*.elf" \) ! -name "*_pre*" -exec cp {} "gh_assets/" \;
+          tar -czf gh_assets.tar.gz gh_assets
+          zip -rq gh_assets.zip gh_assets
+
+      - name: Create Artifacts
+        uses: actions/upload-artifacts@v4
+        if: github.event_name == 'workflow-dispatch'
+        with:
+          name: binary-fw-builds
+          path: |
+            *.tar.gz
+            *.zip
+
+      - name: Publish
+        uses: softprops/action-gh-release@v2
+        if: github.event_name == 'push' && contains(github.ref, 'refs/tags/')
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: Release ${{ github.ref_name }}
+          prerelease: true
+          files: |
+            *.tar.gz
+            *.zip
