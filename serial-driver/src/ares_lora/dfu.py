@@ -152,3 +152,23 @@ class AresDfu:
         else:
             force: Literal[0, 1] = 0
         asyncio.run(self._reset_mcu(force, timeout))
+
+    async def _confirm_image(self, slot: int, force: bool, timeout: float) -> None:
+        images = await self._read_image_states(timeout)
+        if slot < 0 or slot >= len(images):
+            raise ImageManagerException("Invalid slot")
+
+        image = images[slot]
+        if not image.active or not image.bootable or image.confirmed:
+            # Invalid image
+            if not image.active and not force:
+                raise ImageManagerException("Cannot confirm image that is not active")
+            if not image.bootable:
+                raise ImageManagerException("Cannot confirm image that is not bootable")
+            if image.confirmed and not force:
+                raise ImageManagerException("Cannot confirm image that has been confirmed already")
+        async with SMPClient(SMPSerialTransport(), self._port) as client:
+            await client.request(ImageStatesWrite(hash=image.hash, confirm=True), timeout_s=timeout)
+
+    def confirm_image(self, slot: int = 0, force: bool = False, timeout: float = 2.5):
+        asyncio.run(self._confirm_image(slot, force, timeout))
