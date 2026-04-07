@@ -55,7 +55,7 @@ jobs:
           zip -rq gh_assets.zip gh_assets
 
       - name: Create Artifacts
-        uses: actions/upload-artifacts@v4
+        uses: actions/upload-artifact@v4
         if: github.event_name == 'workflow-dispatch'
         with:
           name: binary-fw-builds
