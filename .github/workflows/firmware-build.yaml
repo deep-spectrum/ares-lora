@@ -1,0 +1,46 @@
+name: Firmware Build
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+env:
+  NCS_VERSION: v3.2.2
+
+jobs:
+  build:
+    name: "Firmware Build"
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: checkout
+        uses: actions/checkout@v5
+        with:
+          path: lora
+
+      - name: Inbitialize Machine
+        run: |
+          sudo apt update
+          python3 -m pip install west
+          wget -q https://files.nordicsemi.com/artifactory/swtools/external/nrfutil/executables/x86_64-unknown-linux-gnu/nrfutil
+          chmod +x nrfutil
+          ./nrfutil install sdk-manager
+
+      - name: Install toolchain
+        run: |
+          ./nrfutil sdk-manager install ${NCS_VERSION} --install-dir $(pwd)/ncs
+
+      - name: Initialize toolchain
+        run: |
+          ./nrfutil sdk-manager toolchain launch --install-dir $(pwd)/ncs --ncs-version ${NCS_VERSION} --chdir $(pwd)/ncs/${NCS_VERSION} -- west update
+          ./nrfutil sdk-manager toolchain launch --install-dir $(pwd)/ncs --ncs-version ${NCS_VERSION} --chdir $(pwd)/ncs/${NCS_VERSION} -- west zephyr-export
+          
+      - name: Build
+        run: |
+          source $(pwd)/ncs/${NCS_VERSION}/zephyr/zephyr-env.sh
+          mkdir -p raw-builds
+          export cmd="west build --build-dir raw-builds/lora lora/firmware --pristine --board rak4631/nrf52840 --sysbuild -- -DCONF_FILE=prj.conf -DDTC_OVERLAY_FILE=overlay/rak4631_nrf52840.overlay -DCONFIG_SPEED_OPTIMIZATIONS=y"
+          ./nrfutil sdk-manager toolchain launch --install-dir ./ncs --ncs-version ${NCS_VERSION} -- $cmd
