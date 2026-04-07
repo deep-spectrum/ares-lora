@@ -13,7 +13,7 @@ from smpclient import logger
 import logging
 from abc import ABC, abstractmethod
 import time
-from typing import Type, Callable
+from typing import Type, Callable, Literal
 
 logger.setLevel(logging.CRITICAL + 10)
 
@@ -135,3 +135,20 @@ class AresDfu:
 
     def upload_image(self, image_path: str | Path, slot: int = 0, retries: int = 3, timeout: float = 2.5) -> None:
         asyncio.run(self._upload_image(image_path, slot, retries, timeout))
+
+    async def _reset_mcu(self, force: Literal[0, 1] = 0, timeout: float = 2.5):
+        async with SMPClient(SMPSerialTransport(), self._port) as client:
+            response = await client.request(ResetWrite(force=force), timeout_s=timeout)
+            if error_v1(response):
+                if response.rc != smperror.MGMT_ERR.EOK:
+                    raise ImageManagerException("Response is not OK")
+            elif error_v2(response):
+                if response.err.rc != OS_MGMT_RET_RC.OK:
+                    raise ImageManagerException("Response is not OK")
+
+    def reset_mcu(self, force: bool = False, timeout: float = 2.5):
+        if force:
+            force: Literal[0, 1] = 1
+        else:
+            force: Literal[0, 1] = 0
+        asyncio.run(self._reset_mcu(force, timeout))
