@@ -91,7 +91,7 @@ static void reflect(void *data, size_t size) {
     uint8_t *buf = data;
 
     if (size == 1) {
-        reverse_byte(*buf);
+        *buf = reverse_byte(*buf);
         return;
     }
 

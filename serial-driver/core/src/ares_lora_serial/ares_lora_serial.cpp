@@ -47,6 +47,8 @@ PYBIND11_MODULE(_ares_lora_serial, m, py::mod_gil_not_used()) {
         .def("start", &AresSerial::send_start, py::arg("sec"), py::arg("nsec"),
              py::arg("id"), py::arg("broadcast"))
         .def("lora_config", &AresSerial::lora_config, py::arg("config"))
+        .def("led", &AresSerial::led, py::arg("state"),
+             "Retrieve or set the LED state")
         .def("start_driver", &AresSerial::start, "Start the serial driver")
         .def("stop_driver", &AresSerial::stop, "Stop the serial driver")
         .def("set_response_timeout", &AresSerial::set_response_timeout,
@@ -135,7 +137,9 @@ AresSerial::AresResponse AresSerial::_send_frame(AresFrame &frame) {
 void AresSerial::_handle_bad_frame(const AresResponse &response) {
     std::stringstream ss;
     ss << "Internal error: Bad frame received (code: "
-       << std::get<AresFrame::AresFrameFramingError>(response.payload) << ")";
+       << static_cast<int>(
+              std::get<AresFrame::AresFrameFramingError>(response.payload))
+       << ")";
     throw py::buffer_error(ss.str());
 }
 
@@ -245,6 +249,36 @@ std::chrono::milliseconds AresSerial::get_response_timeout() const {
     return _response_timeout;
 }
 
+py::tuple AresSerial::led(uint8_t state) {
+    AresFrame frame(AresFrame::LED,
+                    AresFrame::AresFrameLed{
+                        static_cast<AresFrame::AresFrameLed::LedState>(state)});
+    AresResponse response = _send_frame(frame);
+
+    int ret = 0;
+    AresFrame::AresFrameLed val;
+
+    switch (response.type) {
+    case AresResponse::ACK: {
+        ret = std::get<AresFrame::AresFrameAckErrorCode>(response.payload);
+        break;
+    }
+    case AresResponse::BAD_FRAME: {
+        _handle_bad_frame(response);
+        break;
+    }
+    case AresResponse::COMMAND_SPECIFIC: {
+        val = std::get<AresFrame::AresFrameLed>(response.payload);
+        break;
+    }
+    default: {
+        throw std::runtime_error("Received invalid response");
+    }
+    }
+
+    return py::make_tuple(static_cast<uint8_t>(val.state), ret);
+}
+
 void AresSerial::start() {
     if (_tasks_running || _serial.is_closed()) {
         throw std::runtime_error("Please stop before restarting");
@@ -313,7 +347,8 @@ void AresSerial::_process_frames_helper() {
         switch (frame.type) {
         case AresFrame::ACK:
         case AresFrame::FRAMING_ERROR:
-        case AresFrame::SETTING: {
+        case AresFrame::SETTING:
+        case AresFrame::LED: {
             _publish_response(frame);
             break;
         }
@@ -349,7 +384,7 @@ void AresSerial::_process_rx_buffer(std::vector<uint8_t> &buf) {
             return;
         }
 
-        LOG_INF("Frame found");
+        LOG_INF_HEXDUMP(buf, frame_size, "Frame found");
         AresFrame frame;
         frame.parse(buf, frame_start);
         _frame_q.put(frame.get_parsed_frame());

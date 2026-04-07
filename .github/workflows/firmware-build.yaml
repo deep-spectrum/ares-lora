@@ -1,0 +1,75 @@
+name: Firmware Build
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+
+permissions:
+  contents: write
+
+env:
+  NCS_VERSION: v3.2.2
+
+jobs:
+  build:
+    name: "Firmware Build"
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: checkout
+        uses: actions/checkout@v5
+        with:
+          path: lora
+
+      - name: Inbitialize Machine
+        run: |
+          sudo apt update
+          python3 -m pip install west
+          wget -q https://files.nordicsemi.com/artifactory/swtools/external/nrfutil/executables/x86_64-unknown-linux-gnu/nrfutil
+          chmod +x nrfutil
+          ./nrfutil install sdk-manager
+
+      - name: Install toolchain
+        run: |
+          ./nrfutil sdk-manager install ${NCS_VERSION} --install-dir $(pwd)/ncs
+
+      - name: Initialize toolchain
+        run: |
+          ./nrfutil sdk-manager toolchain launch --install-dir $(pwd)/ncs --ncs-version ${NCS_VERSION} --chdir $(pwd)/ncs/${NCS_VERSION} -- west update
+          ./nrfutil sdk-manager toolchain launch --install-dir $(pwd)/ncs --ncs-version ${NCS_VERSION} --chdir $(pwd)/ncs/${NCS_VERSION} -- west zephyr-export
+          
+      - name: Build
+        run: |
+          source $(pwd)/ncs/${NCS_VERSION}/zephyr/zephyr-env.sh
+          mkdir -p raw-builds
+          export cmd="west build --build-dir raw-builds/lora lora/firmware --pristine --board rak4631/nrf52840 --sysbuild -- -DCONF_FILE=prj.conf -DDTC_OVERLAY_FILE=overlay/rak4631_nrf52840.overlay -DCONFIG_SPEED_OPTIMIZATIONS=y"
+          ./nrfutil sdk-manager toolchain launch --install-dir ./ncs --ncs-version ${NCS_VERSION} -- $cmd
+
+      - name: Prep Assets
+        run: |
+          mkdir -p gh_assets
+          find raw-builds/lora -type f \( -name "*.bin" -o -name "*.hex" -o -name "*.elf" \) ! -name "*_pre*" -exec cp {} "gh_assets/" \;
+          tar -czf gh_assets.tar.gz gh_assets
+          zip -rq gh_assets.zip gh_assets
+
+      - name: Create Artifacts
+        uses: actions/upload-artifacts@v4
+        if: github.event_name == 'workflow-dispatch'
+        with:
+          name: binary-fw-builds
+          path: |
+            *.tar.gz
+            *.zip
+
+      - name: Publish
+        uses: softprops/action-gh-release@v2
+        if: github.event_name == 'push' && contains(github.ref, 'refs/tags/')
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: Release ${{ github.ref_name }}
+          prerelease: true
+          files: |
+            *.tar.gz
+            *.zip

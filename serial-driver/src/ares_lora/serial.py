@@ -55,6 +55,13 @@ class LoraConfig:
     tx_power: int = 10
 
 
+class LoraLedState(IntEnum):
+    OFF = 0
+    ON = 1
+    BLINK = 2
+    FETCH = 3
+
+
 def lora_serial_command(func):
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
@@ -149,6 +156,14 @@ class LoraSerial:
         configs_ = _AresLoraConfig(**args)
         ret = self._dev.lora_config(configs_)
         self._check_ret_code(ret)
+
+    @lora_serial_command
+    def led(self, state: LoraLedState = LoraLedState.FETCH) -> LoraLedState | None:
+        ret, err_code = self._dev.led(state.value)
+        self._check_ret_code(err_code)
+        if state == LoraLedState.FETCH:
+            return LoraLedState(ret)
+        return None
 
     def start_driver(self):
         self._dev.start_driver()

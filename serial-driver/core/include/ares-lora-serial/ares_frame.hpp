@@ -38,8 +38,9 @@ class AresFrame {
         SETTING = 0,
         START = 1,
         LORA_CONFIG = 2,
-        ACK = 3,
-        FRAMING_ERROR = 4,
+        LED = 3,
+        ACK = 4,
+        FRAMING_ERROR = 5,
         UNKNOWN,
     };
 
@@ -73,23 +74,35 @@ class AresFrame {
         int8_t tx_power = 0;
     };
 
+    struct AresFrameLed {
+        enum LedState : uint8_t {
+            OFF = 0,
+            ON = 1,
+            BLINK = 2,
+            FETCH = 3,
+        };
+
+        LedState state = FETCH;
+    };
+
     using AresFrameAckErrorCode = int32_t;
 
-    enum AresFrameFramingError : uint32_t {
+    enum AresFrameFramingError : uint8_t {
         BAD_FRAME = 0,
         BAD_TYPE = 1,
         NOT_IMPLEMENTED = 2,
     };
 
-    using AresFrameTxTypes = std::variant<std::monostate, AresFrameSetting,
-                                          AresFrameStart, AresFrameLoraConfig>;
-    using AresFrameRxTypes =
+    using AresFrameTxTypes =
         std::variant<std::monostate, AresFrameSetting, AresFrameStart,
-                     AresFrameAckErrorCode, AresFrameFramingError>;
+                     AresFrameLoraConfig, AresFrameLed>;
+    using AresFrameRxTypes = std::variant<std::monostate, AresFrameSetting,
+                                          AresFrameStart, AresFrameAckErrorCode,
+                                          AresFrameFramingError, AresFrameLed>;
 
     using AresFrameResponseTypes =
         std::variant<std::monostate, AresFrameSetting, AresFrameAckErrorCode,
-                     AresFrameFramingError>;
+                     AresFrameFramingError, AresFrameLed>;
 
     struct AresFrameDecoded {
         AresFrameType type;
@@ -131,8 +144,11 @@ class AresFrame {
                                  std::vector<uint8_t> &buffer);
     static void _serialize_lora_config(const AresFrameLoraConfig &payload,
                                        std::vector<uint8_t> &buffer);
+    static void _serialize_led(const AresFrameLed &payload,
+                               std::vector<uint8_t> &buffer);
 
     void _deserialize_setting(const uint8_t *buf, size_t len);
+    void _deserialize_led(const uint8_t *buf, size_t len);
     void _deserialize_start(const uint8_t *buf, size_t len);
     void _deserialize_ack(const uint8_t *buf, size_t len);
     void _deserialize_framing_error(const uint8_t *buf, size_t len);

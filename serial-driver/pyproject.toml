@@ -15,6 +15,7 @@ requires-python = ">=3.10"
 dependencies = [
     "pyserial",
     "ares-lora-core",
+    "smpclient"
 ]
 
 [project.optional-dependencies]

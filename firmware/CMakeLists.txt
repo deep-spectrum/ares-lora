@@ -3,6 +3,8 @@ find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
 
 project(lora-start)
 
+include(${ZEPHYR_BASE}/samples/subsys/usb/common/common.cmake)
+
 include_directories(include)
 
 set(SRC

@@ -8,6 +8,7 @@
  * @author Tom Schmitz \<tschmitz@andrew.cmu.edu\>
  */
 
+#include <led.h>
 #include <lora/lora.h>
 #include <lora/lora_backend.h>
 #include <lora/packet.h>
@@ -126,10 +127,24 @@ static void handle_lora_config(const struct ares_serial *serial,
     send_ack_frame(serial, frame, ret);
 }
 
+static void handle_led(const struct ares_serial *serial,
+                       struct ares_frame *frame) {
+    int ret = update_led_state(frame->payload.LED);
+
+    if (frame->payload.LED >= LED_INVALID) {
+        frame->payload.LED = (uint8_t)ret;
+        ares_serial_write_frame(serial, frame);
+        return;
+    }
+
+    send_ack_frame(serial, frame, 0);
+}
+
 static struct ares_serial_command commands[] = {
     {ARES_FRAME_SETTING, handle_setting},
     {ARES_FRAME_START, handle_start},
     {ARES_FRAME_LORA_CONFIG, handle_lora_config},
+    {ARES_FRAME_LED, handle_led},
 };
 
 static int init_serial_handlers(void) {

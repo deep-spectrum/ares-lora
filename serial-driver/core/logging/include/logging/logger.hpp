@@ -11,6 +11,9 @@
 #ifndef VERSION_LOGGER_HPP
 #define VERSION_LOGGER_HPP
 
+#include <cstdint>
+#include <vector>
+
 #if defined(USE_PYTHON_LOGGERS)
 #include <memory>
 class PieceOfShitIdiom;
@@ -73,6 +76,9 @@ class Logger {
      * @param[in] ... Additional parameters needed for the format string.
      */
     void log(LogLevel level, const char *fmt, ...) const;
+
+    void log_hexdump(LogLevel level, const char *msg,
+                     const std::vector<uint8_t> &buf, std::size_t bytes);
 
   private:
 #if defined(USE_PYTHON_LOGGERS)

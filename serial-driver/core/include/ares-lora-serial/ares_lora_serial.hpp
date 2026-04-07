@@ -22,15 +22,18 @@
 #include <pybind11/pybind11.h>
 #include <serial/serial.hpp>
 #include <string>
+#include <utility>
 
 namespace py = pybind11;
 using namespace std::chrono_literals;
 
 class AresTimeoutError : public std::exception {
   public:
-    explicit AresTimeoutError(const std::string &msg) : _msg(msg) {}
+    explicit AresTimeoutError(std::string msg) : _msg(std::move(msg)) {}
 
-    const char *what() const noexcept override { return _msg.c_str(); }
+    [[nodiscard]] const char *what() const noexcept override {
+        return _msg.c_str();
+    }
 
   private:
     std::string _msg;
@@ -59,7 +62,7 @@ struct AresLoraConfig {
     uint8_t coding_rate = 0;
     int8_t tx_power = 0;
 
-    AresFrame generate_frame() const;
+    [[nodiscard]] AresFrame generate_frame() const;
 };
 
 class AresSerial {
@@ -79,7 +82,9 @@ class AresSerial {
     int lora_config(const AresLoraConfig &config);
 
     void set_response_timeout(const std::chrono::milliseconds &timeout);
-    std::chrono::milliseconds get_response_timeout() const;
+    [[nodiscard]] std::chrono::milliseconds get_response_timeout() const;
+
+    py::tuple led(uint8_t state);
 
     void start();
     void stop();

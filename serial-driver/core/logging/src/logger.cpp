@@ -5,6 +5,9 @@
 #include <../include/logging/logger.hpp>
 #include <cstdarg>
 #include <cstdio>
+#include <cstring>
+#include <iomanip>
+#include <sstream>
 
 #if defined(USE_PYTHON_LOGGERS)
 #include <memory>
@@ -201,6 +204,101 @@ void Logger::log(LogLevel level, const char *fmt, ...) const {
 #endif
 
     delete[] msg;
+}
+
+static void apply_padding(std::stringstream &ss, size_t pad) {
+    ss << std::string(pad, ' ');
+}
+
+constexpr size_t bytes_per_line = 8;
+constexpr size_t space_break = (bytes_per_line / 2) - 1;
+
+static void dump_hex(size_t idx, const std::string_view data,
+                     std::stringstream &ss) {
+    for (size_t i = 0; i < bytes_per_line; i++) {
+        if (i + idx < data.size()) {
+            ss << std::hex << std::setw(2) << std::setfill('0')
+               << (static_cast<int>(data[i + idx]) & 0xFF) << " ";
+        } else {
+            ss << "   ";
+        }
+
+        if (i == space_break) {
+            ss << "  ";
+        }
+    }
+}
+
+static void dump_ascii(size_t idx, const std::string_view data,
+                       std::stringstream &ss) {
+    ss << "  |";
+    size_t i;
+    for (i = 0; i < bytes_per_line; i++) {
+        if (i + idx < data.size()) {
+            auto c = static_cast<uint8_t>(data[i + idx]);
+            ss << (std::isprint(c) ? static_cast<char>(c) : '.');
+        }
+
+        if (i == space_break) {
+            ss << " ";
+        }
+    }
+
+    if (i + idx < data.size()) {
+        ss << std::dec << "\n";
+    }
+}
+
+static void construct_hexdump(const std::string_view data, size_t pad,
+                              std::stringstream &ss) {
+    for (size_t i = 0; i < data.size(); i += bytes_per_line) {
+        apply_padding(ss, pad);
+        dump_hex(i, data, ss);
+        dump_ascii(i, data, ss);
+    }
+}
+
+void Logger::log_hexdump(LogLevel level, const char *msg,
+                         const std::vector<uint8_t> &buf, std::size_t bytes) {
+    std::stringstream ss;
+    ss << msg << "\n";
+    size_t offset =
+        (level == LOG_LEVEL_DBG || level == LOG_LEVEL_ERROR) ? 5 : 7;
+    offset += strlen(_name) + 2;
+
+    construct_hexdump(
+        std::string_view{reinterpret_cast<const char *>(buf.data()),
+                         std::min(bytes, buf.size())},
+        offset, ss);
+
+#if defined(USE_PYTHON_LOGGERS)
+    _impl->log(level, ss.str().c_str())
+#else
+    switch (level) {
+    case LOG_LEVEL_DBG: {
+        _log_dbg(ss.str().c_str());
+        break;
+    }
+    case LOG_LEVEL_INFO: {
+        _log_inf(ss.str().c_str());
+        break;
+    }
+    case LOG_LEVEL_WARN: {
+        _log_wrn(ss.str().c_str());
+        break;
+    }
+    case LOG_LEVEL_ERROR: {
+        _log_err(ss.str().c_str());
+        break;
+    }
+    case LOG_LEVEL_CRITICAL: {
+        _log_crit(ss.str().c_str());
+        break;
+    }
+    default:
+        break;
+    }
+#endif
 }
 
 #if !defined(USE_PYTHON_LOGGERS)

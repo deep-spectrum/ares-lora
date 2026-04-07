@@ -38,6 +38,7 @@ enum ares_frame_type {
     ARES_FRAME_SETTING,       ///< SETTING frame.
     ARES_FRAME_START,         ///< Start time frame.
     ARES_FRAME_LORA_CONFIG,   ///< LoRa configuration frame.
+    ARES_FRAME_LED,           ///< Control LED state.
     ARES_FRAME_ACK,           ///< ACK frame.
     ARES_FRAME_FRAMING_ERROR, ///< Framing error frame. TX only.
 
@@ -70,6 +71,8 @@ struct ares_frame {
             uint8_t coding_rate;
             int8_t tx_pow_dbm;
         } LORA_CONFIG; ///< ARES_FRAME_LORA_CONFIG
+
+        uint8_t LED; ///< ARES_FRAME_LED
 
         int ACK; ///< ARES_FRAME_ACK
 

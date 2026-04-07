@@ -133,6 +133,19 @@
                                 __VA_ARGS__)),                                 \
                 (__logger__.log(Logger::LogLevel::LOG_LEVEL_CRITICAL, msg_)))
 
+#define LOG_DBG_HEXDUMP(bytes_, len_, msg_)                                    \
+    __logger__.log_hexdump(Logger::LogLevel::LOG_LEVEL_DBG, msg_, bytes_, len_)
+#define LOG_INF_HEXDUMP(bytes_, len_, msg_)                                    \
+    __logger__.log_hexdump(Logger::LogLevel::LOG_LEVEL_INFO, msg_, bytes_, len_)
+#define LOG_WRN_HEXDUMP(bytes_, len_, msg_)                                    \
+    __logger__.log_hexdump(Logger::LogLevel::LOG_LEVEL_WARN, msg_, bytes_, len_)
+#define LOG_ERR_HEXDUMP(bytes_, len_, msg_)                                    \
+    __logger__.log_hexdump(Logger::LogLevel::LOG_LEVEL_ERROR, msg_, bytes_,    \
+                           len_)
+#define LOG_CRIT_HEXDUMP(bytes_, len_, msg_)                                   \
+    __logger__.log_hexdump(Logger::LogLevel::LOG_LEVEL_CRITICAL, msg_, bytes_, \
+                           len_)
+
 /**
  * Saves the old logging level and sets the new logging level.
  * @param[in] new_level The new logging level of the module.
