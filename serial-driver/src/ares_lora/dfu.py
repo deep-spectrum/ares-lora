@@ -94,17 +94,13 @@ class AresDfu:
         ret = [AresImageStates.from_smp_lib(state) for state in states]
         return tuple(ret)
 
-    async def _mark_test_image(self, client: SMPClient):
-        images = await self._read_image_states()
-        await client.request(ImageStatesWrite(hash=images[1].hash))
-
     async def __upload_image_run(self, image: bytes, slot: int, timeout_s: float = 2.5,
                                  update_cb: Callable[[int], None] | None = None) -> None:
         async with SMPClient(SMPSerialTransport(), self._port) as client:
             async for offset in client.upload(image, slot, first_timeout_s=timeout_s, use_sha=True):
                 if update_cb is not None:
                     update_cb(offset)
-            await self._mark_test_image(client)
+            await self._mark_image_pending(1, timeout_s)
 
     async def __upload_image(self, image: Path | str, slot: int, update_status: Type[AresUploadStatusBase] | None,
                              timeout_s: float = 2.5):
@@ -172,3 +168,13 @@ class AresDfu:
 
     def confirm_image(self, slot: int = 0, force: bool = False, timeout: float = 2.5):
         asyncio.run(self._confirm_image(slot, force, timeout))
+
+    async def _mark_image_pending(self, slot: int = 1, timeout: float = 2.5):
+        images = await self._read_image_states(timeout)
+        if slot >= len(images):
+            raise ImageManagerException("Cannot mark image as pending since it doesn't exist")
+        async with SMPClient(SMPSerialTransport(), self._port) as client:
+            await client.request(ImageStatesWrite(hash=images[slot].hash), timeout_s=timeout)
+
+    def mark_image_pending(self, slot: int = 1, timeout: float = 2.5):
+        asyncio.run(self._mark_image_pending(slot, timeout))
