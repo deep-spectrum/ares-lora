@@ -76,7 +76,8 @@ PYBIND11_MODULE(_ares_lora_serial, m, py::mod_gil_not_used()) {
 
 AresSerialConfigs::AresSerialConfigs(const py::kwargs &kwargs) {
     from_kwargs(kwargs, SP(port), SP(response_timeout), SP(rx_period),
-                SP(start_callback), SP(serial_timeout));
+                SP(start_callback), SP(serial_timeout), SP(master),
+                SP(heartbeat_callback));
 }
 
 AresLoraConfig::AresLoraConfig(const py::kwargs &kwargs) {
@@ -93,7 +94,7 @@ AresFrame AresLoraConfig::generate_frame() const {
 
 AresSerial::AresSerial(const AresSerialConfigs &configs)
     : _response_timeout(configs.response_timeout),
-      _rx_period(configs.rx_period) {
+      _rx_period(configs.rx_period), _master(configs.master) {
     SerialInternal::SerialAttributes attr;
 
     _serial.port(configs.port);
@@ -103,6 +104,7 @@ AresSerial::AresSerial(const AresSerialConfigs &configs)
     _serial.open();
 
     _start_callback = configs.start_callback;
+    _heartbeat_callback = configs.heartbeat_callback;
 }
 
 AresSerial::~AresSerial() {
@@ -480,4 +482,19 @@ void AresSerial::_start_event(
     _start_callback(start_frame.sec, start_frame.nsec, start_frame.id,
                     start_frame.broadcast, start_frame.seq_cnt,
                     start_frame.packet_id);
+}
+
+void AresSerial::_heartbeat_event(
+    const AresFrame::AresFrameHeartbeat &heartbeat) const {
+    LOG_INF("Heartbeat received from %d", heartbeat.id);
+
+    if (_master && heartbeat.broadcast) {
+        LOG_DBG("Heartbeat received from hanging node");
+        // todo: submit claim host work
+    }
+
+    if (_heartbeat_callback != nullptr) {
+        LOG_DBG("Calling Python event handler");
+        _heartbeat_callback(heartbeat.id, heartbeat.ready);
+    }
 }

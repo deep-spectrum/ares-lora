@@ -47,8 +47,10 @@ struct AresSerialConfigs {
     std::chrono::milliseconds serial_timeout = 100ms;
     std::chrono::milliseconds response_timeout = 2000ms;
     std::chrono::milliseconds rx_period = 100ms;
+    bool master = false;
     std::function<void(int64_t, uint64_t, uint16_t, bool, uint8_t, uint16_t)>
         start_callback = nullptr;
+    std::function<void(uint16_t, bool)> heartbeat_callback = nullptr;
 };
 
 struct AresLoraConfig {
@@ -138,6 +140,10 @@ class AresSerial {
     void _start_event(const AresFrame::AresFrameStart &start_frame) const;
 
     static void _handle_bad_frame(const AresResponse &response);
+
+    bool _master;
+    std::function<void(uint16_t, bool)> _heartbeat_callback = nullptr;
+    void _heartbeat_event(const AresFrame::AresFrameHeartbeat &heartbeat) const;
 };
 
 #endif // ARES_ARES_LORA_SERIAL_HPP
