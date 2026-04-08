@@ -7,16 +7,14 @@ set(CMAKE_CXX_STANDARD 17 CACHE STRING "C++ version selection")  # or 11, 14, 17
 set(CMAKE_CXX_STANDARD_REQUIRED ON)  # optional, ensure standard is supported
 set(CMAKE_CXX_EXTENSIONS OFF)  # optional, keep compiler extensions off
 
-list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
-
 if (NOT IS_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/extern/pybind11/pybind11")
     message(FATAL_ERROR "Please run \"git submodule update --init\" before proceeding")
 endif()
 
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/extern/ares-common/cmake")
+
 add_subdirectory(extern/pybind11)
-add_subdirectory(serial)
-add_subdirectory(data_structures)
-add_subdirectory(logging)
+add_subdirectory(extern/ares-common)
 
 include (AddPythonModule)
 

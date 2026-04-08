@@ -12,7 +12,7 @@
 #define ARES_ARES_LORA_SERIAL_HPP
 
 #include <ares-lora-serial/ares_frame.hpp>
-#include <ares/queue.hpp>
+#include <ares/data-structures/queue.hpp>
 #include <atomic>
 #include <chrono>
 #include <exception>
@@ -20,7 +20,7 @@
 #include <future>
 #include <mutex>
 #include <pybind11/pybind11.h>
-#include <serial/serial.hpp>
+#include <ares/serial/serial.hpp>
 #include <string>
 #include <utility>
 

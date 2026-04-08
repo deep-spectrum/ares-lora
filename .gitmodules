@@ -2,3 +2,6 @@
 	path = serial-driver/core/extern/pybind11
 	url = https://github.com/pybind/pybind11.git
 	branch = stable
+[submodule "serial-driver/core/extern/ares-common"]
+	path = serial-driver/core/extern/ares-common
+	url = https://github.com/deep-spectrum/ares-common.git
