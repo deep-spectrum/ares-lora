@@ -8,7 +8,7 @@
  * @author Tom Schmitz \<tschmitz@andrew.cmu.edu\>
  */
 
-#include <ares-lora-serial/util.h>
+#include <ares/util.h>
 #include <pybind11/pybind11.h>
 
 namespace py = pybind11;

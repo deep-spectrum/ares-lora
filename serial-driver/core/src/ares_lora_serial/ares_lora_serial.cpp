@@ -10,7 +10,7 @@
 
 #include <ares-lora-serial/ares_frame.hpp>
 #include <ares-lora-serial/ares_lora_serial.hpp>
-#include <ares-lora-serial/util.hpp>
+#include <ares/util.hpp>
 #include <cassert>
 #include <chrono>
 #include <ares/logging/log.hpp>
