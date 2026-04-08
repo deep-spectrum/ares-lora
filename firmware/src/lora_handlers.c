@@ -62,12 +62,16 @@ static void handle_heartbeat(const struct ares_lora *lora,
 
     const struct ares_serial *serial = ares_serial_backend_uart_get_ptr();
     struct ares_frame frame = {
-        // todo
+        .type = ARES_FRAME_HEARTBEAT,
     };
 
     CHECK_DIRECTED_PACKET(packet);
 
-    // todo
+    frame.payload.HEARTBEAT.flags.ready =
+        packet->payload.payload.HEARTBEAT.ready;
+    frame.payload.HEARTBEAT.flags.broadcast =
+        packet->type == ARES_PKT_TYPE_BROADCAST;
+    frame.payload.HEARTBEAT.id = packet->source_id;
 
     ares_serial_write_frame(serial, &frame);
 }
