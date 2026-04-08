@@ -9,7 +9,7 @@
  */
 
 #include <ares-lora-serial/ares_frame.hpp>
-#include <ares-lora-serial/util.h>
+#include <ares/util.h>
 #include <cstring>
 
 constexpr uint8_t header = '^';
