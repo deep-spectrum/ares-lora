@@ -69,6 +69,13 @@ static size_t calculate_frame_length(const struct ares_frame *frame) {
         payload_len = SIZEOF_FIELD(struct ares_frame, payload.FRAMING_ERROR);
         break;
     }
+    case ARES_FRAME_HEARTBEAT: {
+        payload_len =
+            SIZEOF_FIELD(struct ares_frame, payload.HEARTBEAT.flags) +
+            SIZEOF_FIELD(struct ares_frame, payload.HEARTBEAT.tx_count) +
+            SIZEOF_FIELD(struct ares_frame, payload.HEARTBEAT.id);
+        break;
+    }
     default: {
         __ASSERT(false, "Invalid frame type received");
         break;
@@ -140,6 +147,20 @@ static void serialize(uint8_t *buf, const struct ares_frame *frame,
     case ARES_FRAME_LED: {
         (void)memcpy(payload, &frame->payload.LED,
                      SIZEOF_FIELD(struct ares_frame, payload.LED));
+        break;
+    }
+    case ARES_FRAME_HEARTBEAT: {
+        (void)memcpy(payload, &frame->payload.HEARTBEAT.flags,
+                     SIZEOF_FIELD(struct ares_frame, payload.HEARTBEAT.flags));
+        (void)memcpy(
+            payload + SIZEOF_FIELD(struct ares_frame, payload.HEARTBEAT.flags),
+            &frame->payload.HEARTBEAT.tx_count,
+            SIZEOF_FIELD(struct ares_frame, payload.HEARTBEAT.tx_count));
+        (void)memcpy(
+            payload + SIZEOF_FIELD(struct ares_frame, payload.HEARTBEAT.flags) +
+                SIZEOF_FIELD(struct ares_frame, payload.HEARTBEAT.tx_count),
+            &frame->payload.HEARTBEAT.id,
+            SIZEOF_FIELD(struct ares_frame, payload.HEARTBEAT.id));
         break;
     }
     case ARES_FRAME_FRAMING_ERROR: {
@@ -231,6 +252,20 @@ static void deserialize(struct ares_frame *frame, const uint8_t *buf) {
     }
     case ARES_FRAME_LED: {
         (void)memcpy(&frame->payload.LED, payload, payload_len);
+        break;
+    }
+    case ARES_FRAME_HEARTBEAT: {
+        (void)memcpy(&frame->payload.HEARTBEAT.flags, payload,
+                     SIZEOF_FIELD(struct ares_frame, payload.HEARTBEAT.flags));
+        (void)memcpy(
+            &frame->payload.HEARTBEAT.tx_count,
+            payload + SIZEOF_FIELD(struct ares_frame, payload.HEARTBEAT.flags),
+            SIZEOF_FIELD(struct ares_frame, payload.HEARTBEAT.tx_count));
+        (void)memcpy(
+            &frame->payload.HEARTBEAT.id,
+            payload + SIZEOF_FIELD(struct ares_frame, payload.HEARTBEAT.flags) +
+                SIZEOF_FIELD(struct ares_frame, payload.HEARTBEAT.tx_count),
+            SIZEOF_FIELD(struct ares_frame, payload.HEARTBEAT.id));
         break;
     }
     default: {
