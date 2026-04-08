@@ -67,7 +67,7 @@ static void handle_start(const struct ares_serial *serial,
 
     struct ares_packet packet = {
         .payload = {.type = ARES_PKT_PAYLOAD_START,
-                    .payload.timespec =
+                    .payload.START =
                         {
                             .sec = frame->payload.START.sec,
                             .nsec = frame->payload.START.ns,

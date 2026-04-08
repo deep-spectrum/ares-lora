@@ -116,7 +116,11 @@ static size_t calculate_packet_size(const struct ares_packet *packet) {
 
     switch (packet->payload.type) {
     case ARES_PKT_PAYLOAD_START: {
-        overhead += sizeof(packet->payload.payload.timespec);
+        overhead += SIZEOF_FIELD(struct ares_packet_payload, payload.START);
+        break;
+    }
+    case ARES_PKT_PAYLOAD_HEARTBEAT: {
+        overhead += SIZEOF_FIELD(struct ares_packet_payload, payload.HEARTBEAT);
         break;
     }
     default: {
@@ -174,7 +178,11 @@ static void serialize(uint8_t *buf, size_t len,
 
     switch (packet->payload.type) {
     case ARES_PKT_PAYLOAD_START: {
-        (void)memcpy(payload, &packet->payload.payload.timespec, payload_len);
+        (void)memcpy(payload, &packet->payload.payload.START, payload_len);
+        break;
+    }
+    case ARES_PKT_PAYLOAD_HEARTBEAT: {
+        (void)memcpy(payload, &packet->payload.payload.HEARTBEAT, payload_len);
         break;
     }
     default: {
@@ -236,7 +244,11 @@ static void deserialize(struct ares_packet *packet, const uint8_t *buf) {
 
     switch (packet->payload.type) {
     case ARES_PKT_PAYLOAD_START: {
-        (void)memcpy(&packet->payload.payload.timespec, payload, payload_len);
+        (void)memcpy(&packet->payload.payload.START, payload, payload_len);
+        break;
+    }
+    case ARES_PKT_PAYLOAD_HEARTBEAT: {
+        (void)memcpy(&packet->payload.payload.HEARTBEAT, payload, payload_len);
         break;
     }
     default: {

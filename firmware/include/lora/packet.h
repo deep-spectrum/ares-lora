@@ -41,6 +41,7 @@
 
 enum ares_packet_payload_type {
     ARES_PKT_PAYLOAD_START = 0,
+    ARES_PKT_PAYLOAD_HEARTBEAT = 1,
 
     ARES_PKT_PAYLOAD_INVALID,
 };
@@ -51,7 +52,13 @@ struct ares_packet_payload {
         struct {
             int64_t sec;
             uint64_t nsec;
-        } timespec;
+        } START;
+
+        struct {
+            bool ready;
+            uint8_t start_seq_cnt;
+            uint8_t stop_seq_cnt;
+        } HEARTBEAT;
     } payload;
 };
 
