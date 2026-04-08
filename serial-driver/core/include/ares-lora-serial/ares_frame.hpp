@@ -39,8 +39,9 @@ class AresFrame {
         START = 1,
         LORA_CONFIG = 2,
         LED = 3,
-        ACK = 4,
-        FRAMING_ERROR = 5,
+        HEARTBEAT = 4,
+        ACK = 5,
+        FRAMING_ERROR = 6,
         UNKNOWN,
     };
 
@@ -85,6 +86,15 @@ class AresFrame {
         LedState state = FETCH;
     };
 
+    struct AresFrameHeartbeat {
+        AresFrameHeartbeat() = default;
+
+        bool ready = false;
+        bool broadcast = false;
+        uint8_t tx_cnt = 0;
+        uint16_t id = 0;
+    };
+
     using AresFrameAckErrorCode = int32_t;
 
     enum AresFrameFramingError : uint8_t {
@@ -95,10 +105,11 @@ class AresFrame {
 
     using AresFrameTxTypes =
         std::variant<std::monostate, AresFrameSetting, AresFrameStart,
-                     AresFrameLoraConfig, AresFrameLed>;
-    using AresFrameRxTypes = std::variant<std::monostate, AresFrameSetting,
-                                          AresFrameStart, AresFrameAckErrorCode,
-                                          AresFrameFramingError, AresFrameLed>;
+                     AresFrameLoraConfig, AresFrameLed, AresFrameHeartbeat>;
+    using AresFrameRxTypes =
+        std::variant<std::monostate, AresFrameSetting, AresFrameStart,
+                     AresFrameAckErrorCode, AresFrameFramingError, AresFrameLed,
+                     AresFrameHeartbeat>;
 
     using AresFrameResponseTypes =
         std::variant<std::monostate, AresFrameSetting, AresFrameAckErrorCode,
@@ -146,10 +157,13 @@ class AresFrame {
                                        std::vector<uint8_t> &buffer);
     static void _serialize_led(const AresFrameLed &payload,
                                std::vector<uint8_t> &buffer);
+    static void _serialize_heartbeat(const AresFrameHeartbeat &payload,
+                                     std::vector<uint8_t> &buffer);
 
     void _deserialize_setting(const uint8_t *buf, size_t len);
     void _deserialize_led(const uint8_t *buf, size_t len);
     void _deserialize_start(const uint8_t *buf, size_t len);
+    void _deserialize_heartbeat(const uint8_t *buf, size_t len);
     void _deserialize_ack(const uint8_t *buf, size_t len);
     void _deserialize_framing_error(const uint8_t *buf, size_t len);
 };

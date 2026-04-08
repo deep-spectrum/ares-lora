@@ -131,6 +131,11 @@ void AresFrame::serialize(std::vector<uint8_t> &bytearray) {
         _serialize_led(std::get<AresFrameLed>(_tx_payload), bytearray);
         break;
     }
+    case HEARTBEAT: {
+        _serialize_heartbeat(std::get<AresFrameHeartbeat>(_tx_payload),
+                             bytearray);
+        break;
+    }
     default: {
         throw AresFrameError("Invalid type for TX");
     }
@@ -178,6 +183,11 @@ void AresFrame::parse(const std::vector<uint8_t> &bytearray,
     }
     case LED: {
         _deserialize_led(&bytearray[start_index + payload_offset], payload_len);
+        break;
+    }
+    case HEARTBEAT: {
+        _deserialize_heartbeat(&bytearray[start_index + payload_offset],
+                               payload_len);
         break;
     }
     default: {
@@ -271,13 +281,43 @@ void AresFrame::_serialize_led(const AresFrameLed &payload,
     SERIALIZE(state);
 }
 
-#define DESERIALIZE_INIT(class_)                                               \
+void AresFrame::_serialize_heartbeat(const AresFrameHeartbeat &payload,
+                                     std::vector<uint8_t> &buffer) {
+    uint8_t flags = 0;
+    if (payload.ready) {
+        flags |= 1;
+    }
+    if (payload.broadcast) {
+        flags |= 2;
+    }
+
+    buffer.emplace_back(flags);
+    SERIALIZE(tx_cnt);
+    SERIALIZE(id);
+}
+
+#define Z_DESERIALIZE_INIT_DEFAULT(class_)                                     \
     class_ val_;                                                               \
     size_t offset_ = 0
+
+#define Z_DESERIALIZE_INIT_OFFSET(class_, offset_val_)                         \
+    class_ val_;                                                               \
+    size_t offset_ = (offset_val_)
+
+#define DESERIALIZE_INIT(class_, start_offset...)                              \
+    COND_CODE_0(IS_EMPTY(start_offset),                                        \
+                (Z_DESERIALIZE_INIT_OFFSET(class_, start_offset)),             \
+                (Z_DESERIALIZE_INIT_DEFAULT(class_)))
+
 #define DESERIALIZE(field)                                                     \
     memcpy(&val_.field, buf + offset_, sizeof(val_.field));                    \
     offset_ += sizeof(val_.field)
-#define DESERIALIZE_FINALIZE() _rx_payload = val_
+
+#define DESERIALIZE_SET(field, val)         val_.field = val
+
+#define DESERIALIZE_SET_ADVANCE(num_bytes_) offset_ += (num_bytes_)
+
+#define DESERIALIZE_FINALIZE()              _rx_payload = val_
 
 void AresFrame::_deserialize_setting(const uint8_t *buf, size_t len) {
     ARG_UNUSED(len);
@@ -303,6 +343,17 @@ void AresFrame::_deserialize_start(const uint8_t *buf, size_t len) {
     DESERIALIZE(broadcast);
     DESERIALIZE(seq_cnt);
     DESERIALIZE(packet_id);
+    DESERIALIZE_FINALIZE();
+}
+
+void AresFrame::_deserialize_heartbeat(const uint8_t *buf, size_t len) {
+    ARG_UNUSED(len);
+    DESERIALIZE_INIT(AresFrameHeartbeat, 1);
+    DESERIALIZE_SET(ready, (buf[0] & 1) != 0);
+    DESERIALIZE_SET(broadcast, (buf[0] & 2) != 0);
+    // No need to advance here. Offset is already set to 1 byte...
+    DESERIALIZE(tx_cnt);
+    DESERIALIZE(id);
     DESERIALIZE_FINALIZE();
 }
 
