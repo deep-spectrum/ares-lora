@@ -59,23 +59,13 @@ static void handle_setting(const struct ares_serial *serial,
     send_ack_frame(serial, frame, 0);
 }
 
-static void handle_start(const struct ares_serial *serial,
-                         struct ares_frame *frame) {
-    uint32_t id, pan, rep_cnt;
+static void send_lora_transmission(const struct ares_serial *serial,
+                                   struct ares_frame *frame,
+                                   struct ares_packet *packet,
+                                   int64_t tx_count) {
+    uint32_t id, pan, rep_cnt = (uint32_t)tx_count;
     const struct ares_lora *lora = ares_lora_backend_lora_get_ptr();
     int ret;
-
-    struct ares_packet packet = {
-        .payload = {.type = ARES_PKT_PAYLOAD_START,
-                    .payload.START =
-                        {
-                            .sec = frame->payload.START.sec,
-                            .nsec = frame->payload.START.ns,
-                        }},
-        .destination_id = frame->payload.START.id,
-        .type = (frame->payload.START.broadcast) ? ARES_PKT_TYPE_BROADCAST
-                                                 : ARES_PKT_TYPE_DIRECT,
-    };
 
     ret = retrieve_setting(ARES_SETTING_ID, &id);
     if (retrieve_setting(ARES_SETTING_ID, &id) < 0) {
@@ -89,18 +79,20 @@ static void handle_start(const struct ares_serial *serial,
         return;
     }
 
-    ret = retrieve_setting(ARES_SETTING_REPCNT, &rep_cnt);
-    if (ret < 0) {
-        send_ack_frame(serial, frame, ret);
-        return;
+    if (tx_count < 0) {
+        ret = retrieve_setting(ARES_SETTING_REPCNT, &rep_cnt);
+        if (ret < 0) {
+            send_ack_frame(serial, frame, ret);
+            return;
+        }
     }
 
-    packet.pan_id = (uint16_t)pan;
-    packet.source_id = (uint16_t)id;
-    (void)ares_lora_get_new_packet_id(lora, &packet.packet_id);
+    packet->pan_id = (uint16_t)pan;
+    packet->source_id = (uint16_t)id;
+    (void)ares_lora_set_packet_id(lora, packet);
 
     for (size_t i = 0; i < rep_cnt; i++) {
-        ret = ares_lora_write_packet(lora, &packet);
+        ret = ares_lora_write_packet(lora, packet);
         if (ret < 0) {
             send_ack_frame(serial, frame, ret);
             return;
@@ -108,6 +100,23 @@ static void handle_start(const struct ares_serial *serial,
     }
 
     send_ack_frame(serial, frame, 0);
+}
+
+static void handle_start(const struct ares_serial *serial,
+                         struct ares_frame *frame) {
+    struct ares_packet packet = {
+        .payload = {.type = ARES_PKT_PAYLOAD_START,
+                    .payload.START =
+                        {
+                            .sec = frame->payload.START.sec,
+                            .nsec = frame->payload.START.ns,
+                        }},
+        .destination_id = frame->payload.START.id,
+        .type = (frame->payload.START.broadcast) ? ARES_PKT_TYPE_BROADCAST
+                                                 : ARES_PKT_TYPE_DIRECT,
+    };
+
+    send_lora_transmission(serial, frame, &packet, -1);
 }
 
 static void handle_lora_config(const struct ares_serial *serial,
@@ -140,11 +149,28 @@ static void handle_led(const struct ares_serial *serial,
     send_ack_frame(serial, frame, 0);
 }
 
+static void handle_heartbeat(const struct ares_serial *serial,
+                             struct ares_frame *frame) {
+    struct ares_packet packet = {
+        .type = (frame->payload.HEARTBEAT.flags.broadcast)
+                    ? ARES_PKT_TYPE_BROADCAST
+                    : ARES_PKT_TYPE_DIRECT,
+        .destination_id = frame->payload.HEARTBEAT.id,
+        .payload = {.type = ARES_PKT_PAYLOAD_HEARTBEAT,
+                    .payload.HEARTBEAT = {
+                        .ready = frame->payload.HEARTBEAT.flags.ready,
+                    }}};
+
+    send_lora_transmission(serial, frame, &packet,
+                           frame->payload.HEARTBEAT.tx_count);
+}
+
 static struct ares_serial_command commands[] = {
     {ARES_FRAME_SETTING, handle_setting},
     {ARES_FRAME_START, handle_start},
     {ARES_FRAME_LORA_CONFIG, handle_lora_config},
     {ARES_FRAME_LED, handle_led},
+    {ARES_FRAME_HEARTBEAT, handle_heartbeat},
 };
 
 static int init_serial_handlers(void) {
