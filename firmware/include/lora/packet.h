@@ -56,8 +56,6 @@ struct ares_packet_payload {
 
         struct {
             bool ready;
-            uint8_t start_seq_cnt;
-            uint8_t stop_seq_cnt;
         } HEARTBEAT;
     } payload;
 };

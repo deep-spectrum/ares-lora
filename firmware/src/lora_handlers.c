@@ -26,6 +26,15 @@ struct modem_id {
 
 static struct modem_id modem_id;
 
+#define CHECK_DIRECTED_PACKET(packet)                                          \
+    do {                                                                       \
+        if (packet->type == ARES_PKT_TYPE_DIRECT &&                            \
+            (packet->destination_id != modem_id.id ||                          \
+             packet->pan_id != modem_id.pan_id)) {                             \
+            return;                                                            \
+        }                                                                      \
+    } while (0)
+
 static void handle_start(const struct ares_lora *lora,
                          const struct ares_packet *packet) {
     ARG_UNUSED(lora);
@@ -35,12 +44,7 @@ static void handle_start(const struct ares_lora *lora,
         .type = ARES_FRAME_START,
     };
 
-    if (packet->type == ARES_PKT_TYPE_DIRECT &&
-        (packet->destination_id != modem_id.id ||
-         packet->pan_id != modem_id.pan_id)) {
-        // not meant for us...
-        return;
-    }
+    CHECK_DIRECTED_PACKET(packet);
 
     frame.payload.START.id = packet->source_id;
     frame.payload.START.broadcast = packet->type == ARES_PKT_TYPE_BROADCAST;
@@ -52,8 +56,25 @@ static void handle_start(const struct ares_lora *lora,
     ares_serial_write_frame(serial, &frame);
 }
 
+static void handle_heartbeat(const struct ares_lora *lora,
+                             const struct ares_packet *packet) {
+    ARG_UNUSED(lora);
+
+    const struct ares_serial *serial = ares_serial_backend_uart_get_ptr();
+    struct ares_frame frame = {
+        // todo
+    };
+
+    CHECK_DIRECTED_PACKET(packet);
+
+    // todo
+
+    ares_serial_write_frame(serial, &frame);
+}
+
 static struct ares_lora_command commands[] = {
     {ARES_PKT_PAYLOAD_START, handle_start},
+    {ARES_PKT_PAYLOAD_HEARTBEAT, handle_heartbeat},
 };
 
 static int init_lora_handlers(void) {
