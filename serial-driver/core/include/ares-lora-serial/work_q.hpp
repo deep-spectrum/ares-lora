@@ -18,6 +18,7 @@
 #include <thread>
 #include <variant>
 #include "spinlock.hpp"
+#include "task.hpp"
 
 using namespace std::chrono_literals;
 
@@ -111,8 +112,7 @@ class WorkQ {
     friend struct WorkDelayable;
 
   private:
-    std::string name;
-    std::thread _thread;
+    Task<void(WorkQ*)> _thread;
     // this is so the lock doesn't get destroyed before objects of this type
     std::shared_ptr<SpinLock> _lock;
 

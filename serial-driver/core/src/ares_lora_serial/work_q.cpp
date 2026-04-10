@@ -248,7 +248,7 @@ bool WorkDelayable::unschedule_locked() {
     return ret;
 }
 
-WorkQ::WorkQ() : _lock(lock) {
+WorkQ::WorkQ() : _lock(lock), _thread(work_queue_main) {
     flags = 0;
 }
 
@@ -276,10 +276,14 @@ void WorkQ::start(const WorkQConfig *config) {
 
     flags_set(&flags, flags_);
 
-    _thread = std::thread(work_queue_main, this);
     if (config != nullptr && config->name != nullptr) {
-        name = config->name;
+        _thread.set_name(config->name);
     }
+    if (config != nullptr) {
+        _thread.set_essential(config->essential);
+    }
+
+    _thread.start(this);
 }
 
 void WorkQ::run(const WorkQConfig *config) {
@@ -290,14 +294,18 @@ void WorkQ::run(const WorkQConfig *config) {
     }
 
     if (config != nullptr && config->name != nullptr) {
-        name = config->name;
+        _thread.set_name(config->name);
+    }
+
+    if (config != nullptr) {
+        _thread.set_essential(config->essential);
     }
 
     sys_slist_init(&pending);
     notifyq.clear();
     drainq.clear();
     flags_set(&flags, flags_);
-    work_queue_main(this);
+    _thread.run(this);
 }
 
 std::thread::id WorkQ::queue_thread_get() const {
@@ -351,13 +359,7 @@ int WorkQ::stop(std::chrono::milliseconds timeout) {
     notifyq.put_nonblocking(0);
     lock_.unlock();
 
-    if (timeout == std::chrono::milliseconds::max()) {
-        _thread.join();
-        return 0;
-    }
-
-    // todo: some timeout (replace with packaged task)
-    return -ETIMEDOUT;
+    return _thread.join(timeout);
 }
 
 int WorkQ::submit_locked(Work *work, WorkQ **queue) {
