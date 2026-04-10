@@ -12,7 +12,10 @@
 #include <ares-lora-serial/work_q.hpp>
 #include <atomic>
 #include <mutex>
-#include <stddef.h>
+#include <cstddef>
+#include <utility>
+#include <ares/util.h>
+#include <ares/util.hpp>
 
 #define BIT(n) (1UL << (n))
 
@@ -61,6 +64,7 @@ enum {
 
 static std::shared_ptr<SpinLock> lock = std::make_shared<SpinLock>();
 WorkQ sys_work_q;
+static sys_slist_t pending_cancels;
 
 static void flag_clear(uint32_t *flags, uint32_t bit) { *flags &= ~BIT(bit); }
 
@@ -82,7 +86,7 @@ static void flags_set(uint32_t *flags, uint32_t new_flags) {
 
 static uint32_t flags_get(const uint32_t *flags) { return *flags; }
 
-Work::Work(const work_handler_t &handler) : _lock(lock), handler(handler) {}
+Work::Work(work_handler_t handler) : _lock(lock), handler(std::move(handler)) {}
 
 int Work::work_busy_get() const {
     std::unique_lock lock_(*lock);
@@ -128,7 +132,7 @@ bool Work::work_cancel_sync(WorkSync *sync) {
     return pending;
 }
 
-int Work::work_busy_get_locked() const { return flags_get(&flags) & WORK_MASK; }
+int Work::work_busy_get_locked() const { return static_cast<int>(flags_get(&flags) & WORK_MASK); }
 
 bool Work::work_flush_locked(WorkFlusher *flusher) {
     bool need_flush =
@@ -161,7 +165,7 @@ bool Work::cancel_sync_locked(WorkCanceller *canceller) {
     bool ret = flag_test(&flags, WORK_CANCELING_BIT);
 
     if (ret) {
-        // todo
+        WorkQ::init_canceller(canceller, this);
     }
 
     return ret;
@@ -187,7 +191,7 @@ bool WorkDelayable::work_flush(WorkSync *sync) {
     }
 
     if (unschedule_locked()) {
-        (void)queue->submit_locked(&work, &queue);
+        (void)WorkQ::submit_locked(&work, &queue);
     }
 
     bool need_flush = work.work_flush_locked(flusher);
@@ -225,7 +229,7 @@ bool WorkDelayable::work_cancel_sync(WorkSync *sync) {
 }
 
 int WorkDelayable::work_busy_delayable_get_locked() const {
-    return flags_get(&work.flags) & WORK_MASK;
+    return static_cast<int>(flags_get(&work.flags) & WORK_MASK);
 }
 
 int WorkDelayable::work_cancel_async_locked() {
@@ -242,4 +246,290 @@ bool WorkDelayable::unschedule_locked() {
     }
 
     return ret;
+}
+
+WorkQ::WorkQ() : _lock(lock) {
+    flags = 0;
+}
+
+WorkQ::~WorkQ() {
+    this->queue_drain(true);
+    stop();
+}
+
+int WorkQ::submit(Work *work) {
+    std::unique_lock lock_(*lock);
+    WorkQ *queue = this;
+    return submit_locked(work, &queue);
+}
+
+void WorkQ::start(const WorkQConfig *config) {
+    uint32_t flags_ = WORK_QUEUE_STARTED;
+
+    sys_slist_init(&pending);
+    notifyq.clear();
+    drainq.clear();
+
+    if (config != nullptr && config->no_yield) {
+        flags_ |= WORK_QUEUE_NO_YIELD;
+    }
+
+    flags_set(&flags, flags_);
+
+    _thread = std::thread(work_queue_main, this);
+    if (config != nullptr && config->name != nullptr) {
+        name = config->name;
+    }
+}
+
+void WorkQ::run(const WorkQConfig *config) {
+    uint32_t flags_ = WORK_QUEUE_STARTED;
+
+    if (config != nullptr && config->no_yield) {
+        flags_ |= WORK_QUEUE_NO_YIELD;
+    }
+
+    if (config != nullptr && config->name != nullptr) {
+        name = config->name;
+    }
+
+    sys_slist_init(&pending);
+    notifyq.clear();
+    drainq.clear();
+    flags_set(&flags, flags_);
+    work_queue_main(this);
+}
+
+std::thread::id WorkQ::queue_thread_get() const {
+    return _thread.get_id();
+}
+
+int WorkQ::queue_drain(bool plug) {
+    int ret = 0;
+    std::unique_lock lock_(*lock);
+
+    if (((flags_get(&flags) & (WORK_QUEUE_BUSY | WORK_QUEUE_DRAIN)) != 0) || plug || !sys_slist_is_empty(&pending)) {
+        flag_set(&flags, WORK_QUEUE_DRAIN_BIT);
+        if (plug) {
+            flag_set(&flags, WORK_QUEUE_PLUGGED_BIT);
+        }
+
+        notifyq.put_nonblocking(0);
+        ret = drainq.get();
+    }
+
+    return ret;
+}
+
+int WorkQ::queue_unplug() {
+    int ret = -EALREADY;
+    std::unique_lock lock_(*lock);
+
+    if (flag_test_and_clear(&flags, WORK_QUEUE_PLUGGED_BIT)) {
+        ret = 0;
+    }
+
+    return ret;
+}
+
+int WorkQ::stop() {
+    return stop(std::chrono::milliseconds::max());
+}
+
+int WorkQ::stop(std::chrono::milliseconds timeout) {
+    std::unique_lock lock_(*lock);
+
+    if (!flag_test(&flags, WORK_QUEUE_STARTED_BIT)) {
+        return -EALREADY;
+    }
+
+    if (!flag_test(&flags, WORK_QUEUE_PLUGGED_BIT)) {
+        return -EBUSY;
+    }
+
+    flag_set(&flags, WORK_QUEUE_STOP_BIT);
+    notifyq.put_nonblocking(0);
+    lock_.unlock();
+
+    if (timeout == std::chrono::milliseconds::max()) {
+        _thread.join();
+        return 0;
+    }
+
+    // todo: some timeout (replace with packaged task)
+    return -ETIMEDOUT;
+}
+
+int WorkQ::submit_locked(Work *work, WorkQ **queue) {
+    int ret = 0;
+
+    if (flag_test(&work->flags, WORK_CANCELING_BIT)) {
+        ret = -EBUSY;
+    } else if (!flag_test(&work->flags, WORK_QUEUED_BIT)) {
+        ret = 1;
+
+        if (*queue == nullptr) {
+            *queue = work->queue;
+        }
+
+        if (flag_test(&work->flags, WORK_RUNNING_BIT)) {
+            *queue = work->queue;
+            ret = 2;
+        }
+
+        int rc = (*queue)->submit_locked(work);
+
+        if (rc < 0) {
+            ret = rc;
+        } else {
+            flag_set(&work->flags, WORK_QUEUED_BIT);
+            work->queue = *queue;
+        }
+    } // else already in queue, do nothing ...
+
+    if (ret <= 0) {
+        *queue = nullptr;
+    }
+
+    return ret;
+}
+
+int WorkQ::submit_locked(Work *work) {
+    int ret;
+    bool chained = std::this_thread::get_id() == _thread.get_id();
+    bool draining = flag_test(&flags, WORK_QUEUE_DRAIN_BIT);
+    bool plugged = flag_test(&flags, WORK_QUEUE_PLUGGED_BIT);
+
+    if (!flag_test(&flags, WORK_QUEUE_STARTED_BIT)) {
+        ret = -ENODEV;
+    } else if ((draining && !chained) || (plugged && !draining)) {
+        ret = -EBUSY;
+    } else {
+        sys_slist_append(&pending, &work->node);
+        ret = 1;
+        notifyq.put_nonblocking(0);
+    }
+
+    return ret;
+}
+
+static void handle_flush(Work *work) { ARG_UNUSED(work); }
+
+void WorkQ::init_flusher(WorkFlusher *flusher) {
+    flusher->work = Work(handle_flush);
+    flusher->sem.clear();
+    flag_set(&flusher->work.flags, WORK_FLUSHING_BIT);
+}
+
+void WorkQ::init_canceller(WorkCanceller *canceller, Work *work) {
+    canceller->sem.clear();
+    canceller->work = work;
+    sys_slist_append(&pending_cancels, &canceller->node);
+}
+
+void WorkQ::flusher_locked(Work *work, WorkFlusher *flusher) {
+    init_flusher(flusher);
+
+    if ((flags_get(&work->flags) & WORK_QUEUED) != 0u) {
+        sys_slist_insert(&pending, &work->node, &flusher->work.node);
+    } else {
+        sys_slist_prepend(&pending, &flusher->work.node);
+    }
+}
+
+void WorkQ::notify_locked() {
+    notifyq.put_nonblocking(0);
+}
+
+void WorkQ::remove_locked(Work *work) {
+    if (flag_test_and_clear(&work->flags, WORK_QUEUED_BIT)) {
+        (void)sys_slist_find_and_remove(&pending, &work->node);
+    }
+}
+
+void WorkQ::work_queue_main(WorkQ *queue) {
+    while (true) {
+        sys_snode_t *node;
+        Work *work = nullptr;
+        work_handler_t handler = nullptr;
+
+        std::unique_lock lock_(*lock);
+
+        node = sys_slist_get(&queue->pending);
+        if (node != nullptr) {
+            flag_set(&queue->flags, WORK_QUEUE_BUSY_BIT);
+            work = container_of(node, &Work::node);
+            flag_set(&work->flags, WORK_RUNNING_BIT);
+            flag_clear(&work->flags, WORK_QUEUED_BIT);
+
+            handler = work->handler;
+        } else if (flag_test_and_clear(&queue->flags, WORK_QUEUE_DRAIN_BIT)) {
+            queue->drainq.put_nonblocking(1);
+        } else if (flag_test(&queue->flags, WORK_QUEUE_STOP_BIT)) {
+            flags_set(&queue->flags, 0);
+            return;
+        }
+
+        if (work == nullptr) {
+            lock_.unlock();
+            queue->notifyq.get();
+            continue;
+        }
+
+        lock_.unlock();
+
+        handler(work);
+
+        lock_.lock();
+
+        flag_clear(&work->flags, WORK_RUNNING_BIT);
+        if (flag_test(&work->flags, WORK_FLUSHING_BIT)) {
+            finalize_flush_locked(work);
+        }
+        if (flag_test(&work->flags, WORK_CANCELING_BIT)) {
+            finalize_cancel_locked(work);
+        }
+
+        flag_clear(&queue->flags, WORK_CANCELING_BIT);
+        bool yield = !flag_test(&queue->flags, WORK_QUEUE_NO_YIELD_BIT);
+        lock_.unlock();
+
+        if (yield) {
+            std::this_thread::yield();
+        }
+    }
+}
+
+void WorkQ::finalize_flush_locked(Work *work) {
+    WorkFlusher *flusher = container_of(work, &WorkFlusher::work);
+    flag_clear(&work->flags, WORK_FLUSHING_BIT);
+    flusher->sem.put_nonblocking(0);
+}
+
+void WorkQ::finalize_cancel_locked(Work *work) {
+    WorkCanceller *wc, *tmp;
+    sys_snode_t *prev = nullptr;
+
+    flag_clear(&work->flags, WORK_CANCELING_BIT);
+
+    SYS_SLIST_FOR_EACH_CONTAINER_SAFE(&pending_cancels, wc, tmp, node) {
+        if (wc->work == work) {
+            sys_slist_remove(&pending_cancels, prev, &wc->node);
+            wc->sem.put_nonblocking(0);
+            break;
+        }
+        prev = &wc->node;
+    }
+}
+
+int work_submit_to_queue(WorkQ *queue, Work *work) {
+    return queue->submit(work);
+}
+
+int work_submit(Work *work) {
+    return sys_work_q.submit(work);
+}
+
+WorkDelayable * work_delayable_from_work(Work *work) {
+    return container_of(work, &WorkDelayable::work);
 }
