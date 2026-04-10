@@ -12,6 +12,7 @@
 #define ARES_ARES_LORA_SERIAL_HPP
 
 #include <ares-lora-serial/ares_frame.hpp>
+#include <ares-lora-serial/work_q.hpp>
 #include <ares/data-structures/queue.hpp>
 #include <ares/serial/serial.hpp>
 #include <atomic>
