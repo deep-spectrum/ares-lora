@@ -47,6 +47,8 @@ template <typename Signature> class Task {
     std::thread thread;
     std::function<Signature> handler;
 
+    void _join();
+
     template <typename... Args> void init_task(Args &&...args);
 };
 
@@ -109,6 +111,12 @@ int Task<Signature>::join(const std::chrono::milliseconds timeout) {
 
 template <typename Signature> std::thread::id Task<Signature>::get_id() const {
     return thread.get_id();
+}
+
+template <typename Signature> void Task<Signature>::_join() {
+    if (thread.joinable()) {
+        thread.join();
+    }
 }
 
 template <typename Signature>

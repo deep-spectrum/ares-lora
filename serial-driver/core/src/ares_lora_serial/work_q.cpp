@@ -66,6 +66,22 @@ static std::shared_ptr<SpinLock> lock = std::make_shared<SpinLock>();
 WorkQ sys_work_q;
 static sys_slist_t pending_cancels;
 
+#include <iostream>
+struct PreMainCaller {
+    PreMainCaller() {
+        std::cout << "Starting\n";
+        WorkQConfig config = {
+            .name = "System Work Queue",
+            .no_yield = false,
+            .essential = true,
+        };
+
+        sys_work_q.start(&config);
+    }
+};
+
+[[maybe_unused]] static PreMainCaller z_caller;
+
 static void handle_flush(Work *work) { ARG_UNUSED(work); }
 
 struct WorkFlusher {
@@ -75,8 +91,8 @@ struct WorkFlusher {
 };
 
 struct WorkCanceller {
-    sys_snode_t node;
-    Work *work;
+    sys_snode_t node{};
+    Work *work{};
     ares::bounded_queue<uint8_t> sem;
 };
 
@@ -187,84 +203,85 @@ bool Work::cancel_sync_locked(WorkCanceller *canceller) {
     return ret;
 }
 
-WorkDelayable::WorkDelayable(const work_handler_t &handler) : work(handler) {}
+// WorkDelayable::WorkDelayable(const work_handler_t &handler) : work(handler)
+// {}
+//
+// WorkDelayable::WorkDelayable(Work &&work) : work(std::move(work)) {}
+//
+// int WorkDelayable::work_busy_get() const {
+//     std::unique_lock lock_(*lock);
+//     return work_busy_delayable_get_locked();
+// }
+//
+// bool WorkDelayable::work_is_pending() const { return work_busy_get() != 0u; }
+//
+// bool WorkDelayable::work_flush() {
+//     WorkFlusher flusher;
+//     std::unique_lock lock_(*lock);
+//
+//     if (work.work_busy_get_locked() == 0u) {
+//         return false;
+//     }
+//
+//     if (unschedule_locked()) {
+//         (void)WorkQ::submit_locked(&work, &queue);
+//     }
+//
+//     bool need_flush = work.work_flush_locked(&flusher);
+//     lock_.unlock();
+//
+//     if (need_flush) {
+//         flusher.sem.get();
+//     }
+//
+//     return need_flush;
+// }
+//
+// int WorkDelayable::work_cancel() {
+//     std::unique_lock lock_(*lock);
+//     return work_cancel_async_locked();
+// }
+//
+// bool WorkDelayable::work_cancel_sync() {
+//     WorkCanceller canceller;
+//     std::unique_lock lock_(*lock);
+//     bool pending = work_busy_delayable_get_locked() != 0u;
+//     bool need_wait = false;
+//
+//     if (pending) {
+//         (void)work_cancel_async_locked();
+//         need_wait = work.cancel_sync_locked(&canceller);
+//     }
+//     lock_.unlock();
+//
+//     if (need_wait) {
+//         canceller.sem.get();
+//     }
+//
+//     return pending;
+// }
+//
+// int WorkDelayable::work_busy_delayable_get_locked() const {
+//     return static_cast<int>(flags_get(&work.flags) & WORK_MASK);
+// }
+//
+// int WorkDelayable::work_cancel_async_locked() {
+//     (void)unschedule_locked();
+//     return work.cancel_async_locked();
+// }
+//
+// bool WorkDelayable::unschedule_locked() {
+//     bool ret = false;
+//
+//     if (flag_test_and_clear(&work.flags, WORK_DELAYED_BIT)) {
+//         // todo: abort timeout
+//         ret = true;
+//     }
+//
+//     return ret;
+// }
 
-WorkDelayable::WorkDelayable(Work &&work) : work(std::move(work)) {}
-
-int WorkDelayable::work_busy_get() const {
-    std::unique_lock lock_(*lock);
-    return work_busy_delayable_get_locked();
-}
-
-bool WorkDelayable::work_is_pending() const { return work_busy_get() != 0u; }
-
-bool WorkDelayable::work_flush() {
-    WorkFlusher flusher;
-    std::unique_lock lock_(*lock);
-
-    if (work.work_busy_get_locked() == 0u) {
-        return false;
-    }
-
-    if (unschedule_locked()) {
-        (void)WorkQ::submit_locked(&work, &queue);
-    }
-
-    bool need_flush = work.work_flush_locked(&flusher);
-    lock_.unlock();
-
-    if (need_flush) {
-        flusher.sem.get();
-    }
-
-    return need_flush;
-}
-
-int WorkDelayable::work_cancel() {
-    std::unique_lock lock_(*lock);
-    return work_cancel_async_locked();
-}
-
-bool WorkDelayable::work_cancel_sync() {
-    WorkCanceller canceller;
-    std::unique_lock lock_(*lock);
-    bool pending = work_busy_delayable_get_locked() != 0u;
-    bool need_wait = false;
-
-    if (pending) {
-        (void)work_cancel_async_locked();
-        need_wait = work.cancel_sync_locked(&canceller);
-    }
-    lock_.unlock();
-
-    if (need_wait) {
-        canceller.sem.get();
-    }
-
-    return pending;
-}
-
-int WorkDelayable::work_busy_delayable_get_locked() const {
-    return static_cast<int>(flags_get(&work.flags) & WORK_MASK);
-}
-
-int WorkDelayable::work_cancel_async_locked() {
-    (void)unschedule_locked();
-    return work.cancel_async_locked();
-}
-
-bool WorkDelayable::unschedule_locked() {
-    bool ret = false;
-
-    if (flag_test_and_clear(&work.flags, WORK_DELAYED_BIT)) {
-        // todo: abort timeout
-        ret = true;
-    }
-
-    return ret;
-}
-
-WorkQ::WorkQ() : _lock(lock), _thread(work_queue_main) { flags = 0; }
+WorkQ::WorkQ() : _thread(work_queue_main), _lock(lock) { flags = 0; }
 
 WorkQ::~WorkQ() {
     this->queue_drain(true);
@@ -336,6 +353,7 @@ int WorkQ::queue_drain(bool plug) {
         }
 
         notifyq.put_nonblocking(0);
+        lock_.unlock();
         ret = drainq.get();
     }
 
@@ -371,6 +389,11 @@ int WorkQ::stop(std::chrono::milliseconds timeout) {
     lock_.unlock();
 
     return _thread.join(timeout);
+}
+
+bool WorkQ::plugged() const {
+    std::unique_lock lock_(*_lock);
+    return (flags_get(&flags) & WORK_QUEUE_PLUGGED) != 0u;
 }
 
 int WorkQ::submit_locked(Work *work, WorkQ **queue) {
@@ -484,7 +507,12 @@ void WorkQ::work_queue_main(WorkQ *queue) {
 
         lock_.unlock();
 
-        handler(work);
+        try {
+            handler(work);
+        } catch (...) {
+            lock_.unlock();
+            throw;
+        }
 
         lock_.lock();
 
@@ -534,6 +562,6 @@ int work_submit_to_queue(WorkQ *queue, Work *work) {
 
 int work_submit(Work *work) { return sys_work_q.submit(work); }
 
-WorkDelayable *work_delayable_from_work(Work *work) {
-    return container_of(work, &WorkDelayable::work);
-}
+// WorkDelayable *work_delayable_from_work(Work *work) {
+//     return container_of(work, &WorkDelayable::work);
+// }

@@ -18,7 +18,6 @@
 #include <chrono>
 #include <functional>
 #include <thread>
-#include <variant>
 
 using namespace std::chrono_literals;
 
@@ -58,37 +57,37 @@ struct Work {
     bool cancel_sync_locked(WorkCanceller *canceller);
 };
 
-struct WorkDelayable {
-    explicit WorkDelayable(const work_handler_t &handler);
-    explicit WorkDelayable(Work &&work);
-    WorkDelayable() = delete;
-
-    [[nodiscard]] int work_busy_get() const;
-    [[nodiscard]] bool work_is_pending() const;
-    // todo: expires_get()
-    // todo: remaining_get()
-    bool work_flush();
-    int work_cancel();
-    bool work_cancel_sync();
-
-    friend WorkDelayable *work_delayable_from_work(Work *work);
-
-  private:
-    Work work;
-    std::chrono::milliseconds timeout{};
-    WorkQ *queue = nullptr;
-
-    [[nodiscard]] int work_busy_delayable_get_locked() const;
-    int work_cancel_async_locked();
-    bool unschedule_locked();
-};
+// struct WorkDelayable {
+//     explicit WorkDelayable(const work_handler_t &handler);
+//     explicit WorkDelayable(Work &&work);
+//     WorkDelayable() = delete;
+//
+//     [[nodiscard]] int work_busy_get() const;
+//     [[nodiscard]] bool work_is_pending() const;
+//     // todo: expires_get()
+//     // todo: remaining_get()
+//     bool work_flush();
+//     int work_cancel();
+//     bool work_cancel_sync();
+//
+//     friend WorkDelayable *work_delayable_from_work(Work *work);
+//
+//   private:
+//     Work work;
+//     std::chrono::milliseconds timeout{};
+//     WorkQ *queue = nullptr;
+//
+//     [[nodiscard]] int work_busy_delayable_get_locked() const;
+//     int work_cancel_async_locked();
+//     bool unschedule_locked();
+// };
 
 struct WorkQConfig {
     const char *name = "";
     bool no_yield = false;
+    bool essential = false;
 
     // unused right now
-    bool essential = false;
     std::chrono::milliseconds work_timeout_ms = 0ms;
 };
 
@@ -107,6 +106,8 @@ class WorkQ {
     int stop(std::chrono::milliseconds timeout);
     // int schedule(WorkDelayable *dwork, std::chrono::milliseconds delay);
     // int reschedule(WorkDelayable *dwork, std::chrono::milliseconds delay);
+
+    [[nodiscard]] bool plugged() const;
 
     friend struct Work;
     friend struct WorkDelayable;
@@ -148,6 +149,6 @@ int work_submit(Work *work);
 //                               std::chrono::milliseconds delay);
 // int work_reschedule(WorkDelayable *dwork, std::chrono::milliseconds delay);
 
-WorkDelayable *work_delayable_from_work(Work *work);
+// WorkDelayable *work_delayable_from_work(Work *work);
 
 #endif // ARES_WORK_Q_HPP
