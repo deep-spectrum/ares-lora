@@ -12,9 +12,10 @@
 #define ARES_ARES_LORA_SERIAL_HPP
 
 #include <ares-lora-serial/ares_frame.hpp>
-#include <ares-lora-serial/work_q.hpp>
 #include <ares/data-structures/queue.hpp>
 #include <ares/serial/serial.hpp>
+#include <ares/synchronization/semaphore.hpp>
+#include <ares/work-q/work_q.hpp>
 #include <atomic>
 #include <chrono>
 #include <exception>
@@ -94,6 +95,7 @@ class AresSerial {
 
   private:
     Serial::Serial _serial;
+    WorkQ _work_q;
 
     std::chrono::milliseconds _response_timeout;
     std::chrono::milliseconds _rx_period;
@@ -142,9 +144,21 @@ class AresSerial {
 
     static void _handle_bad_frame(const AresResponse &response);
 
+    struct HeartbeatWork {
+        HeartbeatWork(work_handler_t handler, AresSerial *ctx)
+            : work(std::move(handler)), obj(ctx) {}
+        ~HeartbeatWork() { work.work_flush(); }
+        Work work;
+        AresSerial *obj;
+        uint16_t id = 0;
+        ares::semaphore<> sem{0};
+    };
+
     bool _master;
     std::function<void(uint16_t, bool)> _heartbeat_callback = nullptr;
-    void _heartbeat_event(const AresFrame::AresFrameHeartbeat &heartbeat) const;
+    void _heartbeat_event(const AresFrame::AresFrameHeartbeat &heartbeat);
+    static void _heartbeat_handler(Work *work);
+    HeartbeatWork _heartbeat_work;
 };
 
 #endif // ARES_ARES_LORA_SERIAL_HPP

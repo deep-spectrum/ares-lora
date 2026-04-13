@@ -94,7 +94,8 @@ AresFrame AresLoraConfig::generate_frame() const {
 
 AresSerial::AresSerial(const AresSerialConfigs &configs)
     : _response_timeout(configs.response_timeout),
-      _rx_period(configs.rx_period), _master(configs.master) {
+      _rx_period(configs.rx_period), _master(configs.master),
+      _heartbeat_work(_heartbeat_handler, this) {
     SerialInternal::SerialAttributes attr;
 
     _serial.port(configs.port);
@@ -485,16 +486,26 @@ void AresSerial::_start_event(
 }
 
 void AresSerial::_heartbeat_event(
-    const AresFrame::AresFrameHeartbeat &heartbeat) const {
+    const AresFrame::AresFrameHeartbeat &heartbeat) {
     LOG_INF("Heartbeat received from %d", heartbeat.id);
 
     if (_master && heartbeat.broadcast) {
         LOG_DBG("Heartbeat received from hanging node");
-        // todo: submit claim host work
+        _heartbeat_work.sem.lock();
+        _heartbeat_work.id = heartbeat.id;
+        _work_q.submit(&_heartbeat_work.work);
     }
 
     if (_heartbeat_callback != nullptr) {
         LOG_DBG("Calling Python event handler");
         _heartbeat_callback(heartbeat.id, heartbeat.ready);
     }
+}
+
+void AresSerial::_heartbeat_handler(Work *work) {
+    HeartbeatWork *hwork = container_of(work, &HeartbeatWork::work);
+    uint16_t id = hwork->id;
+    hwork->sem.unlock();
+
+    // todo
 }
