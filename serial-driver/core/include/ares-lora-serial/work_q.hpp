@@ -11,20 +11,19 @@
 #ifndef ARES_WORK_Q_HPP
 #define ARES_WORK_Q_HPP
 
+#include "spinlock.hpp"
+#include "task.hpp"
 #include <ares/data-structures/queue.hpp>
 #include <ares/data-structures/sys/slist.h>
 #include <chrono>
 #include <functional>
 #include <thread>
 #include <variant>
-#include "spinlock.hpp"
-#include "task.hpp"
 
 using namespace std::chrono_literals;
 
 class WorkQ;
 struct Work;
-struct WorkSync;
 struct WorkFlusher;
 struct WorkCanceller;
 struct WorkDelayable;
@@ -39,9 +38,9 @@ struct Work {
 
     [[nodiscard]] int work_busy_get() const;
     [[nodiscard]] bool work_is_pending() const;
-    bool work_flush(WorkSync *sync);
+    bool work_flush();
     int work_cancel();
-    bool work_cancel_sync(WorkSync *sync);
+    bool work_cancel_sync();
 
   private:
     // this is so the lock doesn't get destroyed before objects of this type
@@ -68,11 +67,12 @@ struct WorkDelayable {
     [[nodiscard]] bool work_is_pending() const;
     // todo: expires_get()
     // todo: remaining_get()
-    bool work_flush(WorkSync *sync);
+    bool work_flush();
     int work_cancel();
-    bool work_cancel_sync(WorkSync *sync);
+    bool work_cancel_sync();
 
     friend WorkDelayable *work_delayable_from_work(Work *work);
+
   private:
     Work work;
     std::chrono::milliseconds timeout{};
@@ -112,7 +112,7 @@ class WorkQ {
     friend struct WorkDelayable;
 
   private:
-    Task<void(WorkQ*)> _thread;
+    Task<void(WorkQ *)> _thread;
     // this is so the lock doesn't get destroyed before objects of this type
     std::shared_ptr<SpinLock> _lock;
 
@@ -135,25 +135,6 @@ class WorkQ {
 
     static void finalize_flush_locked(Work *work);
     static void finalize_cancel_locked(Work *work);
-};
-
-struct WorkFlusher {
-    Work work;
-    ares::bounded_queue<uint8_t> sem;
-};
-
-struct WorkCanceller {
-    sys_snode_t node;
-    Work *work;
-    ares::bounded_queue<uint8_t> sem;
-};
-
-struct WorkSync {
-    friend struct Work;
-    friend struct WorkDelayable;
-
-  private:
-    std::variant<std::monostate, WorkFlusher, WorkCanceller> backend;
 };
 
 extern WorkQ sys_work_q;
