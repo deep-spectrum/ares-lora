@@ -79,7 +79,7 @@ PYBIND11_MODULE(_ares_lora_serial, m, py::mod_gil_not_used()) {
 AresSerialConfigs::AresSerialConfigs(const py::kwargs &kwargs) {
     from_kwargs(kwargs, SP(port), SP(response_timeout), SP(rx_period),
                 SP(start_callback), SP(serial_timeout), SP(master),
-                SP(heartbeat_callback));
+                SP(heartbeat_callback), SP(claim_callback));
 }
 
 AresLoraConfig::AresLoraConfig(const py::kwargs &kwargs) {
@@ -109,6 +109,7 @@ AresSerial::AresSerial(const AresSerialConfigs &configs)
 
     _start_callback = configs.start_callback;
     _heartbeat_callback = configs.heartbeat_callback;
+    _claim_callback = configs.claim_callback;
 }
 
 AresSerial::~AresSerial() {
@@ -143,9 +144,7 @@ AresSerial::AresResponse AresSerial::_send_frame(AresFrame &frame) {
 void AresSerial::_handle_bad_frame(const AresResponse &response) {
     std::stringstream ss;
     ss << "Internal error: Bad frame received (code: "
-       << static_cast<int>(
-              std::get<AresFrame::AresFrameFramingError>(response.payload))
-       << ")";
+       << std::get<AresFrame::AresFrameFramingError>(response.payload) << ")";
     throw py::buffer_error(ss.str());
 }
 
@@ -372,6 +371,15 @@ void AresSerial::_process_frames_helper() {
             _start_event(std::get<AresFrame::AresFrameStart>(frame.payload));
             break;
         }
+        case AresFrame::HEARTBEAT: {
+            _heartbeat_event(
+                std::get<AresFrame::AresFrameHeartbeat>(frame.payload));
+            break;
+        }
+        case AresFrame::CLAIM: {
+            _claim_event(std::get<AresFrame::AresFrameClaim>(frame.payload));
+            break;
+        }
         default: {
             LOG_ERR("Invalid frame received: %d", static_cast<int>(frame.type));
             break;
@@ -511,7 +519,7 @@ void AresSerial::_heartbeat_event(
 
     if (_heartbeat_callback != nullptr) {
         LOG_DBG("Calling Python event handler");
-        _heartbeat_callback(heartbeat.id, heartbeat.ready);
+        _heartbeat_callback(heartbeat.id, heartbeat.ready, heartbeat.broadcast);
     }
 }
 
@@ -546,4 +554,25 @@ int AresSerial::_heartbeat_claim_host(uint16_t destination_id) {
     }
 
     return ret;
+}
+
+void AresSerial::_claim_event(const AresFrame::AresFrameClaim &claim) {
+    LOG_DBG("Claim event received: %d", claim.id);
+    if (_master) {
+        LOG_ERR("Someone sent a claim packet while this is the master node: "
+                "Undefined behavior");
+        return;
+    }
+
+    if (_claimed_host != UINT16_C(0) && claim.id != _claimed_host) {
+        LOG_ERR("Someone sent claim packet even though the host has already "
+                "been claimed");
+        return;
+    }
+
+    _claimed_host = claim.id;
+
+    if (_claim_callback != nullptr) {
+        _claim_callback(claim.id);
+    }
 }

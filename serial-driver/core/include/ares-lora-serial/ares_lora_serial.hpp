@@ -53,7 +53,8 @@ struct AresSerialConfigs {
     bool master = false;
     std::function<void(int64_t, uint64_t, uint16_t, bool, uint8_t, uint16_t)>
         start_callback = nullptr;
-    std::function<void(uint16_t, bool)> heartbeat_callback = nullptr;
+    std::function<void(uint16_t, bool, bool)> heartbeat_callback = nullptr;
+    std::function<void(uint16_t)> claim_callback = nullptr;
 };
 
 struct AresLoraConfig {
@@ -154,11 +155,14 @@ class AresSerial {
 
     bool _master;
     uint16_t _claimed_host = 0;
-    std::function<void(uint16_t, bool)> _heartbeat_callback = nullptr;
+    std::function<void(uint16_t, bool, bool)> _heartbeat_callback = nullptr;
     void _heartbeat_event(const AresFrame::AresFrameHeartbeat &heartbeat);
     static void _heartbeat_handler(Work *work);
     HeartbeatWork _heartbeat_work;
     int _heartbeat_claim_host(uint16_t destination_id);
+
+    std::function<void(uint16_t)> _claim_callback = nullptr;
+    void _claim_event(const AresFrame::AresFrameClaim &claim);
 };
 
 #endif // ARES_ARES_LORA_SERIAL_HPP
