@@ -62,6 +62,18 @@ class LoraLedState(IntEnum):
     FETCH = 3
 
 
+@dataclass
+class LoRaSerialConfig:
+    port: str = ""
+    response_timeout: float = 2.0
+    rx_period: float = 0.1
+    serial_timeout: float = 0.1
+    start_callback: Callable[[int, int], None] | None = None
+    heartbeat_callback: Callable[[int, bool, bool], None] | None = None
+    claim_callback: Callable[[int], None] | None = None
+    master: bool = False
+
+
 def lora_serial_command(func):
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
@@ -74,19 +86,23 @@ def lora_serial_command(func):
 
 
 class LoraSerial:
-    def __init__(self, port: str, response_timeout: float = 2.0, rx_period: float = 0.1, serial_timeout: float = 0.1,
-                 start_callback: Callable[[int, int], None] | None = None):
-        if not port:
+    def __init__(self, config: LoRaSerialConfig = LoRaSerialConfig()):
+        if not config.port:
             raise ValueError("Invalid port")
         configs = _SerialConfigs(
-            port=port,
-            response_timeout=response_timeout,
-            rx_period=rx_period,
-            serial_timeout=serial_timeout,
-            start_callback=self._handle_start
+            port=config.port,
+            response_timeout=config.response_timeout,
+            rx_period=config.rx_period,
+            serial_timeout=config.serial_timeout,
+            master=config.master,
+            start_callback=self._handle_start,
+            heartbeat_callback=self._handle_heartbeat,
+            claim_callback=self._handle_claim,
         )
 
-        self._start_cb = start_callback
+        self._start_cb = config.start_callback
+        self._heartbeat_cb = config.heartbeat_callback
+        self._claim_cb = config.claim_callback
         self._dev = _AresSerial(configs)
         self._nodes: dict[int, dict[str, int]] = {}
 
@@ -112,6 +128,12 @@ class LoraSerial:
             else:
                 logger.info(f"Received start message (sec: {sec}, nsec: {nsec}, src: {src}, "
                             f"broadcast: {broadcast}, sequence count: {seq_cnt}, packet id: {packet_id})")
+
+    def _handle_heartbeat(self, src_id: int, ready: bool, broadcast: bool):
+        pass
+
+    def _handle_claim(self, src_id: int):
+        pass
 
     @staticmethod
     def _check_ret_code(code: int):
