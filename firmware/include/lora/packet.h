@@ -42,6 +42,7 @@
 enum ares_packet_payload_type {
     ARES_PKT_PAYLOAD_START = 0,
     ARES_PKT_PAYLOAD_HEARTBEAT = 1,
+    ARES_PKT_PAYLOAD_CLAIM = 2,
 
     ARES_PKT_PAYLOAD_INVALID,
 };

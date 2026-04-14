@@ -185,6 +185,10 @@ static void serialize(uint8_t *buf, size_t len,
         (void)memcpy(payload, &packet->payload.payload.HEARTBEAT, payload_len);
         break;
     }
+    case ARES_PKT_PAYLOAD_CLAIM: {
+        // nop
+        break;
+    }
     default: {
         __ASSERT_NO_MSG(false);
     }
@@ -249,6 +253,10 @@ static void deserialize(struct ares_packet *packet, const uint8_t *buf) {
     }
     case ARES_PKT_PAYLOAD_HEARTBEAT: {
         (void)memcpy(&packet->payload.payload.HEARTBEAT, payload, payload_len);
+        break;
+    }
+    case ARES_PKT_PAYLOAD_CLAIM: {
+        // nop
         break;
     }
     default: {

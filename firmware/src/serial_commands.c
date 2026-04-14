@@ -170,12 +170,24 @@ static void handle_heartbeat(const struct ares_serial *serial,
                            frame->payload.HEARTBEAT.tx_count);
 }
 
+static void handle_claim(const struct ares_serial *serial,
+                         struct ares_frame *frame) {
+    struct ares_packet packet = {.type = ARES_PKT_TYPE_DIRECT,
+                                 .destination_id = frame->payload.CLAIM,
+                                 .payload = {
+                                     .type = ARES_PKT_PAYLOAD_CLAIM,
+                                 }};
+
+    send_lora_transmission(serial, frame, &packet, -1);
+}
+
 static struct ares_serial_command commands[] = {
     {ARES_FRAME_SETTING, handle_setting},
     {ARES_FRAME_START, handle_start},
     {ARES_FRAME_LORA_CONFIG, handle_lora_config},
     {ARES_FRAME_LED, handle_led},
     {ARES_FRAME_HEARTBEAT, handle_heartbeat},
+    {ARES_FRAME_CLAIM, NULL},
 };
 
 static int init_serial_handlers(void) {
