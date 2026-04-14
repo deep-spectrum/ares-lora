@@ -15,6 +15,7 @@
 #include <ares/data-structures/queue.hpp>
 #include <ares/serial/serial.hpp>
 #include <ares/synchronization/semaphore.hpp>
+#include <ares/synchronization/spinlock.hpp>
 #include <ares/work-q/task.hpp>
 #include <ares/work-q/work_q.hpp>
 #include <atomic>
@@ -101,6 +102,7 @@ class AresSerial {
   private:
     Serial::Serial _serial;
     WorkQ _work_q;
+    SpinLock _command_lock;
 
     std::chrono::milliseconds _response_timeout;
     std::chrono::milliseconds _rx_period;
@@ -125,7 +127,10 @@ class AresSerial {
     };
 
     void _publish_response(const AresFrame::AresFrameDecoded &frame);
-    AresResponse _send_frame(AresFrame &frame);
+    AresResponse _send_frame(AresFrame &frame,
+                             const std::chrono::milliseconds &timeout);
+    AresResponse _wait_response(const std::chrono::milliseconds &timeout);
+    AresResponse _wait_response_forever();
 
     std::atomic_bool _tasks_running = false;
 
@@ -150,7 +155,7 @@ class AresSerial {
         Work work;
         AresSerial *obj;
         uint16_t id = 0;
-        ares::semaphore<> sem{0};
+        ares::semaphore<> sem{};
     };
 
     bool _master;

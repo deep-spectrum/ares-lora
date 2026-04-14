@@ -11,8 +11,8 @@
 #include <ares-lora-serial/ares_frame.hpp>
 #include <ares-lora-serial/ares_lora_serial.hpp>
 #include <ares/logging/log.hpp>
-#include <ares/util.hpp>
 #include <ares/pyutil.hpp>
+#include <ares/util.hpp>
 #include <cassert>
 #include <chrono>
 #include <pybind11/chrono.h>
@@ -115,12 +115,17 @@ AresSerial::AresSerial(const AresSerialConfigs &configs)
 
 AresSerial::~AresSerial() {
     stop();
+    _work_q.stop();
     _serial.close();
 }
 
-AresSerial::AresResponse AresSerial::_send_frame(AresFrame &frame) {
+AresSerial::AresResponse
+AresSerial::_send_frame(AresFrame &frame,
+                        const std::chrono::milliseconds &timeout) {
+    std::unique_lock lock_(_command_lock);
     std::vector<uint8_t> tx;
     frame.serialize(tx);
+    LOG_DBG_HEXDUMP(tx, tx.size(), "Sending frame");
 
     _response_queue.clear();
 
@@ -130,8 +135,21 @@ AresSerial::AresResponse AresSerial::_send_frame(AresFrame &frame) {
 
     AresResponse response;
 
+    if (timeout == std::chrono::milliseconds::max()) {
+        response = _wait_response_forever();
+    } else {
+        response = _wait_response(timeout);
+    }
+
+    return response;
+}
+
+AresSerial::AresResponse
+AresSerial::_wait_response(const std::chrono::milliseconds &timeout) {
+    AresResponse response;
+
     try {
-        response = _response_queue.get(_response_timeout);
+        response = _response_queue.get(timeout);
     } catch (const ares::queue_exception &exc) {
         if (exc.reason() == ares::queue_exception::QUEUE_EMPTY) {
             throw AresTimeoutError(exc.what());
@@ -140,6 +158,10 @@ AresSerial::AresResponse AresSerial::_send_frame(AresFrame &frame) {
     }
 
     return response;
+}
+
+AresSerial::AresResponse AresSerial::_wait_response_forever() {
+    return _response_queue.get();
 }
 
 void AresSerial::_handle_bad_frame(const AresResponse &response) {
@@ -152,7 +174,7 @@ void AresSerial::_handle_bad_frame(const AresResponse &response) {
 int AresSerial::setting_set(uint16_t id, uint32_t value) {
     AresFrame frame(AresFrame::SETTING,
                     AresFrame::AresFrameSetting{true, id, value});
-    AresResponse response = _send_frame(frame);
+    AresResponse response = _send_frame(frame, _response_timeout);
 
     int ret = -1;
     switch (response.type) {
@@ -174,7 +196,7 @@ int AresSerial::setting_set(uint16_t id, uint32_t value) {
 
 py::tuple AresSerial::setting_get(uint16_t id) {
     AresFrame frame(AresFrame::SETTING, AresFrame::AresFrameSetting{false, id});
-    AresResponse response = _send_frame(frame);
+    AresResponse response = _send_frame(frame, _response_timeout);
 
     int ret = 0;
     uint32_t setting = 0;
@@ -202,7 +224,7 @@ int AresSerial::send_start(int64_t sec, uint64_t nsec, uint16_t id,
                            bool broadcast) {
     AresFrame frame(AresFrame::START,
                     AresFrame::AresFrameStart{sec, nsec, id, 0, broadcast, 0});
-    AresResponse response = _send_frame(frame);
+    AresResponse response = _send_frame(frame, _response_timeout);
 
     int ret = -1;
 
@@ -225,7 +247,7 @@ int AresSerial::send_start(int64_t sec, uint64_t nsec, uint16_t id,
 
 int AresSerial::lora_config(const AresLoraConfig &config) {
     AresFrame frame = config.generate_frame();
-    AresResponse response = _send_frame(frame);
+    AresResponse response = _send_frame(frame, _response_timeout);
 
     int ret = -1;
 
@@ -259,7 +281,7 @@ py::tuple AresSerial::led(uint8_t state) {
     AresFrame frame(AresFrame::LED,
                     AresFrame::AresFrameLed{
                         static_cast<AresFrame::AresFrameLed::LedState>(state)});
-    AresResponse response = _send_frame(frame);
+    AresResponse response = _send_frame(frame, _response_timeout);
 
     int ret = 0;
     AresFrame::AresFrameLed val;
@@ -294,7 +316,7 @@ int AresSerial::send_heartbeat(bool ready, uint8_t tx_cnt) {
                     AresFrame::AresFrameHeartbeat{ready,
                                                   _claimed_host == UINT16_C(0),
                                                   tx_cnt, _claimed_host});
-    AresResponse response = _send_frame(frame);
+    AresResponse response = _send_frame(frame, _response_timeout);
 
     int ret = 0;
 
@@ -320,6 +342,12 @@ void AresSerial::start() {
         throw std::runtime_error("Please stop before restarting");
     }
 
+    WorkQConfig config = {
+        .name = "AresSerial queue",
+        .essential = true,
+    };
+    _work_q.start(&config);
+
     _tasks_running = true;
     _processing_task.set_essential(true);
     _processing_task.start();
@@ -332,6 +360,8 @@ void AresSerial::stop() {
     if (!_tasks_running) {
         return;
     }
+
+    _work_q.queue_drain(true);
 
     _tasks_running = false;
     _rx_task.join();
@@ -529,6 +559,7 @@ void AresSerial::_heartbeat_handler(Work *work) {
     HeartbeatWork *hwork = container_of(work, &HeartbeatWork::work);
     uint16_t id = hwork->id;
     hwork->sem.unlock();
+    LOG_DBG("Sending claim response to %d", id);
 
     int ret = hwork->obj->_heartbeat_claim_host(id);
     LOG_DBG("Claim host response: %d", ret);
@@ -537,7 +568,13 @@ void AresSerial::_heartbeat_handler(Work *work) {
 int AresSerial::_heartbeat_claim_host(uint16_t destination_id) {
     AresFrame frame(AresFrame::CLAIM,
                     AresFrame::AresFrameClaim{destination_id});
-    AresResponse response = _send_frame(frame);
+    AresResponse response;
+    try {
+        response = _send_frame(frame, std::chrono::milliseconds::max());
+    } catch (const std::exception &exc) {
+        LOG_ERR("_send_frame(): %s", exc.what());
+        return -EADDRNOTAVAIL;
+    }
     int ret = -EINVAL;
 
     switch (response.type) {
@@ -546,7 +583,7 @@ int AresSerial::_heartbeat_claim_host(uint16_t destination_id) {
         break;
     }
     case AresResponse::BAD_FRAME: {
-        _handle_bad_frame(response);
+        LOG_ERR("Bad frame response received in heartbeat claim host handler");
         break;
     }
     default: {
@@ -573,8 +610,10 @@ void AresSerial::_claim_event(const AresFrame::AresFrameClaim &claim) {
     }
 
     _claimed_host = claim.id;
+    LOG_INF("Host claimed by %d", _claimed_host);
 
     if (_claim_callback != nullptr) {
+        LOG_DBG("Notifying Python of claimed host");
         _claim_callback(claim.id);
     }
 }
