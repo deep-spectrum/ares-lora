@@ -76,6 +76,10 @@ static size_t calculate_frame_length(const struct ares_frame *frame) {
             SIZEOF_FIELD(struct ares_frame, payload.HEARTBEAT.id);
         break;
     }
+    case ARES_FRAME_CLAIM: {
+        payload_len = SIZEOF_FIELD(struct ares_frame, payload.CLAIM);
+        break;
+    }
     default: {
         __ASSERT(false, "Invalid frame type received");
         break;
@@ -161,6 +165,11 @@ static void serialize(uint8_t *buf, const struct ares_frame *frame,
                 SIZEOF_FIELD(struct ares_frame, payload.HEARTBEAT.tx_count),
             &frame->payload.HEARTBEAT.id,
             SIZEOF_FIELD(struct ares_frame, payload.HEARTBEAT.id));
+        break;
+    }
+    case ARES_FRAME_CLAIM: {
+        (void)memcpy(payload, &frame->payload.CLAIM,
+                     SIZEOF_FIELD(struct ares_frame, payload.CLAIM));
         break;
     }
     case ARES_FRAME_FRAMING_ERROR: {
@@ -266,6 +275,11 @@ static void deserialize(struct ares_frame *frame, const uint8_t *buf) {
             payload + SIZEOF_FIELD(struct ares_frame, payload.HEARTBEAT.flags) +
                 SIZEOF_FIELD(struct ares_frame, payload.HEARTBEAT.tx_count),
             SIZEOF_FIELD(struct ares_frame, payload.HEARTBEAT.id));
+        break;
+    }
+    case ARES_FRAME_CLAIM: {
+        (void)memcpy(&frame->payload.CLAIM, payload,
+                     SIZEOF_FIELD(struct ares_frame, payload.CLAIM));
         break;
     }
     default: {

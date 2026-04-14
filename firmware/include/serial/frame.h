@@ -86,6 +86,8 @@ struct ares_frame {
 
         uint8_t LED; ///< ARES_FRAME_LED
 
+        uint16_t CLAIM; ///< ARES_FRAME_CLAIM
+
         int ACK; ///< ARES_FRAME_ACK
 
         enum ares_frame_error FRAMING_ERROR; ///< ARES_FRAME_FRAMING_ERROR
