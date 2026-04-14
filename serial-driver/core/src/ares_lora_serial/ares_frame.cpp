@@ -136,6 +136,10 @@ void AresFrame::serialize(std::vector<uint8_t> &bytearray) {
                              bytearray);
         break;
     }
+    case CLAIM: {
+        _serialize_claim(std::get<AresFrameClaim>(_tx_payload), bytearray);
+        break;
+    }
     default: {
         throw AresFrameError("Invalid type for TX");
     }
@@ -190,6 +194,11 @@ void AresFrame::parse(const std::vector<uint8_t> &bytearray,
                                payload_len);
         break;
     }
+    case CLAIM: {
+        _deserialize_claim(&bytearray[start_index + payload_offset],
+                           payload_len);
+        break;
+    }
     default: {
         throw AresFrameError("Invalid RX type");
     }
@@ -231,6 +240,16 @@ uint16_t AresFrame::_payload_size() const {
     }
     case LED: {
         ret = sizeof(AresFrameLed::state);
+        break;
+    }
+    case CLAIM: {
+        ret = sizeof(AresFrameClaim::id);
+        break;
+    }
+    case HEARTBEAT: {
+        ret = sizeof(AresFrameHeartbeat::tx_cnt) +
+              sizeof(AresFrameHeartbeat::id) +
+              sizeof(uint8_t); // flags are bit-packed
         break;
     }
     default: {
@@ -296,6 +315,11 @@ void AresFrame::_serialize_heartbeat(const AresFrameHeartbeat &payload,
     SERIALIZE(id);
 }
 
+void AresFrame::_serialize_claim(const AresFrameClaim &payload,
+                                 std::vector<uint8_t> &buffer) {
+    SERIALIZE(id);
+}
+
 #define Z_DESERIALIZE_INIT_DEFAULT(class_)                                     \
     class_ val_;                                                               \
     size_t offset_ = 0
@@ -353,6 +377,13 @@ void AresFrame::_deserialize_heartbeat(const uint8_t *buf, size_t len) {
     DESERIALIZE_SET(broadcast, (buf[0] & 2) != 0);
     // No need to advance here. Offset is already set to 1 byte...
     DESERIALIZE(tx_cnt);
+    DESERIALIZE(id);
+    DESERIALIZE_FINALIZE();
+}
+
+void AresFrame::_deserialize_claim(const uint8_t *buf, size_t len) {
+    ARG_UNUSED(len);
+    DESERIALIZE_INIT(AresFrameClaim);
     DESERIALIZE(id);
     DESERIALIZE_FINALIZE();
 }

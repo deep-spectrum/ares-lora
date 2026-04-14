@@ -40,8 +40,9 @@ class AresFrame {
         LORA_CONFIG = 2,
         LED = 3,
         HEARTBEAT = 4,
-        ACK = 5,
-        FRAMING_ERROR = 6,
+        CLAIM = 5,
+        ACK = 6,
+        FRAMING_ERROR = 7,
         UNKNOWN,
     };
 
@@ -95,6 +96,10 @@ class AresFrame {
         uint16_t id = 0;
     };
 
+    struct AresFrameClaim {
+        uint16_t id;
+    };
+
     using AresFrameAckErrorCode = int32_t;
 
     enum AresFrameFramingError : uint8_t {
@@ -105,11 +110,12 @@ class AresFrame {
 
     using AresFrameTxTypes =
         std::variant<std::monostate, AresFrameSetting, AresFrameStart,
-                     AresFrameLoraConfig, AresFrameLed, AresFrameHeartbeat>;
+                     AresFrameLoraConfig, AresFrameLed, AresFrameHeartbeat,
+                     AresFrameClaim>;
     using AresFrameRxTypes =
         std::variant<std::monostate, AresFrameSetting, AresFrameStart,
                      AresFrameAckErrorCode, AresFrameFramingError, AresFrameLed,
-                     AresFrameHeartbeat>;
+                     AresFrameHeartbeat, AresFrameClaim>;
 
     using AresFrameResponseTypes =
         std::variant<std::monostate, AresFrameSetting, AresFrameAckErrorCode,
@@ -159,11 +165,14 @@ class AresFrame {
                                std::vector<uint8_t> &buffer);
     static void _serialize_heartbeat(const AresFrameHeartbeat &payload,
                                      std::vector<uint8_t> &buffer);
+    static void _serialize_claim(const AresFrameClaim &payload,
+                                 std::vector<uint8_t> &buffer);
 
     void _deserialize_setting(const uint8_t *buf, size_t len);
     void _deserialize_led(const uint8_t *buf, size_t len);
     void _deserialize_start(const uint8_t *buf, size_t len);
     void _deserialize_heartbeat(const uint8_t *buf, size_t len);
+    void _deserialize_claim(const uint8_t *buf, size_t len);
     void _deserialize_ack(const uint8_t *buf, size_t len);
     void _deserialize_framing_error(const uint8_t *buf, size_t len);
 };
