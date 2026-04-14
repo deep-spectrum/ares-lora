@@ -91,6 +91,9 @@ class AresSerial {
 
     py::tuple led(uint8_t state);
 
+    // returns error code
+    int send_heartbeat(bool ready, uint8_t tx_cnt);
+
     void start();
     void stop();
 
@@ -150,6 +153,7 @@ class AresSerial {
     };
 
     bool _master;
+    uint16_t _claimed_host = 0;
     std::function<void(uint16_t, bool)> _heartbeat_callback = nullptr;
     void _heartbeat_event(const AresFrame::AresFrameHeartbeat &heartbeat);
     static void _heartbeat_handler(Work *work);

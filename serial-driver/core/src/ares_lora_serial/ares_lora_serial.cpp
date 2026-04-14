@@ -49,6 +49,8 @@ PYBIND11_MODULE(_ares_lora_serial, m, py::mod_gil_not_used()) {
         .def("lora_config", &AresSerial::lora_config, py::arg("config"))
         .def("led", &AresSerial::led, py::arg("state"),
              "Retrieve or set the LED state")
+        .def("send_heartbeat", &AresSerial::send_heartbeat, py::arg("ready"),
+             py::arg("tx_cnt"), "Send heartbeat packet")
         .def("start_driver", &AresSerial::start, "Start the serial driver")
         .def("stop_driver", &AresSerial::stop, "Stop the serial driver")
         .def("set_response_timeout", &AresSerial::set_response_timeout,
@@ -94,10 +96,9 @@ AresFrame AresLoraConfig::generate_frame() const {
 
 AresSerial::AresSerial(const AresSerialConfigs &configs)
     : _response_timeout(configs.response_timeout),
-      _rx_period(configs.rx_period), _master(configs.master),
-      _heartbeat_work(_heartbeat_handler, this),
-      _rx_task([this] { _read_serial(); }),
-      _processing_task([this] { _process_frames(); }) {
+      _rx_period(configs.rx_period), _rx_task([this] { _read_serial(); }),
+      _processing_task([this] { _process_frames(); }), _master(configs.master),
+      _heartbeat_work(_heartbeat_handler, this) {
     SerialInternal::SerialAttributes attr;
 
     _serial.port(configs.port);
@@ -282,6 +283,36 @@ py::tuple AresSerial::led(uint8_t state) {
     }
 
     return py::make_tuple(static_cast<uint8_t>(val.state), ret);
+}
+
+int AresSerial::send_heartbeat(bool ready, uint8_t tx_cnt) {
+    if (_master) {
+        return -EINVAL;
+    }
+
+    AresFrame frame(AresFrame::HEARTBEAT,
+                    AresFrame::AresFrameHeartbeat{ready,
+                                                  _claimed_host == UINT16_C(0),
+                                                  tx_cnt, _claimed_host});
+    AresResponse response = _send_frame(frame);
+
+    int ret = 0;
+
+    switch (response.type) {
+    case AresResponse::ACK: {
+        ret = std::get<AresFrame::AresFrameAckErrorCode>(response.payload);
+        break;
+    }
+    case AresResponse::BAD_FRAME: {
+        _handle_bad_frame(response);
+        break;
+    }
+    default: {
+        throw std::runtime_error("Received invalid response");
+    }
+    }
+
+    return ret;
 }
 
 void AresSerial::start() {
