@@ -15,6 +15,7 @@
 #include <ares/data-structures/queue.hpp>
 #include <ares/serial/serial.hpp>
 #include <ares/synchronization/semaphore.hpp>
+#include <ares/work-q/task.hpp>
 #include <ares/work-q/work_q.hpp>
 #include <atomic>
 #include <chrono>
@@ -122,18 +123,12 @@ class AresSerial {
     void _publish_response(const AresFrame::AresFrameDecoded &frame);
     AresResponse _send_frame(AresFrame &frame);
 
-    struct Task {
-        std::packaged_task<void()> task;
-        std::future<void> future;
-        std::thread thread;
-    };
-
     std::atomic_bool _tasks_running = false;
 
-    Task _rx_task;
+    Task<void()> _rx_task;
     ares::bounded_queue<AresFrame::AresFrameDecoded, 10, true> _frame_q;
 
-    Task _processing_task;
+    Task<void()> _processing_task;
     ares::bounded_queue<AresResponse> _response_queue;
 
     std::recursive_mutex _serial_lock;

@@ -95,7 +95,9 @@ AresFrame AresLoraConfig::generate_frame() const {
 AresSerial::AresSerial(const AresSerialConfigs &configs)
     : _response_timeout(configs.response_timeout),
       _rx_period(configs.rx_period), _master(configs.master),
-      _heartbeat_work(_heartbeat_handler, this) {
+      _heartbeat_work(_heartbeat_handler, this),
+      _rx_task([this] { _read_serial(); }),
+      _processing_task([this] { _process_frames(); }) {
     SerialInternal::SerialAttributes attr;
 
     _serial.port(configs.port);
@@ -288,14 +290,10 @@ void AresSerial::start() {
     }
 
     _tasks_running = true;
-
-    _processing_task.task = std::packaged_task([this] { _process_frames(); });
-    _processing_task.future = _processing_task.task.get_future();
-    _processing_task.thread = std::thread(std::move(_processing_task.task));
-
-    _rx_task.task = std::packaged_task([this] { _read_serial(); });
-    _rx_task.future = _rx_task.task.get_future();
-    _rx_task.thread = std::thread(std::move(_rx_task.task));
+    _processing_task.set_essential(true);
+    _processing_task.start();
+    _rx_task.set_essential(true);
+    _rx_task.start();
 }
 
 void AresSerial::stop() {
@@ -305,33 +303,17 @@ void AresSerial::stop() {
     }
 
     _tasks_running = false;
-
-    while (true) {
-        auto status = _rx_task.future.wait_for(10ms);
-        if (status == std::future_status::ready) {
-            break;
-        }
-    }
-    _rx_task.thread.join();
+    _rx_task.join();
 
     size_t retries = 0;
     for (; retries < max_attempts; retries++) {
-        size_t attempts = 0;
-        for (; attempts < max_attempts; attempts++) {
-            auto status = _processing_task.future.wait_for(10ms);
-            if (status == std::future_status::ready) {
-                break;
-            }
-        }
-
-        if (attempts >= max_attempts) {
+        if (_processing_task.join(100ms) < 0) {
             AresFrame::AresFrameDecoded dummy{AresFrame::UNKNOWN,
                                               std::monostate()};
             _frame_q.put(dummy);
-        } else {
-            _processing_task.thread.join();
-            break;
+            continue;
         }
+        break;
     }
 
     if (retries >= max_attempts) {
