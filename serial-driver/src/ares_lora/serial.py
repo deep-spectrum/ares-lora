@@ -187,6 +187,13 @@ class LoraSerial:
             return LoraLedState(ret)
         return None
 
+    @lora_serial_command
+    def send_heartbeat(self, ready: bool, strobe_count: int = 3) -> None:
+        if strobe_count <= 0:
+            raise ValueError("strobe_count must be a positive, non-zero integer")
+        code = self._dev.send_heartbeat(ready, strobe_count)
+        self._check_ret_code(code)
+
     def start_driver(self):
         self._dev.start_driver()
 
