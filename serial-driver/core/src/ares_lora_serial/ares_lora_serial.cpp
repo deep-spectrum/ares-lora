@@ -307,7 +307,7 @@ void AresSerial::stop() {
 
     size_t retries = 0;
     for (; retries < max_attempts; retries++) {
-        if (_processing_task.join(100ms) < 0) {
+        if (_processing_task.join(100ms) == -ETIMEDOUT) {
             AresFrame::AresFrameDecoded dummy{AresFrame::UNKNOWN,
                                               std::monostate()};
             _frame_q.put(dummy);
@@ -489,5 +489,30 @@ void AresSerial::_heartbeat_handler(Work *work) {
     uint16_t id = hwork->id;
     hwork->sem.unlock();
 
-    // todo
+    int ret = hwork->obj->_heartbeat_claim_host(id);
+    LOG_DBG("Claim host response: %d", ret);
+}
+
+int AresSerial::_heartbeat_claim_host(uint16_t destination_id) {
+    AresFrame frame(AresFrame::CLAIM,
+                    AresFrame::AresFrameClaim{destination_id});
+    AresResponse response = _send_frame(frame);
+    int ret = -EINVAL;
+
+    switch (response.type) {
+    case AresResponse::ACK: {
+        ret = std::get<AresFrame::AresFrameAckErrorCode>(response.payload);
+        break;
+    }
+    case AresResponse::BAD_FRAME: {
+        _handle_bad_frame(response);
+        break;
+    }
+    default: {
+        LOG_ERR("Received invalid response");
+        break;
+    }
+    }
+
+    return ret;
 }

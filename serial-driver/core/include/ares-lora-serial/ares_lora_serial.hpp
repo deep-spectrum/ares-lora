@@ -154,6 +154,7 @@ class AresSerial {
     void _heartbeat_event(const AresFrame::AresFrameHeartbeat &heartbeat);
     static void _heartbeat_handler(Work *work);
     HeartbeatWork _heartbeat_work;
+    int _heartbeat_claim_host(uint16_t destination_id);
 };
 
 #endif // ARES_ARES_LORA_SERIAL_HPP
