@@ -187,7 +187,7 @@ static struct ares_serial_command commands[] = {
     {ARES_FRAME_LORA_CONFIG, handle_lora_config},
     {ARES_FRAME_LED, handle_led},
     {ARES_FRAME_HEARTBEAT, handle_heartbeat},
-    {ARES_FRAME_CLAIM, NULL},
+    {ARES_FRAME_CLAIM, handle_claim},
 };
 
 static int init_serial_handlers(void) {

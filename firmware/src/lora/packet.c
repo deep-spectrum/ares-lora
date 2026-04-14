@@ -123,6 +123,10 @@ static size_t calculate_packet_size(const struct ares_packet *packet) {
         overhead += SIZEOF_FIELD(struct ares_packet_payload, payload.HEARTBEAT);
         break;
     }
+    case ARES_PKT_PAYLOAD_CLAIM: {
+        // nop
+        break;
+    }
     default: {
         return 0;
     }
