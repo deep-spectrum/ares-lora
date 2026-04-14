@@ -63,7 +63,7 @@ class LoraLedState(IntEnum):
 
 
 @dataclass
-class LoRaSerialConfig:
+class LoraSerialConfig:
     port: str = ""
     response_timeout: float = 2.0
     rx_period: float = 0.1
@@ -86,7 +86,7 @@ def lora_serial_command(func):
 
 
 class LoraSerial:
-    def __init__(self, config: LoRaSerialConfig = LoRaSerialConfig()):
+    def __init__(self, config: LoraSerialConfig = LoraSerialConfig()):
         if not config.port:
             raise ValueError("Invalid port")
         configs = _SerialConfigs(
@@ -188,10 +188,18 @@ class LoraSerial:
         return None
 
     @lora_serial_command
-    def send_heartbeat(self, ready: bool, strobe_count: int = 3) -> None:
+    def send_heartbeat(self, ready: bool, strobe_count: int = 3, timeout: float = 20.0) -> None:
         if strobe_count <= 0:
             raise ValueError("strobe_count must be a positive, non-zero integer")
-        code = self._dev.send_heartbeat(ready, strobe_count)
+        prev_timeout = self._dev.get_response_timeout()
+        self._dev.set_response_timeout(timeout)
+        try:
+            code = self._dev.send_heartbeat(ready, strobe_count)
+        except Exception:
+            self._dev.set_response_timeout(prev_timeout)
+            raise
+        else:
+            self._dev.set_response_timeout(prev_timeout)
         self._check_ret_code(code)
 
     def start_driver(self):

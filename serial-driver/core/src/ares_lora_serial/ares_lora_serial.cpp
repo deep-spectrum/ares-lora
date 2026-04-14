@@ -289,7 +289,7 @@ int AresSerial::send_heartbeat(bool ready, uint8_t tx_cnt) {
     if (_master) {
         return -EINVAL;
     }
-
+    LOG_DBG("Heartbeat command received");
     AresFrame frame(AresFrame::HEARTBEAT,
                     AresFrame::AresFrameHeartbeat{ready,
                                                   _claimed_host == UINT16_C(0),
@@ -390,6 +390,7 @@ void AresSerial::_process_frames_helper() {
 }
 
 void AresSerial::_process_frames() {
+    LOG_DBG("Starting processing task");
     while (_tasks_running) {
         try {
             _process_frames_helper();
