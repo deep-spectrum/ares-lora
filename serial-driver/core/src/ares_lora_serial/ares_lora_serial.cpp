@@ -12,6 +12,7 @@
 #include <ares-lora-serial/ares_lora_serial.hpp>
 #include <ares/logging/log.hpp>
 #include <ares/util.hpp>
+#include <ares/pyutil.hpp>
 #include <cassert>
 #include <chrono>
 #include <pybind11/chrono.h>
