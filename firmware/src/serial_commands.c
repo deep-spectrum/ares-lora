@@ -68,8 +68,13 @@ static void send_lora_transmission(const struct ares_serial *serial,
     int ret;
 
     ret = retrieve_setting(ARES_SETTING_ID, &id);
-    if (retrieve_setting(ARES_SETTING_ID, &id) < 0) {
+    if (ret < 0) {
         send_ack_frame(serial, frame, ret);
+        return;
+    }
+
+    if (id == UINT32_C(0)) {
+        send_ack_frame(serial, frame, -ENODEV);
         return;
     }
 

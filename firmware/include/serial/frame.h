@@ -40,6 +40,7 @@ enum ares_frame_type {
     ARES_FRAME_LORA_CONFIG,   ///< LoRa configuration frame.
     ARES_FRAME_LED,           ///< Control LED state.
     ARES_FRAME_HEARTBEAT,     ///< LoRa Heart Beat frame.
+    ARES_FRAME_CLAIM,         ///< LoRa host claim frame.
     ARES_FRAME_ACK,           ///< ACK frame.
     ARES_FRAME_FRAMING_ERROR, ///< Framing error frame. TX only.
 
@@ -75,9 +76,9 @@ struct ares_frame {
 
         struct {
             struct {
-                unsigned int ready : 1;
-                unsigned int broadcast : 1;
-                unsigned int padding : 6;
+                uint8_t ready : 1;
+                uint8_t broadcast : 1;
+                uint8_t padding : 6;
             } flags;
             uint8_t tx_count;
             uint16_t id;
