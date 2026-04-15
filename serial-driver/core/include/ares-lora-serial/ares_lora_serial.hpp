@@ -103,6 +103,9 @@ class AresSerial {
     Serial::Serial _serial;
     WorkQ _work_q;
     SpinLock _command_lock;
+    std::exception_ptr _exception;
+
+    void _check_crash();
 
     std::chrono::milliseconds _response_timeout;
     std::chrono::milliseconds _rx_period;

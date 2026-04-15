@@ -115,7 +115,6 @@ AresSerial::AresSerial(const AresSerialConfigs &configs)
 
 AresSerial::~AresSerial() {
     stop();
-    _work_q.stop();
     _serial.close();
 }
 
@@ -172,6 +171,7 @@ void AresSerial::_handle_bad_frame(const AresResponse &response) {
 }
 
 int AresSerial::setting_set(uint16_t id, uint32_t value) {
+    _check_crash();
     AresFrame frame(AresFrame::SETTING,
                     AresFrame::AresFrameSetting{true, id, value});
     AresResponse response = _send_frame(frame, _response_timeout);
@@ -195,6 +195,7 @@ int AresSerial::setting_set(uint16_t id, uint32_t value) {
 }
 
 py::tuple AresSerial::setting_get(uint16_t id) {
+    _check_crash();
     AresFrame frame(AresFrame::SETTING, AresFrame::AresFrameSetting{false, id});
     AresResponse response = _send_frame(frame, _response_timeout);
 
@@ -222,6 +223,7 @@ py::tuple AresSerial::setting_get(uint16_t id) {
 
 int AresSerial::send_start(int64_t sec, uint64_t nsec, uint16_t id,
                            bool broadcast) {
+    _check_crash();
     AresFrame frame(AresFrame::START,
                     AresFrame::AresFrameStart{sec, nsec, id, 0, broadcast, 0});
     AresResponse response = _send_frame(frame, _response_timeout);
@@ -246,6 +248,7 @@ int AresSerial::send_start(int64_t sec, uint64_t nsec, uint16_t id,
 }
 
 int AresSerial::lora_config(const AresLoraConfig &config) {
+    _check_crash();
     AresFrame frame = config.generate_frame();
     AresResponse response = _send_frame(frame, _response_timeout);
 
@@ -278,6 +281,7 @@ std::chrono::milliseconds AresSerial::get_response_timeout() const {
 }
 
 py::tuple AresSerial::led(uint8_t state) {
+    _check_crash();
     AresFrame frame(AresFrame::LED,
                     AresFrame::AresFrameLed{
                         static_cast<AresFrame::AresFrameLed::LedState>(state)});
@@ -308,6 +312,7 @@ py::tuple AresSerial::led(uint8_t state) {
 }
 
 int AresSerial::send_heartbeat(bool ready, uint8_t tx_cnt) {
+    _check_crash();
     if (_master) {
         return -EINVAL;
     }
@@ -338,30 +343,43 @@ int AresSerial::send_heartbeat(bool ready, uint8_t tx_cnt) {
 }
 
 void AresSerial::start() {
-    if (_tasks_running || _serial.is_closed()) {
+    if (_tasks_running) {
         throw std::runtime_error("Please stop before restarting");
     }
 
+    LOG_INF("Starting driver");
+    _exception = nullptr;
+    if (_serial.is_closed()) {
+        LOG_DBG("Port was closed. Attempting to open it.");
+        _serial.open();
+    }
+
+    LOG_DBG("Starting Work Queue");
     WorkQConfig config = {
         .name = "AresSerial queue",
         .essential = true,
     };
     _work_q.start(&config);
 
+    LOG_DBG("Starting Processing Task");
     _tasks_running = true;
     _processing_task.set_essential(true);
     _processing_task.start();
+
+    LOG_DBG("Starting RX Task");
     _rx_task.set_essential(true);
     _rx_task.start();
 }
 
 void AresSerial::stop() {
     constexpr size_t max_attempts = 10;
-    if (!_tasks_running) {
+    if (!_tasks_running && !_exception) {
         return;
     }
 
+    LOG_INF("Stopping driver");
     _work_q.queue_drain(true);
+    _work_q.stop();
 
     _tasks_running = false;
     _rx_task.join();
@@ -383,6 +401,13 @@ void AresSerial::stop() {
 
     _response_queue.clear();
     _frame_q.clear();
+}
+
+void AresSerial::_check_crash() {
+    if (_exception) {
+        stop();
+        std::rethrow_exception(_exception);
+    }
 }
 
 void AresSerial::_process_frames_helper() {
@@ -424,9 +449,10 @@ void AresSerial::_process_frames() {
     while (_tasks_running) {
         try {
             _process_frames_helper();
-        } catch (const std::exception &exc) {
-            // todo
-            std::abort(); // abort for now...
+        } catch (...) {
+            _exception = std::current_exception();
+            _tasks_running = false;
+            LOG_ERR("Driver crashed in processing thread");
         }
     }
 }
@@ -473,13 +499,11 @@ void AresSerial::_read_serial() {
     while (_tasks_running) {
         try {
             _read_serial_helper();
-        } catch (const Serial::SerialException &exc) {
+        } catch (...) {
+            _exception = std::current_exception();
             _serial.close();
-            // todo
-            std::abort();
-        } catch (const std::exception &exc) {
-            // todo
-            std::abort();
+            _tasks_running = false;
+            LOG_ERR("Driver crashed in read serial task");
         }
     }
 }
