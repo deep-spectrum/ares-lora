@@ -96,9 +96,9 @@ class AresSerial {
     // returns error code
     int send_heartbeat(bool ready, uint8_t tx_cnt);
 
-    // returns error code
-    int send_log(const std::string &log_msg, bool broadcast, uint8_t tx_cnt,
-                 uint16_t id);
+    // returns error code of all frames
+    py::tuple send_log(const std::string &log_msg, bool broadcast,
+                       uint8_t tx_cnt, uint16_t id);
 
     void start();
     void stop();
@@ -136,6 +136,9 @@ class AresSerial {
     void _publish_response(const AresFrame::AresFrameDecoded &frame);
     AresResponse _send_frame(AresFrame &frame,
                              const std::chrono::milliseconds &timeout);
+    void _send_multi_frame(AresFrame &frame,
+                           const std::chrono::milliseconds &timeout,
+                           std::vector<AresResponse> &responses);
     AresResponse _wait_response(const std::chrono::milliseconds &timeout);
     AresResponse _wait_response_forever();
 

@@ -125,22 +125,15 @@ AresSerial::_send_frame(AresFrame &frame,
                         const std::chrono::milliseconds &timeout) {
     std::unique_lock lock_(_command_lock);
     std::vector<uint8_t> tx;
+    frame.serialize(tx);
+    LOG_DBG_HEXDUMP(tx, tx.size(), "Sending frame");
 
     _response_queue.clear();
 
-    std::unique_lock lock(_serial_lock, std::defer_lock);
+    std::unique_lock lock(_serial_lock);
 
-    do {
-        frame.serialize(tx);
-        LOG_DBG_HEXDUMP(tx, tx.size(), "Sending frame");
-        lock.lock();
-        _serial.write(tx);
-        lock.unlock();
-        if (frame.frame_available()) {
-            // wait for MCU to process so it doesn't drop frames
-            std::this_thread::sleep_for(100ms);
-        }
-    } while (frame.frame_available());
+    _serial.write(tx);
+    lock.unlock();
 
     AresResponse response;
 
@@ -151,6 +144,15 @@ AresSerial::_send_frame(AresFrame &frame,
     }
 
     return response;
+}
+
+void AresSerial::_send_multi_frame(AresFrame &frame,
+                                   const std::chrono::milliseconds &timeout,
+                                   std::vector<AresResponse> &responses) {
+    do {
+        AresResponse response = _send_frame(frame, timeout);
+        responses.emplace_back(response);
+    } while (frame.frame_available());
 }
 
 AresSerial::AresResponse
@@ -352,8 +354,8 @@ int AresSerial::send_heartbeat(bool ready, uint8_t tx_cnt) {
     return ret;
 }
 
-int AresSerial::send_log(const std::string &log_msg, bool broadcast,
-                         uint8_t tx_cnt, uint16_t id) {
+py::tuple AresSerial::send_log(const std::string &log_msg, bool broadcast,
+                               uint8_t tx_cnt, uint16_t id) {
     _check_crash();
     LOG_DBG("Log command received");
     AresFrame::AresFrameLog payload{broadcast, tx_cnt, id, log_msg};
@@ -372,26 +374,28 @@ int AresSerial::send_log(const std::string &log_msg, bool broadcast,
     }
 
     AresFrame frame{AresFrame::LOG, payload};
+    std::vector<AresResponse> responses;
+    _send_multi_frame(frame, _response_timeout, responses);
+    std::vector<int> ret;
 
-    AresResponse response = _send_frame(frame, _response_timeout);
+    for (auto &response : responses) {
+        switch (response.type) {
+        case AresResponse::ACK: {
+            ret.emplace_back(
+                std::get<AresFrame::AresFrameAckErrorCode>(response.payload));
+            break;
+        }
+        case AresResponse::BAD_FRAME: {
+            _handle_bad_frame(response);
+            break;
+        }
+        default: {
+            throw std::runtime_error("Received invalid response");
+        }
+        }
+    }
 
-    int ret = 0;
-
-    switch (response.type) {
-    case AresResponse::ACK: {
-        ret = std::get<AresFrame::AresFrameAckErrorCode>(response.payload);
-        break;
-    }
-    case AresResponse::BAD_FRAME: {
-        _handle_bad_frame(response);
-        break;
-    }
-    default: {
-        throw std::runtime_error("Received invalid response");
-    }
-    }
-
-    return ret;
+    return array_to_tuple(ret.data(), ret.size());
 }
 
 void AresSerial::start() {
