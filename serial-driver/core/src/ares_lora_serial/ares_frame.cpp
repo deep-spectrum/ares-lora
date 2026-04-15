@@ -105,6 +105,7 @@ AresFrame::frame_present(const std::vector<uint8_t> &bytearray,
 void AresFrame::serialize(std::vector<uint8_t> &bytearray) {
     _direction = TX;
     bytearray.clear();
+    _preprocess_serialize();
 
     bytearray.resize(head_overhead);
     bytearray[header_offset] = header;
@@ -210,6 +211,8 @@ AresFrame::AresFrameDecoded AresFrame::get_parsed_frame() const {
     return decoded;
 }
 
+bool AresFrame::frame_available() const { return _new_frame; }
+
 uint16_t AresFrame::_payload_size() const {
     uint16_t ret = 0;
 
@@ -258,6 +261,59 @@ uint16_t AresFrame::_payload_size() const {
     }
 
     return ret;
+}
+
+void AresFrame::_preprocess_serialize() {
+    switch (_type) {
+    case LOG: {
+        AresFrameLog payload = std::get<AresFrameLog>(_tx_payload);
+        _preprocess_log(payload);
+        _tx_payload = payload;
+        _new_frame = payload._preprocessed;
+        break;
+    }
+    default: {
+        // doesn't need to be split into multiple frames
+        _new_frame = false;
+        break;
+    }
+    }
+}
+
+void AresFrame::_preprocess_log(AresFrameLog &payload) {
+    if (payload._preprocessed) {
+        payload._idx++;
+        payload._part++;
+        payload._preprocessed = payload._idx < payload._msg_split.size();
+        return;
+    }
+
+    if (payload.msg.empty()) {
+        throw AresFrameError("Log message empty");
+    }
+
+    size_t max_msg_size = max_frame_size - payload._overhead;
+    size_t num_substr =
+        (payload.msg.size() + (max_msg_size - 1)) / max_msg_size;
+
+    if (num_substr > static_cast<size_t>(UINT8_MAX)) {
+        throw AresFrameError("Log message too long");
+    }
+
+    payload._msg_split.reserve(num_substr);
+    std::string_view content = payload.msg;
+    size_t i = 0;
+
+    do {
+        payload._msg_split.emplace_back(content.substr(i, max_msg_size));
+        i += payload._msg_split.back().size();
+    } while (i < payload.msg.size());
+
+    payload._part = 1;
+    payload._idx = 0;
+    payload._num_parts = payload._msg_split.size();
+
+    payload._preprocessed = true;
 }
 
 #define SERIALIZE(field)                                                       \
@@ -320,6 +376,17 @@ void AresFrame::_serialize_claim(const AresFrameClaim &payload,
     SERIALIZE(id);
 }
 
+void AresFrame::_serialize_log(const AresFrameLog &payload,
+                               std::vector<uint8_t> &buffer) {
+    SERIALIZE(broadcast);
+    SERIALIZE(id);
+    SERIALIZE(tx_cnt);
+    SERIALIZE(_part);
+    SERIALIZE(_num_parts);
+    buffer.insert(buffer.end(), payload._msg_split[payload._idx].begin(),
+                  payload._msg_split[payload._idx].end());
+}
+
 #define Z_DESERIALIZE_INIT_DEFAULT(class_)                                     \
     class_ val_;                                                               \
     size_t offset_ = 0
@@ -336,6 +403,10 @@ void AresFrame::_serialize_claim(const AresFrameClaim &payload,
 #define DESERIALIZE(field)                                                     \
     memcpy(&val_.field, buf + offset_, sizeof(val_.field));                    \
     offset_ += sizeof(val_.field)
+
+#define DESERIALIZE_STR(field, len)                                            \
+    val_.field = std::string(buf + offset_, buf + offset_ + (len));            \
+    offset_ += (len)
 
 #define DESERIALIZE_SET(field, val)         val_.field = val
 
@@ -385,6 +456,17 @@ void AresFrame::_deserialize_claim(const uint8_t *buf, size_t len) {
     ARG_UNUSED(len);
     DESERIALIZE_INIT(AresFrameClaim);
     DESERIALIZE(id);
+    DESERIALIZE_FINALIZE();
+}
+
+void AresFrame::_deserialize_log(const uint8_t *buf, size_t len) {
+    DESERIALIZE_INIT(AresFrameLog);
+    DESERIALIZE(broadcast);
+    DESERIALIZE(id);
+    DESERIALIZE(tx_cnt);
+    DESERIALIZE(part);
+    DESERIALIZE(num_parts);
+    DESERIALIZE_STR(msg, len - AresFrameLog::_overhead);
     DESERIALIZE_FINALIZE();
 }
 

@@ -20,6 +20,8 @@
 #include <variant>
 #include <vector>
 
+constexpr size_t max_frame_size = 256;
+
 class AresFrameError : public std::exception {
   public:
     explicit AresFrameError(std::string msg) : msg_(std::move(msg)) {}
@@ -41,8 +43,9 @@ class AresFrame {
         LED = 3,
         HEARTBEAT = 4,
         CLAIM = 5,
-        ACK = 6,
-        FRAMING_ERROR = 7,
+        LOG = 6,
+        ACK = 7,
+        FRAMING_ERROR = 8,
         UNKNOWN,
     };
 
@@ -100,6 +103,28 @@ class AresFrame {
         uint16_t id;
     };
 
+    struct AresFrameLog {
+        bool broadcast = false;
+        uint8_t tx_cnt = 1;
+        uint8_t part = 1;      // 1 indexed. Automatically managed.
+        uint8_t num_parts = 1; // starts at 1. Automatically managed.
+        uint16_t id = 0;
+        std::string msg;
+
+        friend class AresFrame;
+
+      private:
+        std::vector<std::string_view> _msg_split;
+        size_t _idx = 0;
+        // used for serialization
+        uint8_t _part = 0;
+        uint8_t _num_parts = 1;
+        bool _preprocessed = false;
+        static constexpr size_t _overhead = sizeof(broadcast) + sizeof(part) +
+                                            sizeof(num_parts) + sizeof(id) +
+                                            sizeof(tx_cnt);
+    };
+
     using AresFrameAckErrorCode = int32_t;
 
     enum AresFrameFramingError : uint8_t {
@@ -111,11 +136,11 @@ class AresFrame {
     using AresFrameTxTypes =
         std::variant<std::monostate, AresFrameSetting, AresFrameStart,
                      AresFrameLoraConfig, AresFrameLed, AresFrameHeartbeat,
-                     AresFrameClaim>;
+                     AresFrameClaim, AresFrameLog>;
     using AresFrameRxTypes =
         std::variant<std::monostate, AresFrameSetting, AresFrameStart,
                      AresFrameAckErrorCode, AresFrameFramingError, AresFrameLed,
-                     AresFrameHeartbeat, AresFrameClaim>;
+                     AresFrameHeartbeat, AresFrameClaim, AresFrameLog>;
 
     using AresFrameResponseTypes =
         std::variant<std::monostate, AresFrameSetting, AresFrameAckErrorCode,
@@ -145,8 +170,12 @@ class AresFrame {
 
     [[nodiscard]] AresFrameDecoded get_parsed_frame() const;
 
+    [[nodiscard]] bool frame_available() const;
+
   private:
     enum FrameDirection { TX, RX, UNSPECIFIED };
+    using _MultiFrame = std::variant<std::monostate, AresFrameLog>;
+    bool _new_frame = true;
 
     FrameDirection _direction;
     AresFrameType _type;
@@ -154,6 +183,9 @@ class AresFrame {
     AresFrameRxTypes _rx_payload;
 
     [[nodiscard]] uint16_t _payload_size() const;
+
+    void _preprocess_serialize();
+    static void _preprocess_log(AresFrameLog &payload);
 
     static void _serialize_setting(const AresFrameSetting &payload,
                                    std::vector<uint8_t> &buffer);
@@ -167,12 +199,15 @@ class AresFrame {
                                      std::vector<uint8_t> &buffer);
     static void _serialize_claim(const AresFrameClaim &payload,
                                  std::vector<uint8_t> &buffer);
+    static void _serialize_log(const AresFrameLog &payload,
+                               std::vector<uint8_t> &buffer);
 
     void _deserialize_setting(const uint8_t *buf, size_t len);
     void _deserialize_led(const uint8_t *buf, size_t len);
     void _deserialize_start(const uint8_t *buf, size_t len);
     void _deserialize_heartbeat(const uint8_t *buf, size_t len);
     void _deserialize_claim(const uint8_t *buf, size_t len);
+    void _deserialize_log(const uint8_t *buf, size_t len);
     void _deserialize_ack(const uint8_t *buf, size_t len);
     void _deserialize_framing_error(const uint8_t *buf, size_t len);
 };
