@@ -20,8 +20,6 @@
 #include <variant>
 #include <vector>
 
-constexpr size_t max_frame_size = 256;
-
 class AresFrameError : public std::exception {
   public:
     explicit AresFrameError(std::string msg) : msg_(std::move(msg)) {}
@@ -100,10 +98,16 @@ class AresFrame {
     };
 
     struct AresFrameClaim {
-        uint16_t id;
+        uint16_t id = 0;
     };
 
     struct AresFrameLog {
+        AresFrameLog(bool broadcast, uint8_t tx_cnt, uint16_t id,
+                     std::string msg)
+            : broadcast(broadcast), tx_cnt(tx_cnt), id(id),
+              msg(std::move(msg)) {}
+        AresFrameLog() = default;
+
         bool broadcast = false;
         uint8_t tx_cnt = 1;
         uint8_t part = 1;      // 1 indexed. Automatically managed.
@@ -114,7 +118,7 @@ class AresFrame {
         friend class AresFrame;
 
       private:
-        std::vector<std::string_view> _msg_split;
+        std::vector<std::string> _msg_split;
         size_t _idx = 0;
         // used for serialization
         uint8_t _part = 0;
@@ -174,7 +178,6 @@ class AresFrame {
 
   private:
     enum FrameDirection { TX, RX, UNSPECIFIED };
-    using _MultiFrame = std::variant<std::monostate, AresFrameLog>;
     bool _new_frame = true;
 
     FrameDirection _direction;

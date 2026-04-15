@@ -11,6 +11,7 @@
 #include <ares-lora-serial/ares_frame.hpp>
 #include <ares/util.h>
 #include <cstring>
+#include <utility>
 
 constexpr uint8_t header = '^';
 constexpr uint8_t footer = '@';
@@ -28,6 +29,8 @@ constexpr size_t len_offset = header_offset + header_size;
 constexpr size_t type_offset = len_offset + len_size;
 constexpr size_t payload_offset = type_offset + type_size;
 
+constexpr size_t max_frame_size = 256;
+
 static size_t footer_offset(size_t payload_size) {
     return payload_offset + payload_size;
 }
@@ -40,7 +43,7 @@ static size_t retrieve_payload_len(const uint8_t *data) {
 
 AresFrame::AresFrame(AresFrameType type, AresFrameTxTypes payload)
     : _direction(TX), _type(type) {
-    _tx_payload = payload;
+    _tx_payload = std::move(payload);
 }
 
 AresFrame::AresFrame(const std::vector<uint8_t> &bytearray) : _direction(RX) {
@@ -141,6 +144,10 @@ void AresFrame::serialize(std::vector<uint8_t> &bytearray) {
         _serialize_claim(std::get<AresFrameClaim>(_tx_payload), bytearray);
         break;
     }
+    case LOG: {
+        _serialize_log(std::get<AresFrameLog>(_tx_payload), bytearray);
+        break;
+    }
     default: {
         throw AresFrameError("Invalid type for TX");
     }
@@ -200,6 +207,10 @@ void AresFrame::parse(const std::vector<uint8_t> &bytearray,
                            payload_len);
         break;
     }
+    case LOG: {
+        _deserialize_log(&bytearray[start_index + payload_offset], payload_len);
+        break;
+    }
     default: {
         throw AresFrameError("Invalid RX type");
     }
@@ -255,6 +266,12 @@ uint16_t AresFrame::_payload_size() const {
               sizeof(uint8_t); // flags are bit-packed
         break;
     }
+    case LOG: {
+        AresFrameLog payload = std::get<AresFrameLog>(_tx_payload);
+        ret =
+            AresFrameLog::_overhead + payload._msg_split[payload._idx].length();
+        break;
+    }
     default: {
         throw AresFrameError("Invalid TX type");
     }
@@ -269,7 +286,7 @@ void AresFrame::_preprocess_serialize() {
         AresFrameLog payload = std::get<AresFrameLog>(_tx_payload);
         _preprocess_log(payload);
         _tx_payload = payload;
-        _new_frame = payload._preprocessed;
+        _new_frame = payload._msg_split.size() > (payload._idx + 1);
         break;
     }
     default: {
@@ -284,7 +301,6 @@ void AresFrame::_preprocess_log(AresFrameLog &payload) {
     if (payload._preprocessed) {
         payload._idx++;
         payload._part++;
-        payload._preprocessed = payload._idx < payload._msg_split.size();
         return;
     }
 
@@ -292,7 +308,8 @@ void AresFrame::_preprocess_log(AresFrameLog &payload) {
         throw AresFrameError("Log message empty");
     }
 
-    size_t max_msg_size = max_frame_size - payload._overhead;
+    size_t max_msg_size =
+        max_frame_size - frame_overhead - AresFrameLog::_overhead;
     size_t num_substr =
         (payload.msg.size() + (max_msg_size - 1)) / max_msg_size;
 

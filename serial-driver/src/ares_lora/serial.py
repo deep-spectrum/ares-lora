@@ -202,6 +202,21 @@ class LoraSerial:
             self._dev.set_response_timeout(prev_timeout)
         self._check_ret_code(code)
 
+    @lora_serial_command
+    def send_log(self, log_msg: str, broadcast: bool = False, dst_id: int = 0, strobe_count: int = 3, timeout: float = 60.0):
+        if strobe_count <= 0:
+            raise ValueError("strobe_count must be a positive, non-zero integer")
+        prev_timeout = self._dev.get_response_timeout()
+        self._dev.set_response_timeout(timeout)
+        try:
+            code = self._dev.send_log(log_msg, broadcast, strobe_count, dst_id)
+        except Exception:
+            self._dev.set_response_timeout(prev_timeout)
+            raise
+        else:
+            self._dev.set_response_timeout(prev_timeout)
+        self._check_ret_code(code)
+
     def start_driver(self):
         self._dev.start_driver()
 

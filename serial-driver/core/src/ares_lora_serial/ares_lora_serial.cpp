@@ -52,6 +52,8 @@ PYBIND11_MODULE(_ares_lora_serial, m, py::mod_gil_not_used()) {
              "Retrieve or set the LED state")
         .def("send_heartbeat", &AresSerial::send_heartbeat, py::arg("ready"),
              py::arg("tx_cnt"), "Send heartbeat packet")
+        .def("send_log", &AresSerial::send_log,
+             "Send a logging message over LoRa")
         .def("start_driver", &AresSerial::start, "Start the serial driver")
         .def("stop_driver", &AresSerial::stop, "Stop the serial driver")
         .def("set_response_timeout", &AresSerial::set_response_timeout,
@@ -340,6 +342,30 @@ int AresSerial::send_heartbeat(bool ready, uint8_t tx_cnt) {
     }
 
     return ret;
+}
+
+int AresSerial::send_log(const std::string &log_msg, bool broadcast,
+                         uint8_t tx_cnt, uint16_t id) {
+    _check_crash();
+    LOG_DBG("Log command received");
+    AresFrame frame{AresFrame::LOG,
+                    AresFrame::AresFrameLog{broadcast, tx_cnt, id, log_msg}};
+
+    std::vector<uint8_t> tx;
+    do {
+        frame.serialize(tx);
+        LOG_DBG_HEXDUMP(tx, tx.size(), "Log message");
+        AresFrame decoded(tx);
+
+        AresFrame::AresFrameLog log = std::get<AresFrame::AresFrameLog>(
+            decoded.get_parsed_frame().payload);
+        LOG_DBG("Broadcast: %d, Target: %d, TX Count: %d, Part: %d, Total "
+                "Parts: %d",
+                log.broadcast, log.id, log.tx_cnt, log.part, log.num_parts);
+        LOG_DBG("Message: %s", log.msg.c_str());
+    } while (frame.frame_available());
+
+    return 0;
 }
 
 void AresSerial::start() {

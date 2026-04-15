@@ -96,6 +96,10 @@ class AresSerial {
     // returns error code
     int send_heartbeat(bool ready, uint8_t tx_cnt);
 
+    // returns error code
+    int send_log(const std::string &log_msg, bool broadcast, uint8_t tx_cnt,
+                 uint16_t id);
+
     void start();
     void stop();
 
