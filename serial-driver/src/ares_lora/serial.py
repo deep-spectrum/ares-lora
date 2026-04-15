@@ -136,9 +136,14 @@ class LoraSerial:
         pass
 
     @staticmethod
-    def _check_ret_code(code: int):
-        if code != 0:
-            raise LoraException(code)
+    def _check_ret_code(code: int | tuple[int, ...]):
+        if isinstance(code, int):
+            if code != 0:
+                raise LoraException(code)
+            return
+        for c in code:
+            if c != 0:
+                raise LoraException(c)
 
     @lora_serial_command
     def setting(self, setting_id: SettingId, value: int | None = None) -> int | None:
@@ -209,13 +214,13 @@ class LoraSerial:
         prev_timeout = self._dev.get_response_timeout()
         self._dev.set_response_timeout(timeout)
         try:
-            code = self._dev.send_log(log_msg, broadcast, strobe_count, dst_id)
+            codes = self._dev.send_log(log_msg, broadcast, strobe_count, dst_id)
         except Exception:
             self._dev.set_response_timeout(prev_timeout)
             raise
         else:
             self._dev.set_response_timeout(prev_timeout)
-        self._check_ret_code(code)
+        self._check_ret_code(codes)
 
     def start_driver(self):
         self._dev.start_driver()
