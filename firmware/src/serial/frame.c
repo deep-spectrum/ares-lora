@@ -9,6 +9,7 @@
  */
 
 #include <serial/frame.h>
+#include <serial/serial_common.h>
 #include <zephyr/kernel.h>
 
 #define ARES_FRAME_HEADER_OFFSET UINT32_C(0)
@@ -19,6 +20,10 @@
     (ARES_FRAME_TYPE_OFFSET + ARES_FRAME_TYPE_OVERHEAD)
 #define ARES_FRAME_FOOTER_OFFSET(payload_len)                                  \
     (ARES_FRAME_PAYLOAD_OFFSET + (uint64_t)(payload_len))
+
+#define ARES_FRAME_MAX_SIZE                                                    \
+    MIN(SERIAL_BACKEND_RX_RINGBUF_SIZE, SERIAL_BACKEND_TX_RINGBUF_SIZE)
+#define ARES_FRAME_MAX_PAYLOAD_SIZE (ARES_FRAME_MAX_SIZE - ARES_FRAME_OVERHEAD)
 
 static size_t ares_strlen(const char *s, size_t max_cnt) {
     size_t len = 0;
@@ -78,6 +83,15 @@ static size_t calculate_frame_length(const struct ares_frame *frame) {
     }
     case ARES_FRAME_CLAIM: {
         payload_len = SIZEOF_FIELD(struct ares_frame, payload.CLAIM);
+        break;
+    }
+    case ARES_FRAME_LOG: {
+        payload_len = SIZEOF_FIELD(struct ares_frame, payload.LOG.broadcast) +
+                      SIZEOF_FIELD(struct ares_frame, payload.LOG.id) +
+                      SIZEOF_FIELD(struct ares_frame, payload.LOG.part) +
+                      SIZEOF_FIELD(struct ares_frame, payload.LOG.num_parts);
+        payload_len += ares_strlen(frame->payload.LOG.msg,
+                                   ARES_FRAME_MAX_PAYLOAD_SIZE - payload_len);
         break;
     }
     default: {
@@ -141,6 +155,39 @@ static void serialize(uint8_t *buf, const struct ares_frame *frame,
                 SIZEOF_FIELD(struct ares_frame, payload.START.seq_cnt),
             &frame->payload.START.packet_id,
             SIZEOF_FIELD(struct ares_frame, payload.START.packet_id));
+        break;
+    }
+    case ARES_FRAME_LOG: {
+        (void)memcpy(payload, &frame->payload.LOG.broadcast,
+                     SIZEOF_FIELD(struct ares_frame, payload.LOG.broadcast));
+        (void)memcpy(payload +
+                         SIZEOF_FIELD(struct ares_frame, payload.LOG.broadcast),
+                     &frame->payload.LOG.id,
+                     SIZEOF_FIELD(struct ares_frame, payload.LOG.id));
+        (void)memcpy(
+            payload + SIZEOF_FIELD(struct ares_frame, payload.LOG.broadcast) +
+                SIZEOF_FIELD(struct ares_frame, payload.LOG.id),
+            &frame->payload.LOG.part,
+            SIZEOF_FIELD(struct ares_frame, payload.LOG.part));
+        (void)memcpy(
+            payload + SIZEOF_FIELD(struct ares_frame, payload.LOG.broadcast) +
+                SIZEOF_FIELD(struct ares_frame, payload.LOG.id) +
+                SIZEOF_FIELD(struct ares_frame, payload.LOG.part),
+            &frame->payload.LOG.num_parts,
+            SIZEOF_FIELD(struct ares_frame, payload.LOG.num_parts));
+        (void)memcpy(
+            payload + SIZEOF_FIELD(struct ares_frame, payload.LOG.broadcast) +
+                SIZEOF_FIELD(struct ares_frame, payload.LOG.id) +
+                SIZEOF_FIELD(struct ares_frame, payload.LOG.part) +
+                SIZEOF_FIELD(struct ares_frame, payload.LOG.num_parts),
+            frame->payload.LOG.msg,
+            ares_strlen(
+                frame->payload.LOG.msg,
+                payload_len -
+                    (SIZEOF_FIELD(struct ares_frame, payload.LOG.broadcast) +
+                     SIZEOF_FIELD(struct ares_frame, payload.LOG.id) +
+                     SIZEOF_FIELD(struct ares_frame, payload.LOG.part) +
+                     SIZEOF_FIELD(struct ares_frame, payload.LOG.num_parts))));
         break;
     }
     case ARES_FRAME_ACK: {
@@ -280,6 +327,36 @@ static void deserialize(struct ares_frame *frame, const uint8_t *buf) {
     case ARES_FRAME_CLAIM: {
         (void)memcpy(&frame->payload.CLAIM, payload,
                      SIZEOF_FIELD(struct ares_frame, payload.CLAIM));
+        break;
+    }
+    case ARES_FRAME_LOG: {
+        (void)memcpy(&frame->payload.LOG.broadcast, payload,
+                     SIZEOF_FIELD(struct ares_frame, payload.LOG.broadcast));
+        (void)memcpy(&frame->payload.LOG.id,
+                     payload +
+                         SIZEOF_FIELD(struct ares_frame, payload.LOG.broadcast),
+                     SIZEOF_FIELD(struct ares_frame, payload.LOG.id));
+        (void)memcpy(
+            &frame->payload.LOG.part,
+            payload + SIZEOF_FIELD(struct ares_frame, payload.LOG.broadcast) +
+                SIZEOF_FIELD(struct ares_frame, payload.LOG.id),
+            SIZEOF_FIELD(struct ares_frame, payload.LOG.part));
+        (void)memcpy(
+            &frame->payload.LOG.num_parts,
+            payload + SIZEOF_FIELD(struct ares_frame, payload.LOG.broadcast) +
+                SIZEOF_FIELD(struct ares_frame, payload.LOG.id) +
+                SIZEOF_FIELD(struct ares_frame, payload.LOG.part),
+            SIZEOF_FIELD(struct ares_frame, payload.LOG.num_parts));
+        frame->payload.LOG.msg =
+            (const char *)(payload +
+                           SIZEOF_FIELD(struct ares_frame,
+                                        payload.LOG.broadcast) +
+                           SIZEOF_FIELD(struct ares_frame, payload.LOG.id) +
+                           SIZEOF_FIELD(struct ares_frame, payload.LOG.part) +
+                           SIZEOF_FIELD(struct ares_frame,
+                                        payload.LOG.num_parts));
+        frame->payload.LOG.msg_len =
+            payload_len - ((const uint8_t *)frame->payload.LOG.msg - payload);
         break;
     }
     default: {

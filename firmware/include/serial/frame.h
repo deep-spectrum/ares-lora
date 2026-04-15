@@ -41,6 +41,7 @@ enum ares_frame_type {
     ARES_FRAME_LED,           ///< Control LED state.
     ARES_FRAME_HEARTBEAT,     ///< LoRa Heart Beat frame.
     ARES_FRAME_CLAIM,         ///< LoRa host claim frame.
+    ARES_FRAME_LOG,           ///< Log message.
     ARES_FRAME_ACK,           ///< ACK frame.
     ARES_FRAME_FRAMING_ERROR, ///< Framing error frame. TX only.
 
@@ -87,6 +88,16 @@ struct ares_frame {
         uint8_t LED; ///< ARES_FRAME_LED
 
         uint16_t CLAIM; ///< ARES_FRAME_CLAIM
+
+        struct {
+            bool broadcast;
+            uint16_t id;
+            uint8_t part;
+            uint8_t num_parts;
+            const char *msg; // This must remain valid for
+                             // the lifetime of the frame.
+            size_t msg_len;  // only used after deserialization
+        } LOG;               ///< ARES_FRAME_LOG
 
         int ACK; ///< ARES_FRAME_ACK
 
