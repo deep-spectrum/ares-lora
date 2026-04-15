@@ -108,11 +108,16 @@ static void reflect(void *data, size_t size) {
 }
 #endif // IS_ENABLED(CONFIG_LORA_REFLECT_CRC_OUTPUT)
 
+static inline size_t packet_overhead(const struct ares_packet *packet) {
+    __ASSERT_NO_MSG(packet != NULL);
+    return (packet->type == ARES_PKT_TYPE_BROADCAST)
+               ? ARES_PACKET_BROADCAST_OVERHEAD
+               : ARES_PACKET_DIRECT_OVERHEAD;
+}
+
 static size_t calculate_packet_size(const struct ares_packet *packet) {
     __ASSERT_NO_MSG(packet != NULL);
-    size_t overhead = (packet->type == ARES_PKT_TYPE_BROADCAST)
-                          ? ARES_PACKET_BROADCAST_OVERHEAD
-                          : ARES_PACKET_DIRECT_OVERHEAD;
+    size_t overhead = packet_overhead(packet);
 
     switch (packet->payload.type) {
     case ARES_PKT_PAYLOAD_START: {
@@ -152,7 +157,7 @@ static void serialize(uint8_t *buf, size_t len,
     __ASSERT_NO_MSG(buf != NULL);
     __ASSERT_NO_MSG(packet != NULL);
     crc16_t crc;
-    size_t payload_len = packet_length - ARES_PACKET_BROADCAST_OVERHEAD;
+    size_t payload_len = packet_length - packet_overhead(packet);
     uint8_t *payload = &buf[ARES_PACKET_PAYLOAD_OFFSET(packet->type)];
 
     uint16_t su_payload_len = (uint16_t)payload_len;
@@ -174,7 +179,7 @@ static void serialize(uint8_t *buf, size_t len,
                  ARES_PACKET_SRC_ID_OVERHEAD);
 
     if (packet->type == ARES_PKT_TYPE_DIRECT) {
-        (void)memcpy(&buf[ARES_PACKET_HEADER_OFFSET], &packet->destination_id,
+        (void)memcpy(&buf[ARES_PACKET_DST_ID_OFFSET], &packet->destination_id,
                      ARES_PACKET_DST_ID_OVERHEAD);
     }
 
