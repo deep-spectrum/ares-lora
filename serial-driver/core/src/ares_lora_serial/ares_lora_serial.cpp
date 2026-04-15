@@ -125,14 +125,22 @@ AresSerial::_send_frame(AresFrame &frame,
                         const std::chrono::milliseconds &timeout) {
     std::unique_lock lock_(_command_lock);
     std::vector<uint8_t> tx;
-    frame.serialize(tx);
-    LOG_DBG_HEXDUMP(tx, tx.size(), "Sending frame");
 
     _response_queue.clear();
 
-    std::unique_lock lock(_serial_lock);
-    _serial.write(tx);
-    lock.unlock();
+    std::unique_lock lock(_serial_lock, std::defer_lock);
+
+    do {
+        frame.serialize(tx);
+        LOG_DBG_HEXDUMP(tx, tx.size(), "Sending frame");
+        lock.lock();
+        _serial.write(tx);
+        lock.unlock();
+        if (frame.frame_available()) {
+            // wait for MCU to process so it doesn't drop frames
+            std::this_thread::sleep_for(100ms);
+        }
+    } while (frame.frame_available());
 
     AresResponse response;
 
@@ -348,24 +356,42 @@ int AresSerial::send_log(const std::string &log_msg, bool broadcast,
                          uint8_t tx_cnt, uint16_t id) {
     _check_crash();
     LOG_DBG("Log command received");
-    AresFrame frame{AresFrame::LOG,
-                    AresFrame::AresFrameLog{broadcast, tx_cnt, id, log_msg}};
+    AresFrame::AresFrameLog payload{broadcast, tx_cnt, id, log_msg};
 
-    std::vector<uint8_t> tx;
-    do {
-        frame.serialize(tx);
-        LOG_DBG_HEXDUMP(tx, tx.size(), "Log message");
-        AresFrame decoded(tx);
+    if (!broadcast && id == UINT16_C(0)) {
+        if (_claimed_host == UINT16_C(0)) {
+            LOG_WRN("Log message broadcast parameter is `false` and the `id` "
+                    "is `0`. That means the message gets directed to the "
+                    "master node, but the master node has not been claimed. "
+                    "Switching to broadcast mode.");
+            payload.broadcast = true;
+        } else {
+            LOG_INF("Directing message to node %d", _claimed_host);
+            payload.id = _claimed_host;
+        }
+    }
 
-        AresFrame::AresFrameLog log = std::get<AresFrame::AresFrameLog>(
-            decoded.get_parsed_frame().payload);
-        LOG_DBG("Broadcast: %d, Target: %d, TX Count: %d, Part: %d, Total "
-                "Parts: %d",
-                log.broadcast, log.id, log.tx_cnt, log.part, log.num_parts);
-        LOG_DBG("Message: %s", log.msg.c_str());
-    } while (frame.frame_available());
+    AresFrame frame{AresFrame::LOG, payload};
 
-    return 0;
+    AresResponse response = _send_frame(frame, _response_timeout);
+
+    int ret = 0;
+
+    switch (response.type) {
+    case AresResponse::ACK: {
+        ret = std::get<AresFrame::AresFrameAckErrorCode>(response.payload);
+        break;
+    }
+    case AresResponse::BAD_FRAME: {
+        _handle_bad_frame(response);
+        break;
+    }
+    default: {
+        throw std::runtime_error("Received invalid response");
+    }
+    }
+
+    return ret;
 }
 
 void AresSerial::start() {
