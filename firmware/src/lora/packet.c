@@ -128,6 +128,13 @@ static size_t calculate_packet_size(const struct ares_packet *packet) {
         overhead += SIZEOF_FIELD(struct ares_packet_payload, payload.HEARTBEAT);
         break;
     }
+    case ARES_PKT_PAYLOAD_LOG: {
+        overhead +=
+            SIZEOF_FIELD(struct ares_packet_payload, payload.LOG.part) +
+            SIZEOF_FIELD(struct ares_packet_payload, payload.LOG.num_parts) +
+            packet->payload.payload.LOG.msg_len;
+        break;
+    }
     case ARES_PKT_PAYLOAD_CLAIM: {
         // nop
         break;
@@ -192,6 +199,23 @@ static void serialize(uint8_t *buf, size_t len,
     }
     case ARES_PKT_PAYLOAD_HEARTBEAT: {
         (void)memcpy(payload, &packet->payload.payload.HEARTBEAT, payload_len);
+        break;
+    }
+    case ARES_PKT_PAYLOAD_LOG: {
+        (void)memcpy(
+            payload, &packet->payload.payload.LOG.part,
+            SIZEOF_FIELD(struct ares_packet, payload.payload.LOG.part));
+        (void)memcpy(
+            payload +
+                SIZEOF_FIELD(struct ares_packet, payload.payload.LOG.part),
+            &packet->payload.payload.LOG.num_parts,
+            SIZEOF_FIELD(struct ares_packet, payload.payload.LOG.num_parts));
+        (void)memcpy(
+            payload +
+                SIZEOF_FIELD(struct ares_packet, payload.payload.LOG.part) +
+                SIZEOF_FIELD(struct ares_packet, payload.payload.LOG.num_parts),
+            packet->payload.payload.LOG.msg,
+            packet->payload.payload.LOG.msg_len);
         break;
     }
     case ARES_PKT_PAYLOAD_CLAIM: {
@@ -262,6 +286,26 @@ static void deserialize(struct ares_packet *packet, const uint8_t *buf) {
     }
     case ARES_PKT_PAYLOAD_HEARTBEAT: {
         (void)memcpy(&packet->payload.payload.HEARTBEAT, payload, payload_len);
+        break;
+    }
+    case ARES_PKT_PAYLOAD_LOG: {
+        (void)memcpy(
+            &packet->payload.payload.LOG.part, payload,
+            SIZEOF_FIELD(struct ares_packet, payload.payload.LOG.part));
+        (void)memcpy(
+            &packet->payload.payload.LOG.part,
+            payload +
+                SIZEOF_FIELD(struct ares_packet, payload.payload.LOG.part),
+            SIZEOF_FIELD(struct ares_packet, payload.payload.LOG.num_parts));
+        packet->payload.payload.LOG.msg =
+            (const char *)(payload +
+                           SIZEOF_FIELD(struct ares_packet,
+                                        payload.payload.LOG.part) +
+                           SIZEOF_FIELD(struct ares_packet,
+                                        payload.payload.LOG.num_parts));
+        packet->payload.payload.LOG.msg_len =
+            payload_len -
+            ((const uint8_t *)packet->payload.payload.LOG.msg - payload);
         break;
     }
     case ARES_PKT_PAYLOAD_CLAIM: {

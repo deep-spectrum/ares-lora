@@ -43,6 +43,7 @@ enum ares_packet_payload_type {
     ARES_PKT_PAYLOAD_START = 0,
     ARES_PKT_PAYLOAD_HEARTBEAT = 1,
     ARES_PKT_PAYLOAD_CLAIM = 2,
+    ARES_PKT_PAYLOAD_LOG = 3,
 
     ARES_PKT_PAYLOAD_INVALID,
 };
@@ -58,6 +59,13 @@ struct ares_packet_payload {
         struct {
             bool ready;
         } HEARTBEAT;
+
+        struct {
+            uint8_t part;
+            uint8_t num_parts;
+            const char *msg;
+            size_t msg_len;
+        } LOG;
     } payload;
 };
 
