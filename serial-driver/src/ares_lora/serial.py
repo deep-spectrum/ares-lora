@@ -98,6 +98,7 @@ class LoraSerial:
             start_callback=self._handle_start,
             heartbeat_callback=self._handle_heartbeat,
             claim_callback=self._handle_claim,
+            log_callback=self._handle_log,
         )
 
         self._start_cb = config.start_callback
@@ -133,6 +134,9 @@ class LoraSerial:
         pass
 
     def _handle_claim(self, src_id: int):
+        pass
+
+    def _handle_log(self, src_id: int, chunk: int, num_chunks: int, msg: str):
         pass
 
     @staticmethod
