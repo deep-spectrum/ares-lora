@@ -181,6 +181,27 @@ static void handle_claim(const struct ares_serial *serial,
     send_lora_transmission(serial, frame, &packet, -1);
 }
 
+static void handle_log(const struct ares_serial *serial,
+                       struct ares_frame *frame) {
+    struct ares_packet packet = {
+        .type = frame->payload.LOG.broadcast ? ARES_PKT_TYPE_BROADCAST
+                                             : ARES_PKT_TYPE_DIRECT,
+        .destination_id = frame->payload.LOG.id,
+        .payload = {.type = ARES_PKT_PAYLOAD_LOG,
+                    .payload.LOG =
+                        {
+                            .part = frame->payload.LOG.part,
+                            .num_parts = frame->payload.LOG.num_parts,
+                            .msg = frame->payload.LOG.msg,
+                            .msg_len = frame->payload.LOG.msg_len,
+                        }},
+    };
+
+    // todo
+    ARG_UNUSED(packet);
+    send_ack_frame(serial, frame, 0);
+}
+
 static struct ares_serial_command commands[] = {
     {ARES_FRAME_SETTING, handle_setting},
     {ARES_FRAME_START, handle_start},
@@ -188,6 +209,7 @@ static struct ares_serial_command commands[] = {
     {ARES_FRAME_LED, handle_led},
     {ARES_FRAME_HEARTBEAT, handle_heartbeat},
     {ARES_FRAME_CLAIM, handle_claim},
+    {ARES_FRAME_LOG, handle_log},
 };
 
 static int init_serial_handlers(void) {

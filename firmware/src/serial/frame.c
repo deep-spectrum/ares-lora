@@ -25,23 +25,6 @@
     MIN(SERIAL_BACKEND_RX_RINGBUF_SIZE, SERIAL_BACKEND_TX_RINGBUF_SIZE)
 #define ARES_FRAME_MAX_PAYLOAD_SIZE (ARES_FRAME_MAX_SIZE - ARES_FRAME_OVERHEAD)
 
-static size_t ares_strlen(const char *s, size_t max_cnt) {
-    size_t len = 0;
-    if (s == NULL) {
-        return 0;
-    }
-
-    if (max_cnt == 0) {
-        max_cnt = UINT16_MAX;
-    }
-
-    for (const char *buf = s; *buf != '\0' && len < max_cnt; buf++) {
-        len++;
-    }
-
-    return len;
-}
-
 static size_t calculate_frame_length(const struct ares_frame *frame) {
     size_t payload_len = 0;
 
@@ -90,8 +73,7 @@ static size_t calculate_frame_length(const struct ares_frame *frame) {
                       SIZEOF_FIELD(struct ares_frame, payload.LOG.id) +
                       SIZEOF_FIELD(struct ares_frame, payload.LOG.part) +
                       SIZEOF_FIELD(struct ares_frame, payload.LOG.num_parts);
-        payload_len += ares_strlen(frame->payload.LOG.msg,
-                                   ARES_FRAME_MAX_PAYLOAD_SIZE - payload_len);
+        payload_len += frame->payload.LOG.msg_len;
         break;
     }
     default: {
@@ -180,14 +162,7 @@ static void serialize(uint8_t *buf, const struct ares_frame *frame,
                 SIZEOF_FIELD(struct ares_frame, payload.LOG.id) +
                 SIZEOF_FIELD(struct ares_frame, payload.LOG.part) +
                 SIZEOF_FIELD(struct ares_frame, payload.LOG.num_parts),
-            frame->payload.LOG.msg,
-            ares_strlen(
-                frame->payload.LOG.msg,
-                payload_len -
-                    (SIZEOF_FIELD(struct ares_frame, payload.LOG.broadcast) +
-                     SIZEOF_FIELD(struct ares_frame, payload.LOG.id) +
-                     SIZEOF_FIELD(struct ares_frame, payload.LOG.part) +
-                     SIZEOF_FIELD(struct ares_frame, payload.LOG.num_parts))));
+            frame->payload.LOG.msg, frame->payload.LOG.msg_len);
         break;
     }
     case ARES_FRAME_ACK: {

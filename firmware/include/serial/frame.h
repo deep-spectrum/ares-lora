@@ -96,8 +96,8 @@ struct ares_frame {
             uint8_t num_parts;
             const char *msg; // This must remain valid for
                              // the lifetime of the frame.
-            size_t msg_len;  // only used after deserialization
-        } LOG;               ///< ARES_FRAME_LOG
+            size_t msg_len;
+        } LOG; ///< ARES_FRAME_LOG
 
         int ACK; ///< ARES_FRAME_ACK
 
