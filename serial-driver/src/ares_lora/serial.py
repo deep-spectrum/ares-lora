@@ -72,6 +72,19 @@ class LoraSerialConfig:
     heartbeat_callback: Callable[[int, bool, bool], None] | None = None
     claim_callback: Callable[[int], None] | None = None
     master: bool = False
+    log_callback: Callable[[int, str], None] = None
+
+
+@dataclass
+class _LogMessageChunk:
+    chunk_id: int
+    num_chunks: int
+    msg: str
+
+    def __eq__(self, other):
+        if not isinstance(other, type(self)):
+            return False
+        return (self.chunk_id == other.chunk_id) and (self.num_chunks == other.num_chunks) and (self.msg == other.msg)
 
 
 def lora_serial_command(func):
@@ -104,8 +117,10 @@ class LoraSerial:
         self._start_cb = config.start_callback
         self._heartbeat_cb = config.heartbeat_callback
         self._claim_cb = config.claim_callback
+        self._log_cb = config.log_callback
         self._dev = _AresSerial(configs)
         self._nodes: dict[int, dict[str, int]] = {}
+        self._log_msg: dict[int, list[_LogMessageChunk]] = {}
 
     def _should_event_be_dispatched(self, src: int, seq_cnt: int, packet_id: int) -> bool:
         if src not in self._nodes:
@@ -137,7 +152,21 @@ class LoraSerial:
         pass
 
     def _handle_log(self, src_id: int, chunk: int, num_chunks: int, msg: str):
-        pass
+        chunk_ = _LogMessageChunk(chunk, num_chunks, msg)
+        if src_id not in self._log_msg:
+            self._log_msg[src_id] = [chunk_]
+            return
+        if self._log_msg[src_id][-1] == chunk_:
+            return
+        self._log_msg[src_id].append(chunk_)
+        if chunk_.num_chunks == chunk_.chunk_id:
+            msg = ""
+            for chunk in self._log_msg[src_id]:
+                msg += chunk.msg
+            if self._log_cb is not None:
+                self._log_cb(src_id, msg)
+            print(f"Logged: {msg}")
+            del self._log_msg[src_id]
 
     @staticmethod
     def _check_ret_code(code: int | tuple[int, ...]):
@@ -225,6 +254,10 @@ class LoraSerial:
         else:
             self._dev.set_response_timeout(prev_timeout)
         self._check_ret_code(codes)
+
+    @lora_serial_command
+    def version(self) -> tuple[tuple[int, int, int], tuple[int, int, int], tuple[int, int, int]]:
+        return self._dev.version()
 
     def start_driver(self):
         self._dev.start_driver()
