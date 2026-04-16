@@ -91,13 +91,14 @@ struct ares_frame {
 
         struct {
             bool broadcast;
-            uint16_t id;
+            uint8_t tx_cnt;
             uint8_t part;
             uint8_t num_parts;
+            uint16_t id;
+            size_t msg_len;
             const char *msg; // This must remain valid for
                              // the lifetime of the frame.
-            size_t msg_len;
-        } LOG; ///< ARES_FRAME_LOG
+        } LOG;               ///< ARES_FRAME_LOG
 
         int ACK; ///< ARES_FRAME_ACK
 

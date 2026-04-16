@@ -197,9 +197,7 @@ static void handle_log(const struct ares_serial *serial,
                         }},
     };
 
-    // todo
-    ARG_UNUSED(packet);
-    send_ack_frame(serial, frame, 0);
+    send_lora_transmission(serial, frame, &packet, frame->payload.LOG.tx_cnt);
 }
 
 static struct ares_serial_command commands[] = {
