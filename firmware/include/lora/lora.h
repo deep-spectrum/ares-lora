@@ -53,9 +53,14 @@ enum ares_lora_signal {
     ARES_LORA_SIGNALS,
 };
 
-#define ARES_LORA_TRX_BUF_SIZE 256
+#if defined(CONFIG_ARES_LORA_TRX_BUF_SIZE)
+#define ARES_LORA_TRX_BUF_SIZE CONFIG_ARES_LORA_TRX_BUF_SIZE
+#else
+#define ARES_LORA_TRX_BUF_SIZE 512
+#endif
+
 struct ares_lora_buf {
-    uint8_t buf[ARES_LORA_TRX_BUF_SIZE + 1];
+    uint8_t buf[ARES_LORA_TRX_BUF_SIZE];
     size_t len;
 };
 
