@@ -42,8 +42,9 @@ class AresFrame {
         HEARTBEAT = 4,
         CLAIM = 5,
         LOG = 6,
-        ACK = 7,
-        FRAMING_ERROR = 8,
+        VERSION = 7,
+        ACK = 8,
+        FRAMING_ERROR = 9,
         UNKNOWN,
     };
 
@@ -75,6 +76,10 @@ class AresFrame {
         uint8_t data_rate = 0;
         uint8_t coding_rate = 0;
         int8_t tx_power = 0;
+        uint8_t cad_mode = 0;
+        uint8_t cad_num_symbols = 0;
+        uint8_t cad_det_peak = 0;
+        uint8_t cad_det_min = 0;
     };
 
     struct AresFrameLed {
@@ -129,6 +134,12 @@ class AresFrame {
                                             sizeof(tx_cnt);
     };
 
+    struct AresFrameVersion {
+        uint32_t app = 0;
+        uint32_t ncs = 0;
+        uint32_t kernel = 0;
+    };
+
     using AresFrameAckErrorCode = int32_t;
 
     enum AresFrameFramingError : uint8_t {
@@ -140,15 +151,16 @@ class AresFrame {
     using AresFrameTxTypes =
         std::variant<std::monostate, AresFrameSetting, AresFrameStart,
                      AresFrameLoraConfig, AresFrameLed, AresFrameHeartbeat,
-                     AresFrameClaim, AresFrameLog>;
+                     AresFrameClaim, AresFrameLog, AresFrameVersion>;
     using AresFrameRxTypes =
         std::variant<std::monostate, AresFrameSetting, AresFrameStart,
                      AresFrameAckErrorCode, AresFrameFramingError, AresFrameLed,
-                     AresFrameHeartbeat, AresFrameClaim, AresFrameLog>;
+                     AresFrameHeartbeat, AresFrameClaim, AresFrameLog,
+                     AresFrameVersion>;
 
     using AresFrameResponseTypes =
         std::variant<std::monostate, AresFrameSetting, AresFrameAckErrorCode,
-                     AresFrameFramingError, AresFrameLed>;
+                     AresFrameFramingError, AresFrameLed, AresFrameVersion>;
 
     struct AresFrameDecoded {
         AresFrameType type;
@@ -204,6 +216,8 @@ class AresFrame {
                                  std::vector<uint8_t> &buffer);
     static void _serialize_log(const AresFrameLog &payload,
                                std::vector<uint8_t> &buffer);
+    static void _serialize_version(const AresFrameVersion &payload,
+                                   std::vector<uint8_t> &buffer);
 
     void _deserialize_setting(const uint8_t *buf, size_t len);
     void _deserialize_led(const uint8_t *buf, size_t len);
@@ -211,6 +225,7 @@ class AresFrame {
     void _deserialize_heartbeat(const uint8_t *buf, size_t len);
     void _deserialize_claim(const uint8_t *buf, size_t len);
     void _deserialize_log(const uint8_t *buf, size_t len);
+    void _deserialize_version(const uint8_t *buf, size_t len);
     void _deserialize_ack(const uint8_t *buf, size_t len);
     void _deserialize_framing_error(const uint8_t *buf, size_t len);
 };

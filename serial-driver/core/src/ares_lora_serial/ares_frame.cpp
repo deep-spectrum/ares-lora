@@ -273,6 +273,11 @@ uint16_t AresFrame::_payload_size() const {
             AresFrameLog::_overhead + payload._msg_split[payload._idx].length();
         break;
     }
+    case VERSION: {
+        ret = sizeof(AresFrameVersion::app) + sizeof(AresFrameVersion::ncs) +
+              sizeof(AresFrameVersion::kernel);
+        break;
+    }
     default: {
         throw AresFrameError("Invalid TX type");
     }
@@ -366,6 +371,10 @@ void AresFrame::_serialize_lora_config(const AresFrameLoraConfig &payload,
     SERIALIZE(data_rate);
     SERIALIZE(coding_rate);
     SERIALIZE(tx_power);
+    SERIALIZE(cad_mode);
+    SERIALIZE(cad_num_symbols);
+    SERIALIZE(cad_det_peak);
+    SERIALIZE(cad_det_min);
 }
 
 void AresFrame::_serialize_led(const AresFrameLed &payload,
@@ -402,6 +411,13 @@ void AresFrame::_serialize_log(const AresFrameLog &payload,
     SERIALIZE(_num_parts);
     buffer.insert(buffer.end(), payload._msg_split[payload._idx].begin(),
                   payload._msg_split[payload._idx].end());
+}
+
+void AresFrame::_serialize_version(const AresFrameVersion &payload,
+                                   std::vector<uint8_t> &buffer) {
+    SERIALIZE(app);
+    SERIALIZE(ncs);
+    SERIALIZE(kernel);
 }
 
 #define Z_DESERIALIZE_INIT_DEFAULT(class_)                                     \
@@ -484,6 +500,15 @@ void AresFrame::_deserialize_log(const uint8_t *buf, size_t len) {
     DESERIALIZE(part);
     DESERIALIZE(num_parts);
     DESERIALIZE_STR(msg, len - AresFrameLog::_overhead);
+    DESERIALIZE_FINALIZE();
+}
+
+void AresFrame::_deserialize_version(const uint8_t *buf, size_t len) {
+    ARG_UNUSED(len);
+    DESERIALIZE_INIT(AresFrameVersion);
+    DESERIALIZE(app);
+    DESERIALIZE(ncs);
+    DESERIALIZE(kernel);
     DESERIALIZE_FINALIZE();
 }
 
