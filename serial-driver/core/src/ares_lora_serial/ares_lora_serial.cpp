@@ -54,6 +54,7 @@ PYBIND11_MODULE(_ares_lora_serial, m, py::mod_gil_not_used()) {
              py::arg("tx_cnt"), "Send heartbeat packet")
         .def("send_log", &AresSerial::send_log,
              "Send a logging message over LoRa")
+        .def("version", &AresSerial::version, "Retrieve the firmware version")
         .def("start_driver", &AresSerial::start, "Start the serial driver")
         .def("stop_driver", &AresSerial::stop, "Stop the serial driver")
         .def("set_response_timeout", &AresSerial::set_response_timeout,
@@ -399,6 +400,32 @@ py::tuple AresSerial::send_log(const std::string &log_msg, bool broadcast,
     return array_to_tuple(ret.data(), ret.size());
 }
 
+py::tuple AresSerial::version() {
+    _check_crash();
+    LOG_DBG("Version command received");
+    AresFrame frame(AresFrame::VERSION, AresFrame::AresFrameVersion{});
+    AresResponse response = _send_frame(frame, _response_timeout);
+    AresFrame::AresFrameVersion version;
+
+    switch (response.type) {
+    case AresResponse::COMMAND_SPECIFIC: {
+        version = std::get<AresFrame::AresFrameVersion>(response.payload);
+        break;
+    }
+    case AresResponse::BAD_FRAME: {
+        _handle_bad_frame(response);
+        break;
+    }
+    default: {
+        throw std::runtime_error("Received invalid response");
+    }
+    }
+
+    return py::make_tuple(_decode_version(version.app),
+                          _decode_version(version.ncs),
+                          _decode_version(version.kernel));
+}
+
 void AresSerial::start() {
     if (_tasks_running) {
         throw std::runtime_error("Please stop before restarting");
@@ -476,7 +503,8 @@ void AresSerial::_process_frames_helper() {
         case AresFrame::ACK:
         case AresFrame::FRAMING_ERROR:
         case AresFrame::SETTING:
-        case AresFrame::LED: {
+        case AresFrame::LED:
+        case AresFrame::VERSION: {
             _publish_response(frame);
             break;
         }
@@ -712,4 +740,16 @@ void AresSerial::_log_event(const AresFrame::AresFrameLog &log) const {
         LOG_DBG("Forwarding log event to Python");
         _log_callback(log.id, log.part, log.num_parts, log.msg);
     }
+}
+
+py::tuple AresSerial::_decode_version(uint32_t version_num) {
+    constexpr uint32_t mask = 0xFF;
+    constexpr uint32_t minor_shift = 8;
+    constexpr uint32_t major_shift = 16;
+
+    uint32_t patch = version_num & mask;
+    uint32_t minor = (version_num >> minor_shift) & mask;
+    uint32_t major = (version_num >> major_shift) & mask;
+
+    return py::make_tuple(major, minor, patch);
 }

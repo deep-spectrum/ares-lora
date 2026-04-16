@@ -102,6 +102,8 @@ class AresSerial {
     py::tuple send_log(const std::string &log_msg, bool broadcast,
                        uint8_t tx_cnt, uint16_t id);
 
+    py::tuple version();
+
     void start();
     void stop();
 
@@ -184,6 +186,8 @@ class AresSerial {
     std::function<void(uint16_t, uint8_t, uint8_t, const std::string &msg)>
         _log_callback = nullptr;
     void _log_event(const AresFrame::AresFrameLog &log) const;
+
+    static py::tuple _decode_version(uint32_t version_num);
 };
 
 #endif // ARES_ARES_LORA_SERIAL_HPP
