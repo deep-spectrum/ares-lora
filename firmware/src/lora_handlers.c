@@ -94,10 +94,34 @@ static void handle_claim(const struct ares_lora *lora,
     ares_serial_write_frame(serial, &frame);
 }
 
+static void handle_log(const struct ares_lora *lora,
+                       const struct ares_packet *packet) {
+    ARG_UNUSED(lora);
+
+    const struct ares_serial *serial = ares_serial_backend_uart_get_ptr();
+    struct ares_frame frame = {
+        .type = ARES_FRAME_LOG,
+        .payload.LOG =
+            {
+                .broadcast = packet->type == ARES_PKT_TYPE_BROADCAST,
+                .id = packet->source_id,
+                .part = packet->payload.payload.LOG.part,
+                .num_parts = packet->payload.payload.LOG.num_parts,
+                .msg = packet->payload.payload.LOG.msg,
+                .msg_len = packet->payload.payload.LOG.msg_len,
+            },
+    };
+
+    CHECK_DIRECTED_PACKET(packet);
+
+    ares_serial_write_frame(serial, &frame);
+}
+
 static struct ares_lora_command commands[] = {
     {ARES_PKT_PAYLOAD_START, handle_start},
     {ARES_PKT_PAYLOAD_HEARTBEAT, handle_heartbeat},
     {ARES_PKT_PAYLOAD_CLAIM, handle_claim},
+    {ARES_PKT_PAYLOAD_LOG, handle_log},
 };
 
 static int init_lora_handlers(void) {
