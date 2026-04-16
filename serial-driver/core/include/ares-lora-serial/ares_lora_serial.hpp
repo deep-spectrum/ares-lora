@@ -56,6 +56,8 @@ struct AresSerialConfigs {
         start_callback = nullptr;
     std::function<void(uint16_t, bool, bool)> heartbeat_callback = nullptr;
     std::function<void(uint16_t)> claim_callback = nullptr;
+    std::function<void(uint16_t, uint8_t, uint8_t, const std::string &)>
+        log_callback = nullptr;
 };
 
 struct AresLoraConfig {

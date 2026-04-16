@@ -82,7 +82,7 @@ PYBIND11_MODULE(_ares_lora_serial, m, py::mod_gil_not_used()) {
 AresSerialConfigs::AresSerialConfigs(const py::kwargs &kwargs) {
     from_kwargs(kwargs, SP(port), SP(response_timeout), SP(rx_period),
                 SP(start_callback), SP(serial_timeout), SP(master),
-                SP(heartbeat_callback), SP(claim_callback));
+                SP(heartbeat_callback), SP(claim_callback), SP(log_callback));
 }
 
 AresLoraConfig::AresLoraConfig(const py::kwargs &kwargs) {
@@ -113,6 +113,7 @@ AresSerial::AresSerial(const AresSerialConfigs &configs)
     _start_callback = configs.start_callback;
     _heartbeat_callback = configs.heartbeat_callback;
     _claim_callback = configs.claim_callback;
+    _log_callback = configs.log_callback;
 }
 
 AresSerial::~AresSerial() {
