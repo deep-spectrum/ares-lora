@@ -149,6 +149,10 @@ void AresFrame::serialize(std::vector<uint8_t> &bytearray) {
         _serialize_log(std::get<AresFrameLog>(_tx_payload), bytearray);
         break;
     }
+    case VERSION: {
+        _serialize_version(std::get<AresFrameVersion>(_tx_payload), bytearray);
+        break;
+    }
     default: {
         throw AresFrameError("Invalid type for TX");
     }
@@ -210,6 +214,11 @@ void AresFrame::parse(const std::vector<uint8_t> &bytearray,
     }
     case LOG: {
         _deserialize_log(&bytearray[start_index + payload_offset], payload_len);
+        break;
+    }
+    case VERSION: {
+        _deserialize_version(&bytearray[start_index + payload_offset],
+                             payload_len);
         break;
     }
     default: {
