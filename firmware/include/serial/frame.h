@@ -42,6 +42,7 @@ enum ares_frame_type {
     ARES_FRAME_HEARTBEAT,     ///< LoRa Heart Beat frame.
     ARES_FRAME_CLAIM,         ///< LoRa host claim frame.
     ARES_FRAME_LOG,           ///< Log message.
+    ARES_FRAME_VERSION,       ///< Version information.
     ARES_FRAME_ACK,           ///< ACK frame.
     ARES_FRAME_FRAMING_ERROR, ///< Framing error frame. TX only.
 
@@ -73,6 +74,10 @@ struct ares_frame {
             uint8_t data_rate;
             uint8_t coding_rate;
             int8_t tx_pow_dbm;
+            uint8_t cad_mode;
+            uint8_t cad_symbol_num;
+            uint8_t cad_detection_peak;
+            uint8_t cad_detection_min;
         } LORA_CONFIG; ///< ARES_FRAME_LORA_CONFIG
 
         struct {
@@ -99,6 +104,12 @@ struct ares_frame {
             const char *msg; // This must remain valid for
                              // the lifetime of the frame.
         } LOG;               ///< ARES_FRAME_LOG
+
+        struct {
+            uint32_t app;
+            uint32_t ncs;
+            uint32_t kernel;
+        } VERSION; ///< ARES_FRAME_VERSION
 
         int ACK; ///< ARES_FRAME_ACK
 

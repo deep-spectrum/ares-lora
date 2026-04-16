@@ -13,11 +13,14 @@
 #include <lora/lora_backend.h>
 #include <lora/packet.h>
 #include <lora_handlers.h>
+#include <ncs_version.h>
 #include <serial/frame.h>
 #include <serial/serial.h>
 #include <settings.h>
+#include <zephyr/app_version.h>
 #include <zephyr/init.h>
 #include <zephyr/kernel.h>
+#include <zephyr/version.h>
 
 static void send_ack_frame(const struct ares_serial *serial,
                            struct ares_frame *frame, int code) {
@@ -200,6 +203,15 @@ static void handle_log(const struct ares_serial *serial,
     send_lora_transmission(serial, frame, &packet, frame->payload.LOG.tx_cnt);
 }
 
+static void handle_version(const struct ares_serial *serial,
+                           struct ares_frame *frame) {
+    frame->payload.VERSION.app = (uint32_t)APP_VERSION_NUMBER;
+    frame->payload.VERSION.kernel = (uint32_t)KERNEL_VERSION_NUMBER;
+    frame->payload.VERSION.ncs = (uint32_t)NCS_VERSION_NUMBER;
+
+    ares_serial_write_frame(serial, frame);
+}
+
 static struct ares_serial_command commands[] = {
     {ARES_FRAME_SETTING, handle_setting},
     {ARES_FRAME_START, handle_start},
@@ -208,6 +220,7 @@ static struct ares_serial_command commands[] = {
     {ARES_FRAME_HEARTBEAT, handle_heartbeat},
     {ARES_FRAME_CLAIM, handle_claim},
     {ARES_FRAME_LOG, handle_log},
+    {ARES_FRAME_VERSION, handle_version},
 };
 
 static int init_serial_handlers(void) {

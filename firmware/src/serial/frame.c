@@ -77,6 +77,12 @@ static size_t calculate_frame_length(const struct ares_frame *frame) {
         payload_len += frame->payload.LOG.msg_len;
         break;
     }
+    case ARES_FRAME_VERSION: {
+        payload_len = SIZEOF_FIELD(struct ares_frame, payload.VERSION.app) +
+                      SIZEOF_FIELD(struct ares_frame, payload.VERSION.ncs) +
+                      SIZEOF_FIELD(struct ares_frame, payload.VERSION.kernel);
+        break;
+    }
     default: {
         __ASSERT(false, "Invalid frame type received");
         break;
@@ -202,6 +208,20 @@ static void serialize(uint8_t *buf, const struct ares_frame *frame,
     case ARES_FRAME_FRAMING_ERROR: {
         uint32_t error_code = frame->payload.FRAMING_ERROR;
         (void)memcpy(payload, &error_code, sizeof(error_code));
+        break;
+    }
+    case ARES_FRAME_VERSION: {
+        (void)memcpy(payload, &frame->payload.VERSION.app,
+                     SIZEOF_FIELD(struct ares_frame, payload.VERSION.app));
+        (void)memcpy(payload +
+                         SIZEOF_FIELD(struct ares_frame, payload.VERSION.app),
+                     &frame->payload.VERSION.ncs,
+                     SIZEOF_FIELD(struct ares_frame, payload.VERSION.ncs));
+        (void)memcpy(payload +
+                         SIZEOF_FIELD(struct ares_frame, payload.VERSION.app) +
+                         SIZEOF_FIELD(struct ares_frame, payload.VERSION.ncs),
+                     &frame->payload.VERSION.kernel,
+                     SIZEOF_FIELD(struct ares_frame, payload.VERSION.kernel));
         break;
     }
     default:
@@ -345,6 +365,11 @@ static void deserialize(struct ares_frame *frame, const uint8_t *buf) {
                                         payload.LOG.num_parts));
         frame->payload.LOG.msg_len =
             payload_len - ((const uint8_t *)frame->payload.LOG.msg - payload);
+        break;
+    }
+    case ARES_FRAME_VERSION: {
+        // nop: This is a request so it doesn't make sense to look at the
+        // payload
         break;
     }
     default: {
