@@ -30,6 +30,7 @@ constexpr size_t type_offset = len_offset + len_size;
 constexpr size_t payload_offset = type_offset + type_size;
 
 constexpr size_t max_frame_size = 256;
+constexpr size_t max_payload_size = 32;
 
 static size_t footer_offset(size_t payload_size) {
     return payload_offset + payload_size;
@@ -308,8 +309,7 @@ void AresFrame::_preprocess_log(AresFrameLog &payload) {
         throw AresFrameError("Log message empty");
     }
 
-    size_t max_msg_size =
-        max_frame_size - frame_overhead - AresFrameLog::_overhead;
+    size_t max_msg_size = max_payload_size - AresFrameLog::_overhead;
     size_t num_substr =
         (payload.msg.size() + (max_msg_size - 1)) / max_msg_size;
 
