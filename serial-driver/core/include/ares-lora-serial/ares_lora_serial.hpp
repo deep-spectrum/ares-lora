@@ -178,6 +178,10 @@ class AresSerial {
 
     std::function<void(uint16_t)> _claim_callback = nullptr;
     void _claim_event(const AresFrame::AresFrameClaim &claim);
+
+    std::function<void(uint16_t, uint8_t, uint8_t, const std::string &msg)>
+        _log_callback = nullptr;
+    void _log_event(const AresFrame::AresFrameLog &log) const;
 };
 
 #endif // ARES_ARES_LORA_SERIAL_HPP

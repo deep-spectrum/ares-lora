@@ -492,6 +492,10 @@ void AresSerial::_process_frames_helper() {
             _claim_event(std::get<AresFrame::AresFrameClaim>(frame.payload));
             break;
         }
+        case AresFrame::LOG: {
+            _log_event(std::get<AresFrame::AresFrameLog>(frame.payload));
+            break;
+        }
         default: {
             LOG_ERR("Invalid frame received: %d", static_cast<int>(frame.type));
             break;
@@ -695,5 +699,16 @@ void AresSerial::_claim_event(const AresFrame::AresFrameClaim &claim) {
     if (_claim_callback != nullptr) {
         LOG_DBG("Notifying Python of claimed host");
         _claim_callback(claim.id);
+    }
+}
+
+void AresSerial::_log_event(const AresFrame::AresFrameLog &log) const {
+    LOG_DBG("Log event received from %d", log.id);
+    LOG_DBG("Part %d of %d", log.part, log.num_parts);
+    LOG_DBG("Log message: %s", log.msg.c_str());
+
+    if (_log_callback) {
+        LOG_DBG("Forwarding log event to Python");
+        _log_callback(log.id, log.part, log.num_parts, log.msg);
     }
 }
