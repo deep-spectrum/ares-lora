@@ -175,7 +175,7 @@ static crc16_t compute_crc(const uint8_t *buf, size_t len) {
     do {                                                                       \
         (void)memcpy(payload, &packet->payload.payload.field,                  \
                      SIZEOF_FIELD(struct ares_packet, payload.payload.field)); \
-        payload += (len);                                                      \
+        payload += SIZEOF_FIELD(struct ares_packet, payload.payload.field);    \
     } while (0)
 
 #define PSERIALIZE(field, len...)                                              \
