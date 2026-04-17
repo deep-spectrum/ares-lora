@@ -416,7 +416,7 @@ py::tuple AresSerial::send_log(const std::string &log_msg, bool broadcast,
         _send_multi_frame(frame, _response_timeout, responses);
     } else {
         _send_log_frame_directed(frame, _response_timeout, tx_cnt, responses,
-                                 id);
+                                 payload.id);
     }
 
     std::vector<int> ret;
@@ -806,6 +806,12 @@ bool AresSerial::_log_ack_event_wait(const std::chrono::milliseconds &timeout,
             throw;
         }
     }
+
+    LOG_DBG("Expected: (%d, %d, %d)", expected.part, expected.num_parts,
+            expected.id);
+    LOG_DBG("Received: (%d, %d, %d)", response.part, response.num_parts,
+            response.id);
+    LOG_DBG("Comparison: %d", response == expected);
 
     return response == expected;
 }
