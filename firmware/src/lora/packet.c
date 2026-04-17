@@ -135,6 +135,12 @@ static size_t calculate_packet_size(const struct ares_packet *packet) {
             packet->payload.payload.LOG.msg_len;
         break;
     }
+    case ARES_PKT_PAYLOAD_LOG_ACK: {
+        overhead +=
+            SIZEOF_FIELD(struct ares_packet_payload, payload.LOG_ACK.part) +
+            SIZEOF_FIELD(struct ares_packet_payload, payload.LOG_ACK.num_parts);
+        break;
+    }
     case ARES_PKT_PAYLOAD_CLAIM: {
         // nop
         break;
@@ -216,6 +222,17 @@ static void serialize(uint8_t *buf, size_t len,
                 SIZEOF_FIELD(struct ares_packet, payload.payload.LOG.num_parts),
             packet->payload.payload.LOG.msg,
             packet->payload.payload.LOG.msg_len);
+        break;
+    }
+    case ARES_PKT_PAYLOAD_LOG_ACK: {
+        (void)memcpy(
+            payload, &packet->payload.payload.LOG_ACK.part,
+            SIZEOF_FIELD(struct ares_packet, payload.payload.LOG_ACK.part));
+        (void)memcpy(payload + SIZEOF_FIELD(struct ares_packet,
+                                            payload.payload.LOG_ACK.part),
+                     &packet->payload.payload.LOG_ACK.num_parts,
+                     SIZEOF_FIELD(struct ares_packet,
+                                  payload.payload.LOG_ACK.num_parts));
         break;
     }
     case ARES_PKT_PAYLOAD_CLAIM: {
@@ -306,6 +323,17 @@ static void deserialize(struct ares_packet *packet, const uint8_t *buf) {
         packet->payload.payload.LOG.msg_len =
             payload_len -
             ((const uint8_t *)packet->payload.payload.LOG.msg - payload);
+        break;
+    }
+    case ARES_PKT_PAYLOAD_LOG_ACK: {
+        (void)memcpy(
+            &packet->payload.payload.LOG_ACK.part, payload,
+            SIZEOF_FIELD(struct ares_packet, payload.payload.LOG_ACK.part));
+        (void)memcpy(&packet->payload.payload.LOG_ACK.num_parts,
+                     payload + SIZEOF_FIELD(struct ares_packet,
+                                            payload.payload.LOG_ACK.part),
+                     SIZEOF_FIELD(struct ares_packet,
+                                  payload.payload.LOG_ACK.num_parts));
         break;
     }
     case ARES_PKT_PAYLOAD_CLAIM: {
