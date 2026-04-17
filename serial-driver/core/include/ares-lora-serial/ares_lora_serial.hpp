@@ -138,12 +138,15 @@ class AresSerial {
     };
 
     void _publish_response(const AresFrame::AresFrameDecoded &frame);
+    void _send_frame(const std::vector<uint8_t> &tx);
     AresResponse _send_frame(AresFrame &frame,
                              const std::chrono::milliseconds &timeout);
     void _send_multi_frame(AresFrame &frame,
                            const std::chrono::milliseconds &timeout,
                            std::vector<AresResponse> &responses);
     AresResponse _wait_response(const std::chrono::milliseconds &timeout);
+    AresResponse
+    _wait_response_timeout(const std::chrono::milliseconds &timeout);
     AresResponse _wait_response_forever();
 
     std::atomic_bool _tasks_running = false;
@@ -183,6 +186,16 @@ class AresSerial {
     std::function<void(uint16_t)> _claim_callback = nullptr;
     void _claim_event(const AresFrame::AresFrameClaim &claim);
 
+    SpinLock _log_spinlock;
+    ares::bounded_queue<AresFrame::AresFrameLogAck> _log_ack_signal;
+    void _log_ack_event(const AresFrame::AresFrameLogAck &ack);
+    bool _log_ack_event_wait(const std::chrono::milliseconds &timeout,
+                             size_t part, size_t num_parts, uint16_t id);
+    void _send_log_frame_directed(AresFrame &frame,
+                                  const std::chrono::milliseconds &ack_timeout,
+                                  size_t max_attempts,
+                                  std::vector<AresResponse> &responses,
+                                  uint16_t target);
     std::function<void(uint16_t, uint8_t, uint8_t, const std::string &msg)>
         _log_callback = nullptr;
     void _log_event(const AresFrame::AresFrameLog &log) const;

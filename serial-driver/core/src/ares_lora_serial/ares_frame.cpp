@@ -239,6 +239,27 @@ AresFrame::AresFrameDecoded AresFrame::get_parsed_frame() const {
 
 bool AresFrame::frame_available() const { return _new_frame; }
 
+size_t AresFrame::total_frames() const {
+    if (_direction != TX) {
+        return 0;
+    }
+
+    size_t ret = 1;
+
+    switch (_type) {
+    case LOG: {
+        ret = std::get<AresFrameLog>(_tx_payload)._num_parts;
+        break;
+    }
+    default: {
+        // nop
+        break;
+    }
+    }
+
+    return ret;
+}
+
 uint16_t AresFrame::_payload_size() const {
     uint16_t ret = 0;
 

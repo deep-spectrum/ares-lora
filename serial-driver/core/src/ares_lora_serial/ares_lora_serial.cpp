@@ -122,30 +122,22 @@ AresSerial::~AresSerial() {
     _serial.close();
 }
 
+void AresSerial::_send_frame(const std::vector<uint8_t> &tx) {
+    LOG_DBG_HEXDUMP(tx, tx.size(), "Sending frame");
+    std::unique_lock lock(_serial_lock);
+    _serial.write(tx);
+}
+
 AresSerial::AresResponse
 AresSerial::_send_frame(AresFrame &frame,
                         const std::chrono::milliseconds &timeout) {
     std::unique_lock lock_(_command_lock);
     std::vector<uint8_t> tx;
     frame.serialize(tx);
-    LOG_DBG_HEXDUMP(tx, tx.size(), "Sending frame");
 
     _response_queue.clear();
-
-    std::unique_lock lock(_serial_lock);
-
-    _serial.write(tx);
-    lock.unlock();
-
-    AresResponse response;
-
-    if (timeout == std::chrono::milliseconds::max()) {
-        response = _wait_response_forever();
-    } else {
-        response = _wait_response(timeout);
-    }
-
-    return response;
+    _send_frame(tx);
+    return _wait_response(timeout);
 }
 
 void AresSerial::_send_multi_frame(AresFrame &frame,
@@ -157,8 +149,48 @@ void AresSerial::_send_multi_frame(AresFrame &frame,
     } while (frame.frame_available());
 }
 
+void AresSerial::_send_log_frame_directed(
+    AresFrame &frame, const std::chrono::milliseconds &ack_timeout,
+    size_t max_attempts, std::vector<AresResponse> &responses,
+    uint16_t target) {
+    std::vector<uint8_t> tx;
+    size_t acked_frames = 0;
+
+    do {
+        acked_frames++;
+        frame.serialize(tx);
+        size_t tot_frames = frame.total_frames();
+        AresResponse last_response;
+        bool acked = false;
+
+        for (size_t attempt = 0u; attempt < max_attempts && !acked; attempt++) {
+            _response_queue.clear();
+            _send_frame(tx);
+            last_response = _wait_response(_response_timeout);
+            acked = _log_ack_event_wait(ack_timeout, acked_frames, tot_frames,
+                                        target);
+        }
+        responses.emplace_back(last_response);
+
+        if (!acked) {
+            throw std::runtime_error("Did not receive an ACK");
+        }
+    } while (frame.frame_available());
+}
+
 AresSerial::AresResponse
 AresSerial::_wait_response(const std::chrono::milliseconds &timeout) {
+    AresResponse response;
+    if (timeout == std::chrono::milliseconds::max()) {
+        response = _wait_response_forever();
+    } else {
+        response = _wait_response_timeout(timeout);
+    }
+    return response;
+}
+
+AresSerial::AresResponse
+AresSerial::_wait_response_timeout(const std::chrono::milliseconds &timeout) {
     AresResponse response;
 
     try {
@@ -360,7 +392,8 @@ py::tuple AresSerial::send_log(const std::string &log_msg, bool broadcast,
                                uint8_t tx_cnt, uint16_t id) {
     _check_crash();
     LOG_DBG("Log command received");
-    AresFrame::AresFrameLog payload{broadcast, tx_cnt, id, log_msg};
+    AresFrame::AresFrameLog payload{
+        broadcast, (broadcast) ? tx_cnt : static_cast<uint8_t>(1), id, log_msg};
 
     if (!broadcast && id == UINT16_C(0)) {
         if (_claimed_host == UINT16_C(0)) {
@@ -369,6 +402,7 @@ py::tuple AresSerial::send_log(const std::string &log_msg, bool broadcast,
                     "master node, but the master node has not been claimed. "
                     "Switching to broadcast mode.");
             payload.broadcast = true;
+            payload.tx_cnt = tx_cnt;
         } else {
             LOG_INF("Directing message to node %d", _claimed_host);
             payload.id = _claimed_host;
@@ -377,7 +411,14 @@ py::tuple AresSerial::send_log(const std::string &log_msg, bool broadcast,
 
     AresFrame frame{AresFrame::LOG, payload};
     std::vector<AresResponse> responses;
-    _send_multi_frame(frame, _response_timeout, responses);
+
+    if (payload.broadcast) {
+        _send_multi_frame(frame, _response_timeout, responses);
+    } else {
+        _send_log_frame_directed(frame, _response_timeout, tx_cnt, responses,
+                                 id);
+    }
+
     std::vector<int> ret;
 
     for (auto &response : responses) {
@@ -523,6 +564,10 @@ void AresSerial::_process_frames_helper() {
         }
         case AresFrame::LOG: {
             _log_event(std::get<AresFrame::AresFrameLog>(frame.payload));
+            break;
+        }
+        case AresFrame::LOG_ACK: {
+            _log_ack_event(std::get<AresFrame::AresFrameLogAck>(frame.payload));
             break;
         }
         default: {
@@ -729,6 +774,40 @@ void AresSerial::_claim_event(const AresFrame::AresFrameClaim &claim) {
         LOG_DBG("Notifying Python of claimed host");
         _claim_callback(claim.id);
     }
+}
+
+void AresSerial::_log_ack_event(const AresFrame::AresFrameLogAck &ack) {
+    LOG_DBG("Log ACK event received (%d, %d, %d)", ack.part, ack.num_parts,
+            ack.id);
+
+    try {
+        _log_ack_signal.put_nonblocking(ack);
+    } catch (const ares::queue_exception &exc) {
+        if (exc.reason() != ares::queue_exception::QUEUE_FULL) {
+            throw;
+        }
+        LOG_ERR("Signal queue full");
+        _log_ack_signal.clear();
+    }
+}
+
+bool AresSerial::_log_ack_event_wait(const std::chrono::milliseconds &timeout,
+                                     size_t part, size_t num_parts,
+                                     uint16_t id) {
+    AresFrame::AresFrameLogAck expected{static_cast<uint8_t>(part),
+                                        static_cast<uint8_t>(num_parts), id};
+    AresFrame::AresFrameLogAck response{};
+
+    _log_ack_signal.clear();
+    try {
+        response = _log_ack_signal.get(timeout);
+    } catch (const ares::queue_exception &exc) {
+        if (exc.reason() != ares::queue_exception::QUEUE_TIMEOUT) {
+            throw;
+        }
+    }
+
+    return response == expected;
 }
 
 void AresSerial::_log_event(const AresFrame::AresFrameLog &log) const {

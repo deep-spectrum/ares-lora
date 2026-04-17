@@ -200,6 +200,8 @@ class AresFrame {
 
     [[nodiscard]] bool frame_available() const;
 
+    [[nodiscard]] size_t total_frames() const;
+
   private:
     enum FrameDirection { TX, RX, UNSPECIFIED };
     bool _new_frame = true;
