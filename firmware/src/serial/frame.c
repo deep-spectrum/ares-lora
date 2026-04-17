@@ -70,7 +70,7 @@ static size_t calculate_frame_length(const struct ares_frame *frame) {
     case ARES_FRAME_LOG: {
         payload_len = FSIZEOF_FIELD(LOG.broadcast) + FSIZEOF_FIELD(LOG.id) +
                       FSIZEOF_FIELD(LOG.tx_cnt) + FSIZEOF_FIELD(LOG.part) +
-                      FSIZEOF_FIELD(LOG.num_parts) +FSIZEOF_FIELD(LOG.log_id);
+                      FSIZEOF_FIELD(LOG.num_parts) + FSIZEOF_FIELD(LOG.log_id);
         payload_len += frame->payload.LOG.msg_len;
         break;
     }

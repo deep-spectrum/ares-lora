@@ -195,6 +195,7 @@ static void handle_log(const struct ares_serial *serial,
                         {
                             .part = frame->payload.LOG.part,
                             .num_parts = frame->payload.LOG.num_parts,
+                            .log_id = frame->payload.LOG.log_id,
                             .msg = frame->payload.LOG.msg,
                             .msg_len = frame->payload.LOG.msg_len,
                         }},
