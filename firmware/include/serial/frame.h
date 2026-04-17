@@ -102,6 +102,7 @@ struct ares_frame {
             uint8_t part;
             uint8_t num_parts;
             uint16_t id;
+            uint16_t log_id;
             size_t msg_len;
             const char *msg; // This must remain valid for
                              // the lifetime of the frame.
@@ -111,6 +112,7 @@ struct ares_frame {
             uint8_t part;
             uint8_t num_parts;
             uint16_t id;
+            uint16_t log_id;
         } LOG_ACK; ///< ARES_FRAME_LOG_ACK
 
         struct {

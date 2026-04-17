@@ -70,14 +70,14 @@ static size_t calculate_frame_length(const struct ares_frame *frame) {
     case ARES_FRAME_LOG: {
         payload_len = FSIZEOF_FIELD(LOG.broadcast) + FSIZEOF_FIELD(LOG.id) +
                       FSIZEOF_FIELD(LOG.tx_cnt) + FSIZEOF_FIELD(LOG.part) +
-                      FSIZEOF_FIELD(LOG.num_parts);
+                      FSIZEOF_FIELD(LOG.num_parts) +FSIZEOF_FIELD(LOG.log_id);
         payload_len += frame->payload.LOG.msg_len;
         break;
     }
     case ARES_FRAME_LOG_ACK: {
         payload_len = FSIZEOF_FIELD(LOG_ACK.part) +
                       FSIZEOF_FIELD(LOG_ACK.num_parts) +
-                      FSIZEOF_FIELD(LOG_ACK.id);
+                      FSIZEOF_FIELD(LOG_ACK.id) + FSIZEOF_FIELD(LOG_ACK.log_id);
         break;
     }
     case ARES_FRAME_VERSION: {
@@ -150,6 +150,7 @@ static void serialize(uint8_t *buf, const struct ares_frame *frame,
         FSERIALIZE(LOG.tx_cnt);
         FSERIALIZE(LOG.part);
         FSERIALIZE(LOG.num_parts);
+        FSERIALIZE(LOG.log_id);
         FSERIALIZE_PTR(LOG.msg, frame->payload.LOG.msg_len);
         break;
     }
@@ -157,6 +158,7 @@ static void serialize(uint8_t *buf, const struct ares_frame *frame,
         FSERIALIZE(LOG_ACK.part);
         FSERIALIZE(LOG_ACK.num_parts);
         FSERIALIZE(LOG_ACK.id);
+        FSERIALIZE(LOG_ACK.log_id);
         break;
     }
     case ARES_FRAME_ACK: {
@@ -303,6 +305,7 @@ static void deserialize(struct ares_frame *frame, const uint8_t *buf) {
         FDESERIALIZE(LOG.tx_cnt);
         FDESERIALIZE(LOG.part);
         FDESERIALIZE(LOG.num_parts);
+        FDESERIALIZE(LOG.log_id);
         FDESERIALIZE_BUF(LOG.msg, const char *, LOG.msg_len);
         break;
     }
