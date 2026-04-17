@@ -80,7 +80,8 @@ static size_t calculate_frame_length(const struct ares_frame *frame) {
     case ARES_FRAME_LOG_ACK: {
         payload_len =
             SIZEOF_FIELD(struct ares_frame, payload.LOG_ACK.part) +
-            SIZEOF_FIELD(struct ares_frame, payload.LOG_ACK.num_parts);
+            SIZEOF_FIELD(struct ares_frame, payload.LOG_ACK.num_parts) +
+            SIZEOF_FIELD(struct ares_frame, payload.LOG_ACK.id);
         break;
     }
     case ARES_FRAME_VERSION: {
@@ -189,6 +190,11 @@ static void serialize(uint8_t *buf, const struct ares_frame *frame,
             payload + SIZEOF_FIELD(struct ares_frame, payload.LOG_ACK.part),
             &frame->payload.LOG_ACK.num_parts,
             SIZEOF_FIELD(struct ares_frame, payload.LOG_ACK.num_parts));
+        (void)memcpy(payload +
+                         SIZEOF_FIELD(struct ares_frame, payload.LOG_ACK.part) +
+                         SIZEOF_FIELD(struct ares_frame, payload.LOG_ACK.part),
+                     &frame->payload.LOG_ACK.id,
+                     SIZEOF_FIELD(struct ares_frame, payload.LOG_ACK.id));
         break;
     }
     case ARES_FRAME_ACK: {
