@@ -293,7 +293,7 @@ static void deserialize(struct ares_packet *packet, const uint8_t *buf) {
             &packet->payload.payload.LOG.part, payload,
             SIZEOF_FIELD(struct ares_packet, payload.payload.LOG.part));
         (void)memcpy(
-            &packet->payload.payload.LOG.part,
+            &packet->payload.payload.LOG.num_parts,
             payload +
                 SIZEOF_FIELD(struct ares_packet, payload.payload.LOG.part),
             SIZEOF_FIELD(struct ares_packet, payload.payload.LOG.num_parts));
