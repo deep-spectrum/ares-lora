@@ -196,7 +196,7 @@ AresSerial::_wait_response_timeout(const std::chrono::milliseconds &timeout) {
     try {
         response = _response_queue.get(timeout);
     } catch (const ares::queue_exception &exc) {
-        if (exc.reason() == ares::queue_exception::QUEUE_EMPTY) {
+        if (exc.reason() == ares::queue_exception::QUEUE_TIMEOUT) {
             throw AresTimeoutError(exc.what());
         }
         throw;
@@ -809,9 +809,7 @@ bool AresSerial::_log_ack_event_wait(const std::chrono::milliseconds &timeout,
     try {
         response = _log_ack_signal.get(timeout);
     } catch (const ares::queue_exception &exc) {
-        if (exc.reason() != ares::queue_exception::QUEUE_TIMEOUT) {
-            throw;
-        }
+        // nop
     }
 
     LOG_DBG("Expected: (%d, %d, %d)", expected.part, expected.num_parts,
