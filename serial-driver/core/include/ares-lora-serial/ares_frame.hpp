@@ -42,9 +42,10 @@ class AresFrame {
         HEARTBEAT = 4,
         CLAIM = 5,
         LOG = 6,
-        VERSION = 7,
-        ACK = 8,
-        FRAMING_ERROR = 9,
+        LOG_ACK = 7,
+        VERSION = 8,
+        ACK = 9,
+        FRAMING_ERROR = 10,
         UNKNOWN,
     };
 
@@ -134,6 +135,17 @@ class AresFrame {
                                             sizeof(tx_cnt);
     };
 
+    struct AresFrameLogAck {
+        uint8_t part = 0;
+        uint8_t num_parts = 0;
+        uint16_t id = 0;
+
+        bool operator==(const AresFrameLogAck &other) const {
+            return (part == other.part) && (num_parts == other.num_parts) &&
+                   (id == other.id);
+        }
+    };
+
     struct AresFrameVersion {
         uint32_t app = 0;
         uint32_t ncs = 0;
@@ -156,7 +168,7 @@ class AresFrame {
         std::variant<std::monostate, AresFrameSetting, AresFrameStart,
                      AresFrameAckErrorCode, AresFrameFramingError, AresFrameLed,
                      AresFrameHeartbeat, AresFrameClaim, AresFrameLog,
-                     AresFrameVersion>;
+                     AresFrameVersion, AresFrameLogAck>;
 
     using AresFrameResponseTypes =
         std::variant<std::monostate, AresFrameSetting, AresFrameAckErrorCode,
@@ -225,6 +237,7 @@ class AresFrame {
     void _deserialize_heartbeat(const uint8_t *buf, size_t len);
     void _deserialize_claim(const uint8_t *buf, size_t len);
     void _deserialize_log(const uint8_t *buf, size_t len);
+    void _deserialize_log_ack(const uint8_t *buf, size_t len);
     void _deserialize_version(const uint8_t *buf, size_t len);
     void _deserialize_ack(const uint8_t *buf, size_t len);
     void _deserialize_framing_error(const uint8_t *buf, size_t len);

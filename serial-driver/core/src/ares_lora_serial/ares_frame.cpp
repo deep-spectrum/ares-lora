@@ -216,6 +216,11 @@ void AresFrame::parse(const std::vector<uint8_t> &bytearray,
         _deserialize_log(&bytearray[start_index + payload_offset], payload_len);
         break;
     }
+    case LOG_ACK: {
+        _deserialize_log_ack(&bytearray[start_index + payload_offset],
+                             payload_len);
+        break;
+    }
     case VERSION: {
         _deserialize_version(&bytearray[start_index + payload_offset],
                              payload_len);
@@ -509,6 +514,15 @@ void AresFrame::_deserialize_log(const uint8_t *buf, size_t len) {
     DESERIALIZE(part);
     DESERIALIZE(num_parts);
     DESERIALIZE_STR(msg, len - AresFrameLog::_overhead);
+    DESERIALIZE_FINALIZE();
+}
+
+void AresFrame::_deserialize_log_ack(const uint8_t *buf, size_t len) {
+    ARG_UNUSED(len);
+    DESERIALIZE_INIT(AresFrameLogAck);
+    DESERIALIZE(part);
+    DESERIALIZE(num_parts);
+    DESERIALIZE(id);
     DESERIALIZE_FINALIZE();
 }
 
