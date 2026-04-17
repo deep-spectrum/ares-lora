@@ -155,10 +155,8 @@ class LoraSerial:
         chunk_ = _LogMessageChunk(chunk, num_chunks, msg)
         if src_id not in self._log_msg:
             self._log_msg[src_id] = [chunk_]
-            return
-        if self._log_msg[src_id][-1] == chunk_:
-            return
-        self._log_msg[src_id].append(chunk_)
+        elif self._log_msg[src_id][-1] != chunk_:
+            self._log_msg[src_id].append(chunk_)
         if chunk_.num_chunks == chunk_.chunk_id:
             msg = ""
             for chunk in self._log_msg[src_id]:
