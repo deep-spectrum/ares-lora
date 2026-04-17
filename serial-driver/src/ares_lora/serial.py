@@ -81,6 +81,7 @@ class LogMessage:
     last_part: int
     total_parts: int
     msg: str
+    transmitted: bool = False
 
 
 def lora_serial_command(func):
@@ -147,18 +148,18 @@ class LoraSerial:
     def _handle_claim(self, src_id: int):
         pass
 
-    def _handle_log(self, src_id: int, chunk: int, num_chunks: int, msg: str):
-        # TODO: Log message ID
+    def _handle_log(self, src_id: int, log_id: int, chunk: int, num_chunks: int, msg: str):
         if src_id not in self._log_msg:
-            self._log_msg[src_id] = LogMessage(0, chunk, num_chunks, msg)
-        # TODO: Check if message IDs match, if not overwrite the old message
-
+            self._log_msg[src_id] = LogMessage(log_id, chunk, num_chunks, msg)
+        elif log_id != self._log_msg[src_id].msg_id:
+            self._log_msg[src_id] = LogMessage(log_id, chunk, num_chunks, msg)
         elif self._log_msg[src_id].last_part != chunk and (self._log_msg[src_id].last_part + 1) == chunk:
             print(msg)
             self._log_msg[src_id].msg = f"{self._log_msg[src_id].msg}{msg}"
             self._log_msg[src_id].last_part = chunk
 
-        if self._log_msg[src_id].last_part == self._log_msg[src_id].total_parts:
+        if self._log_msg[src_id].last_part == self._log_msg[src_id].total_parts and not self._log_msg[src_id].transmitted:
+            self._log_msg[src_id].transmitted = True
             if self._log_cb is not None:
                 self._log_cb(src_id, msg)
             print(self._log_msg[src_id].msg)

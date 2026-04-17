@@ -56,7 +56,7 @@ struct AresSerialConfigs {
         start_callback = nullptr;
     std::function<void(uint16_t, bool, bool)> heartbeat_callback = nullptr;
     std::function<void(uint16_t)> claim_callback = nullptr;
-    std::function<void(uint16_t, uint8_t, uint8_t, const std::string &)>
+    std::function<void(uint16_t, uint16_t, uint8_t, uint8_t, const std::string &)>
         log_callback = nullptr;
 };
 
@@ -187,6 +187,7 @@ class AresSerial {
     void _claim_event(const AresFrame::AresFrameClaim &claim);
 
     SpinLock _log_spinlock;
+    uint16_t _log_id = 0;
     ares::bounded_queue<AresFrame::AresFrameLogAck> _log_ack_signal;
     void _log_ack_event(const AresFrame::AresFrameLogAck &ack);
     bool _log_ack_event_wait(const std::chrono::milliseconds &timeout,
@@ -196,7 +197,7 @@ class AresSerial {
                                   size_t max_attempts,
                                   std::vector<AresResponse> &responses,
                                   uint16_t target);
-    std::function<void(uint16_t, uint8_t, uint8_t, const std::string &msg)>
+    std::function<void(uint16_t, uint16_t, uint8_t, uint8_t, const std::string &msg)>
         _log_callback = nullptr;
     void _log_event(const AresFrame::AresFrameLog &log) const;
 

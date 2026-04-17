@@ -390,10 +390,13 @@ int AresSerial::send_heartbeat(bool ready, uint8_t tx_cnt) {
 
 py::tuple AresSerial::send_log(const std::string &log_msg, bool broadcast,
                                uint8_t tx_cnt, uint16_t id) {
+    std::unique_lock lock_(_log_spinlock);
     _check_crash();
     LOG_DBG("Log command received");
     AresFrame::AresFrameLog payload{
-        broadcast, (broadcast) ? tx_cnt : static_cast<uint8_t>(1), id, log_msg};
+        broadcast, (broadcast) ? tx_cnt : static_cast<uint8_t>(1), id, _log_id,
+        log_msg};
+    _log_id++;
 
     if (!broadcast && id == UINT16_C(0)) {
         if (_claimed_host == UINT16_C(0)) {
@@ -824,10 +827,11 @@ void AresSerial::_log_event(const AresFrame::AresFrameLog &log) const {
     LOG_DBG("Log event received from %d", log.id);
     LOG_DBG("Part %d of %d", log.part, log.num_parts);
     LOG_DBG("Log message: %s", log.msg.c_str());
+    LOG_DBG("Log ID: %d", log.log_id);
 
     if (_log_callback) {
         LOG_DBG("Forwarding log event to Python");
-        _log_callback(log.id, log.part, log.num_parts, log.msg);
+        _log_callback(log.id, log.log_id, log.part, log.num_parts, log.msg);
     }
 }
 

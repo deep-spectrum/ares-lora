@@ -110,8 +110,8 @@ class AresFrame {
 
     struct AresFrameLog {
         AresFrameLog(bool broadcast, uint8_t tx_cnt, uint16_t id,
-                     std::string msg)
-            : broadcast(broadcast), tx_cnt(tx_cnt), id(id),
+                     uint16_t log_id, std::string msg)
+            : broadcast(broadcast), tx_cnt(tx_cnt), id(id), log_id(log_id),
               msg(std::move(msg)) {}
         AresFrameLog() = default;
 
