@@ -120,6 +120,7 @@ class AresFrame {
         uint8_t part = 1;      // 1 indexed. Automatically managed.
         uint8_t num_parts = 1; // starts at 1. Automatically managed.
         uint16_t id = 0;
+        uint16_t log_id = 0;
         std::string msg;
 
         friend class AresFrame;
@@ -140,10 +141,11 @@ class AresFrame {
         uint8_t part = 0;
         uint8_t num_parts = 0;
         uint16_t id = 0;
+        uint16_t log_id = 0;
 
         bool operator==(const AresFrameLogAck &other) const {
             return (part == other.part) && (num_parts == other.num_parts) &&
-                   (id == other.id);
+                   (id == other.id) && (log_id == other.log_id);
         }
     };
 

@@ -448,6 +448,7 @@ void AresFrame::_serialize_log(const AresFrameLog &payload,
     SERIALIZE(tx_cnt);
     SERIALIZE(_part);
     SERIALIZE(_num_parts);
+    SERIALIZE(log_id);
     buffer.insert(buffer.end(), payload._msg_split[payload._idx].begin(),
                   payload._msg_split[payload._idx].end());
 }
@@ -538,6 +539,7 @@ void AresFrame::_deserialize_log(const uint8_t *buf, size_t len) {
     DESERIALIZE(tx_cnt);
     DESERIALIZE(part);
     DESERIALIZE(num_parts);
+    DESERIALIZE(log_id);
     DESERIALIZE_STR(msg, len - AresFrameLog::_overhead);
     DESERIALIZE_FINALIZE();
 }
@@ -548,6 +550,7 @@ void AresFrame::_deserialize_log_ack(const uint8_t *buf, size_t len) {
     DESERIALIZE(part);
     DESERIALIZE(num_parts);
     DESERIALIZE(id);
+    DESERIALIZE(log_id);
     DESERIALIZE_FINALIZE();
 }
 
