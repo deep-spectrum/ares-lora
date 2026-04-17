@@ -115,30 +115,32 @@ static inline size_t packet_overhead(const struct ares_packet *packet) {
                : ARES_PACKET_DIRECT_OVERHEAD;
 }
 
+#define PSIZEOF_FIELD(field)                                                   \
+    SIZEOF_FIELD(struct ares_packet_payload, payload.field)
+
 static size_t calculate_packet_size(const struct ares_packet *packet) {
     __ASSERT_NO_MSG(packet != NULL);
     size_t overhead = packet_overhead(packet);
 
     switch (packet->payload.type) {
     case ARES_PKT_PAYLOAD_START: {
-        overhead += SIZEOF_FIELD(struct ares_packet_payload, payload.START);
+        overhead += PSIZEOF_FIELD(START);
         break;
     }
     case ARES_PKT_PAYLOAD_HEARTBEAT: {
-        overhead += SIZEOF_FIELD(struct ares_packet_payload, payload.HEARTBEAT);
+        overhead += PSIZEOF_FIELD(HEARTBEAT);
         break;
     }
     case ARES_PKT_PAYLOAD_LOG: {
-        overhead +=
-            SIZEOF_FIELD(struct ares_packet_payload, payload.LOG.part) +
-            SIZEOF_FIELD(struct ares_packet_payload, payload.LOG.num_parts) +
-            packet->payload.payload.LOG.msg_len;
+        overhead += PSIZEOF_FIELD(LOG.part) + PSIZEOF_FIELD(LOG.num_parts) +
+                    PSIZEOF_FIELD(LOG.log_id) +
+                    packet->payload.payload.LOG.msg_len;
         break;
     }
     case ARES_PKT_PAYLOAD_LOG_ACK: {
-        overhead +=
-            SIZEOF_FIELD(struct ares_packet_payload, payload.LOG_ACK.part) +
-            SIZEOF_FIELD(struct ares_packet_payload, payload.LOG_ACK.num_parts);
+        overhead += PSIZEOF_FIELD(LOG_ACK.part) +
+                    PSIZEOF_FIELD(LOG_ACK.num_parts) +
+                    PSIZEOF_FIELD(LOG_ACK.log_id);
         break;
     }
     case ARES_PKT_PAYLOAD_CLAIM: {
@@ -163,6 +165,28 @@ static crc16_t compute_crc(const uint8_t *buf, size_t len) {
 
     return crc ^ CONFIG_LORA_CRC_XOR_OUTPUT;
 }
+
+#define Z_PSERIALIZE_LEN(field, len)                                           \
+    do {                                                                       \
+        (void)memcpy(payload, &packet->payload.payload.field, (len));          \
+        payload += (len);                                                      \
+    } while (0)
+#define Z_PSERIALIZE_FIELD(field)                                              \
+    do {                                                                       \
+        (void)memcpy(payload, &packet->payload.payload.field,                  \
+                     SIZEOF_FIELD(struct ares_packet, payload.payload.field)); \
+        payload += (len);                                                      \
+    } while (0)
+
+#define PSERIALIZE(field, len...)                                              \
+    COND_CODE_0(IS_EMPTY(len), (Z_PSERIALIZE_LEN(field, len)),                 \
+                (Z_PSERIALIZE_FIELD(field)))
+
+#define PSERIALIZE_PTR(field, len)                                             \
+    do {                                                                       \
+        (void)memcpy(payload, packet->payload.payload.field, (len));           \
+        payload += (len);                                                      \
+    } while (0)
 
 static void serialize(uint8_t *buf, size_t len,
                       const struct ares_packet *packet, size_t packet_length,
@@ -208,31 +232,16 @@ static void serialize(uint8_t *buf, size_t len,
         break;
     }
     case ARES_PKT_PAYLOAD_LOG: {
-        (void)memcpy(
-            payload, &packet->payload.payload.LOG.part,
-            SIZEOF_FIELD(struct ares_packet, payload.payload.LOG.part));
-        (void)memcpy(
-            payload +
-                SIZEOF_FIELD(struct ares_packet, payload.payload.LOG.part),
-            &packet->payload.payload.LOG.num_parts,
-            SIZEOF_FIELD(struct ares_packet, payload.payload.LOG.num_parts));
-        (void)memcpy(
-            payload +
-                SIZEOF_FIELD(struct ares_packet, payload.payload.LOG.part) +
-                SIZEOF_FIELD(struct ares_packet, payload.payload.LOG.num_parts),
-            packet->payload.payload.LOG.msg,
-            packet->payload.payload.LOG.msg_len);
+        PSERIALIZE(LOG.part);
+        PSERIALIZE(LOG.num_parts);
+        PSERIALIZE(LOG.log_id);
+        PSERIALIZE_PTR(LOG.msg, packet->payload.payload.LOG.msg_len);
         break;
     }
     case ARES_PKT_PAYLOAD_LOG_ACK: {
-        (void)memcpy(
-            payload, &packet->payload.payload.LOG_ACK.part,
-            SIZEOF_FIELD(struct ares_packet, payload.payload.LOG_ACK.part));
-        (void)memcpy(payload + SIZEOF_FIELD(struct ares_packet,
-                                            payload.payload.LOG_ACK.part),
-                     &packet->payload.payload.LOG_ACK.num_parts,
-                     SIZEOF_FIELD(struct ares_packet,
-                                  payload.payload.LOG_ACK.num_parts));
+        PSERIALIZE(LOG_ACK.part);
+        PSERIALIZE(LOG_ACK.num_parts);
+        PSERIALIZE(LOG_ACK.log_id);
         break;
     }
     case ARES_PKT_PAYLOAD_CLAIM: {
@@ -273,6 +282,23 @@ int serialize_ares_packet(uint8_t *buf, size_t len,
     return (int)packet_len;
 }
 
+#define PDESERIALIZE_INIT() size_t z_offset = 0
+
+#define PDESERIALIZE(field)                                                    \
+    do {                                                                       \
+        (void)memcpy(&packet->payload.payload.field, &payload[z_offset],       \
+                     SIZEOF_FIELD(struct ares_packet, payload.payload.field)); \
+        z_offset += SIZEOF_FIELD(struct ares_packet, payload.payload.field);   \
+    } while (0)
+
+#define PDESERIALIZE_BUF(field, type_cast, len_field)                          \
+    do {                                                                       \
+        packet->payload.payload.field = (type_cast)(payload + z_offset);       \
+        packet->payload.payload.len_field =                                    \
+            payload_len -                                                      \
+            ((const uint8_t *)packet->payload.payload.field - payload);        \
+    } while (0)
+
 static void deserialize(struct ares_packet *packet, const uint8_t *buf) {
     size_t payload_len;
     const uint8_t *payload;
@@ -306,34 +332,18 @@ static void deserialize(struct ares_packet *packet, const uint8_t *buf) {
         break;
     }
     case ARES_PKT_PAYLOAD_LOG: {
-        (void)memcpy(
-            &packet->payload.payload.LOG.part, payload,
-            SIZEOF_FIELD(struct ares_packet, payload.payload.LOG.part));
-        (void)memcpy(
-            &packet->payload.payload.LOG.num_parts,
-            payload +
-                SIZEOF_FIELD(struct ares_packet, payload.payload.LOG.part),
-            SIZEOF_FIELD(struct ares_packet, payload.payload.LOG.num_parts));
-        packet->payload.payload.LOG.msg =
-            (const char *)(payload +
-                           SIZEOF_FIELD(struct ares_packet,
-                                        payload.payload.LOG.part) +
-                           SIZEOF_FIELD(struct ares_packet,
-                                        payload.payload.LOG.num_parts));
-        packet->payload.payload.LOG.msg_len =
-            payload_len -
-            ((const uint8_t *)packet->payload.payload.LOG.msg - payload);
+        PDESERIALIZE_INIT();
+        PDESERIALIZE(LOG.part);
+        PDESERIALIZE(LOG.num_parts);
+        PDESERIALIZE(LOG.log_id);
+        PDESERIALIZE_BUF(LOG.msg, const char *, LOG.msg_len);
         break;
     }
     case ARES_PKT_PAYLOAD_LOG_ACK: {
-        (void)memcpy(
-            &packet->payload.payload.LOG_ACK.part, payload,
-            SIZEOF_FIELD(struct ares_packet, payload.payload.LOG_ACK.part));
-        (void)memcpy(&packet->payload.payload.LOG_ACK.num_parts,
-                     payload + SIZEOF_FIELD(struct ares_packet,
-                                            payload.payload.LOG_ACK.part),
-                     SIZEOF_FIELD(struct ares_packet,
-                                  payload.payload.LOG_ACK.num_parts));
+        PDESERIALIZE_INIT();
+        PDESERIALIZE(LOG_ACK.part);
+        PDESERIALIZE(LOG_ACK.num_parts);
+        PDESERIALIZE(LOG_ACK.log_id);
         break;
     }
     case ARES_PKT_PAYLOAD_CLAIM: {

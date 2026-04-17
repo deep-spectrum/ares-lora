@@ -64,6 +64,7 @@ struct ares_packet_payload {
         struct {
             uint8_t part;
             uint8_t num_parts;
+            uint16_t log_id;
             const char *msg;
             size_t msg_len;
         } LOG;
@@ -71,6 +72,7 @@ struct ares_packet_payload {
         struct {
             uint8_t part;
             uint8_t num_parts;
+            uint16_t log_id;
         } LOG_ACK;
     } payload;
 };
