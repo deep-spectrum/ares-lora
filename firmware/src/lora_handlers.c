@@ -139,6 +139,11 @@ static void handle_log(const struct ares_lora *lora,
     CHECK_DIRECTED_PACKET(packet);
 
     int ret = ares_serial_write_frame(serial, &frame);
+    if (ret < 0) {
+        frame.type = ARES_FRAME_DBG;
+        frame.payload.DBG = ret;
+        ares_serial_write_frame(serial, &frame);
+    }
 
     ack_log(lora, packet);
 }
