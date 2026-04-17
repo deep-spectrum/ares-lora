@@ -201,6 +201,8 @@ class AresSerial {
     void _log_event(const AresFrame::AresFrameLog &log) const;
 
     static py::tuple _decode_version(uint32_t version_num);
+
+    static void _debug_event(const AresFrame::AresFrameDbg &msg);
 };
 
 #endif // ARES_ARES_LORA_SERIAL_HPP

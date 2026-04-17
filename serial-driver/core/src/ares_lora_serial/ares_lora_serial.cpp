@@ -570,6 +570,10 @@ void AresSerial::_process_frames_helper() {
             _log_ack_event(std::get<AresFrame::AresFrameLogAck>(frame.payload));
             break;
         }
+        case AresFrame::DBG: {
+            _debug_event(std::get<AresFrame::AresFrameDbg>(frame.payload));
+            break;
+        }
         default: {
             LOG_ERR("Invalid frame received: %d", static_cast<int>(frame.type));
             break;
@@ -837,4 +841,8 @@ py::tuple AresSerial::_decode_version(uint32_t version_num) {
     uint32_t major = (version_num >> major_shift) & mask;
 
     return py::make_tuple(major, minor, patch);
+}
+
+void AresSerial::_debug_event(const AresFrame::AresFrameDbg &msg) {
+    LOG_DBG("Received debug event: %d", msg.code);
 }

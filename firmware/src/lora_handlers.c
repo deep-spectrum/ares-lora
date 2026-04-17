@@ -138,7 +138,7 @@ static void handle_log(const struct ares_lora *lora,
 
     CHECK_DIRECTED_PACKET(packet);
 
-    ares_serial_write_frame(serial, &frame);
+    int ret = ares_serial_write_frame(serial, &frame);
 
     ack_log(lora, packet);
 }

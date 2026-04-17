@@ -226,6 +226,10 @@ void AresFrame::parse(const std::vector<uint8_t> &bytearray,
                              payload_len);
         break;
     }
+    case DBG: {
+        _deserialize_dbg(&bytearray[start_index + payload_offset], payload_len);
+        break;
+    }
     default: {
         throw AresFrameError("Invalid RX type");
     }
@@ -568,4 +572,11 @@ void AresFrame::_deserialize_framing_error(const uint8_t *buf, size_t len) {
     memcpy(&mem, buf, len);
     error = static_cast<AresFrameFramingError>(mem);
     _rx_payload = error;
+}
+
+void AresFrame::_deserialize_dbg(const uint8_t *buf, size_t len) {
+    ARG_UNUSED(len);
+    DESERIALIZE_INIT(AresFrameDbg);
+    DESERIALIZE(code);
+    DESERIALIZE_FINALIZE();
 }

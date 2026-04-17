@@ -90,6 +90,10 @@ static size_t calculate_frame_length(const struct ares_frame *frame) {
                       SIZEOF_FIELD(struct ares_frame, payload.VERSION.kernel);
         break;
     }
+    case ARES_FRAME_DBG: {
+        payload_len = SIZEOF_FIELD(struct ares_frame, payload.DBG);
+        break;
+    }
     default: {
         __ASSERT(false, "Invalid frame type received");
         break;
@@ -245,6 +249,11 @@ static void serialize(uint8_t *buf, const struct ares_frame *frame,
                      SIZEOF_FIELD(struct ares_frame, payload.VERSION.kernel));
         break;
     }
+    case ARES_FRAME_DBG: {
+        (void)memcpy(payload, &frame->payload.DBG,
+                     SIZEOF_FIELD(struct ares_frame, payload.DBG));
+        break;
+    }
     default:
         // ARES_FRAME_LORA_CONFIG is RX only
         __ASSERT(false, "Invalid frame type received");
@@ -395,8 +404,8 @@ static void deserialize(struct ares_frame *frame, const uint8_t *buf) {
         break;
     }
     default: {
-        // ARES_FRAME_LOG_ACK, ARES_FRAME_ACK, and ARES_FRAME_FRAMING_ERROR are
-        // TX only
+        // ARES_FRAME_LOG_ACK, ARES_FRAME_ACK, ARES_FRAME_FRAMING_ERROR,
+        // and ARES_FRAME_DBG are TX only
         __ASSERT(false, "Invalid frame type for deserialization.");
         break;
     }

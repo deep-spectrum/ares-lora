@@ -46,6 +46,7 @@ class AresFrame {
         VERSION = 8,
         ACK = 9,
         FRAMING_ERROR = 10,
+        DBG = 11,
         UNKNOWN,
     };
 
@@ -160,6 +161,10 @@ class AresFrame {
         NOT_IMPLEMENTED = 2,
     };
 
+    struct AresFrameDbg {
+        int32_t code;
+    };
+
     using AresFrameTxTypes =
         std::variant<std::monostate, AresFrameSetting, AresFrameStart,
                      AresFrameLoraConfig, AresFrameLed, AresFrameHeartbeat,
@@ -168,7 +173,7 @@ class AresFrame {
         std::variant<std::monostate, AresFrameSetting, AresFrameStart,
                      AresFrameAckErrorCode, AresFrameFramingError, AresFrameLed,
                      AresFrameHeartbeat, AresFrameClaim, AresFrameLog,
-                     AresFrameVersion, AresFrameLogAck>;
+                     AresFrameVersion, AresFrameLogAck, AresFrameDbg>;
 
     using AresFrameResponseTypes =
         std::variant<std::monostate, AresFrameSetting, AresFrameAckErrorCode,
@@ -243,6 +248,7 @@ class AresFrame {
     void _deserialize_version(const uint8_t *buf, size_t len);
     void _deserialize_ack(const uint8_t *buf, size_t len);
     void _deserialize_framing_error(const uint8_t *buf, size_t len);
+    void _deserialize_dbg(const uint8_t *buf, size_t len);
 };
 
 #endif // ARES_ARES_FRAME_HPP

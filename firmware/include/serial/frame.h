@@ -46,6 +46,7 @@ enum ares_frame_type {
     ARES_FRAME_VERSION,       ///< Version information.
     ARES_FRAME_ACK,           ///< ACK frame.
     ARES_FRAME_FRAMING_ERROR, ///< Framing error frame. TX only.
+    ARES_FRAME_DBG,           ///< Debug frames, TX only.
 
     ARES_FRAME_TYPE_INVALID,
 };
@@ -121,6 +122,8 @@ struct ares_frame {
         int ACK; ///< ARES_FRAME_ACK
 
         enum ares_frame_error FRAMING_ERROR; ///< ARES_FRAME_FRAMING_ERROR
+
+        int DBG; ///< ARES_FRAME_DBG
     } payload;
 };
 

@@ -76,15 +76,11 @@ class LoraSerialConfig:
 
 
 @dataclass
-class _LogMessageChunk:
-    chunk_id: int
-    num_chunks: int
+class LogMessage:
+    msg_id: int
+    last_part: int
+    total_parts: int
     msg: str
-
-    def __eq__(self, other):
-        if not isinstance(other, type(self)):
-            return False
-        return (self.chunk_id == other.chunk_id) and (self.num_chunks == other.num_chunks) and (self.msg == other.msg)
 
 
 def lora_serial_command(func):
@@ -120,7 +116,7 @@ class LoraSerial:
         self._log_cb = config.log_callback
         self._dev = _AresSerial(configs)
         self._nodes: dict[int, dict[str, int]] = {}
-        self._log_msg: dict[int, list[_LogMessageChunk]] = {}
+        self._log_msg: dict[int, LogMessage] = {}
 
     def _should_event_be_dispatched(self, src: int, seq_cnt: int, packet_id: int) -> bool:
         if src not in self._nodes:
@@ -152,19 +148,20 @@ class LoraSerial:
         pass
 
     def _handle_log(self, src_id: int, chunk: int, num_chunks: int, msg: str):
-        chunk_ = _LogMessageChunk(chunk, num_chunks, msg)
+        # TODO: Log message ID
         if src_id not in self._log_msg:
-            self._log_msg[src_id] = [chunk_]
-        elif self._log_msg[src_id][-1] != chunk_:
-            self._log_msg[src_id].append(chunk_)
-        if chunk_.num_chunks == chunk_.chunk_id:
-            msg = ""
-            for chunk in self._log_msg[src_id]:
-                msg += chunk.msg
+            self._log_msg[src_id] = LogMessage(0, chunk, num_chunks, msg)
+        # TODO: Check if message IDs match, if not overwrite the old message
+
+        elif self._log_msg[src_id].last_part != chunk and (self._log_msg[src_id].last_part + 1) == chunk:
+            print(msg)
+            self._log_msg[src_id].msg = f"{self._log_msg[src_id].msg}{msg}"
+            self._log_msg[src_id].last_part = chunk
+
+        if self._log_msg[src_id].last_part == self._log_msg[src_id].total_parts:
             if self._log_cb is not None:
                 self._log_cb(src_id, msg)
-            print(f"Logged: {msg}")
-            del self._log_msg[src_id]
+            print(self._log_msg[src_id].msg)
 
     @staticmethod
     def _check_ret_code(code: int | tuple[int, ...]):
@@ -239,7 +236,7 @@ class LoraSerial:
         self._check_ret_code(code)
 
     @lora_serial_command
-    def send_log(self, log_msg: str, broadcast: bool = False, dst_id: int = 0, strobe_count: int = 3, timeout: float = 60.0):
+    def send_log(self, log_msg: str, broadcast: bool = False, dst_id: int = 0, strobe_count: int = 3, timeout: float = 15.0):
         if strobe_count <= 0:
             raise ValueError("strobe_count must be a positive, non-zero integer")
         prev_timeout = self._dev.get_response_timeout()
