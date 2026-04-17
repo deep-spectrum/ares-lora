@@ -77,6 +77,12 @@ static size_t calculate_frame_length(const struct ares_frame *frame) {
         payload_len += frame->payload.LOG.msg_len;
         break;
     }
+    case ARES_FRAME_LOG_ACK: {
+        payload_len =
+            SIZEOF_FIELD(struct ares_frame, payload.LOG_ACK.part) +
+            SIZEOF_FIELD(struct ares_frame, payload.LOG_ACK.num_parts);
+        break;
+    }
     case ARES_FRAME_VERSION: {
         payload_len = SIZEOF_FIELD(struct ares_frame, payload.VERSION.app) +
                       SIZEOF_FIELD(struct ares_frame, payload.VERSION.ncs) +
@@ -176,6 +182,15 @@ static void serialize(uint8_t *buf, const struct ares_frame *frame,
         // tx_cnt ignored by host computer...
         break;
     }
+    case ARES_FRAME_LOG_ACK: {
+        (void)memcpy(payload, &frame->payload.LOG_ACK.part,
+                     SIZEOF_FIELD(struct ares_frame, payload.LOG_ACK.part));
+        (void)memcpy(
+            payload + SIZEOF_FIELD(struct ares_frame, payload.LOG_ACK.part),
+            &frame->payload.LOG_ACK.num_parts,
+            SIZEOF_FIELD(struct ares_frame, payload.LOG_ACK.num_parts));
+        break;
+    }
     case ARES_FRAME_ACK: {
         (void)memcpy(payload, &frame->payload.ACK,
                      SIZEOF_FIELD(struct ares_frame, payload.ACK));
@@ -225,6 +240,7 @@ static void serialize(uint8_t *buf, const struct ares_frame *frame,
         break;
     }
     default:
+        // ARES_FRAME_LORA_CONFIG is RX only
         __ASSERT(false, "Invalid frame type received");
     }
 
@@ -373,6 +389,8 @@ static void deserialize(struct ares_frame *frame, const uint8_t *buf) {
         break;
     }
     default: {
+        // ARES_FRAME_LOG_ACK, ARES_FRAME_ACK, and ARES_FRAME_FRAMING_ERROR are
+        // TX only
         __ASSERT(false, "Invalid frame type for deserialization.");
         break;
     }
