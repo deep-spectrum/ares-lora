@@ -94,10 +94,34 @@ static void handle_claim(const struct ares_lora *lora,
     ares_serial_write_frame(serial, &frame);
 }
 
+static void ack_log(const struct ares_lora *lora,
+                    const struct ares_packet *packet) {
+    struct ares_packet ack = {
+        .type = ARES_PKT_TYPE_DIRECT,
+        .pan_id = modem_id.pan_id,
+        .destination_id = packet->source_id,
+        .source_id = modem_id.id,
+        .payload =
+            {
+                .type = ARES_PKT_PAYLOAD_LOG_ACK,
+                .payload.LOG_ACK =
+                    {
+                        .part = packet->payload.payload.LOG.part,
+                        .num_parts = packet->payload.payload.LOG.num_parts,
+                    },
+            },
+    };
+
+    if (packet->type != ARES_PKT_TYPE_DIRECT) {
+        return;
+    }
+
+    ares_lora_set_packet_id(lora, &ack);
+    ares_lora_write_packet(lora, &ack);
+}
+
 static void handle_log(const struct ares_lora *lora,
                        const struct ares_packet *packet) {
-    ARG_UNUSED(lora);
-
     const struct ares_serial *serial = ares_serial_backend_uart_get_ptr();
     struct ares_frame frame = {
         .type = ARES_FRAME_LOG,
@@ -115,6 +139,32 @@ static void handle_log(const struct ares_lora *lora,
     CHECK_DIRECTED_PACKET(packet);
 
     ares_serial_write_frame(serial, &frame);
+
+    ack_log(lora, packet);
+}
+
+static void handle_log_ack(const struct ares_lora *lora,
+                           const struct ares_packet *packet) {
+    ARG_UNUSED(lora);
+    const struct ares_serial *serial = ares_serial_backend_uart_get_ptr();
+    struct ares_frame frame = {
+        .type = ARES_FRAME_LOG_ACK,
+        .payload.LOG_ACK =
+            {
+                .part = packet->payload.payload.LOG_ACK.part,
+                .num_parts = packet->payload.payload.LOG_ACK.num_parts,
+                .id = packet->source_id,
+            },
+    };
+
+    CHECK_DIRECTED_PACKET(packet);
+
+    if (packet->type == ARES_PKT_TYPE_BROADCAST) {
+        // invalid
+        return;
+    }
+
+    ares_serial_write_frame(serial, &frame);
 }
 
 static struct ares_lora_command commands[] = {
@@ -122,6 +172,7 @@ static struct ares_lora_command commands[] = {
     {ARES_PKT_PAYLOAD_HEARTBEAT, handle_heartbeat},
     {ARES_PKT_PAYLOAD_CLAIM, handle_claim},
     {ARES_PKT_PAYLOAD_LOG, handle_log},
+    {ARES_PKT_PAYLOAD_LOG_ACK, handle_log_ack},
 };
 
 static int init_lora_handlers(void) {

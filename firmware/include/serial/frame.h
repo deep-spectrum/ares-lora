@@ -109,6 +109,7 @@ struct ares_frame {
         struct {
             uint8_t part;
             uint8_t num_parts;
+            uint16_t id;
         } LOG_ACK; ///< ARES_FRAME_LOG_ACK
 
         struct {
