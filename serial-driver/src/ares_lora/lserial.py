@@ -185,7 +185,17 @@ def lora_serial_command(func):
 
 class LoraSerial:
     """LoRa serial driver python implementation. Works only on Linux."""
+
     def __init__(self, config: LoraSerialConfig = LoraSerialConfig()):
+        """Initializes the LoRa driver.
+
+        Args:
+            config: The configurations for the LoRa driver.
+
+        Raises:
+            ValueError: Empty port configuration.
+            IOError: Port not found.
+        """
         if not config.port:
             raise ValueError("Invalid port")
         if not check_serial_port(config.port):
@@ -270,6 +280,20 @@ class LoraSerial:
 
     @lora_serial_command
     def setting(self, setting_id: SettingId, value: int | None = None) -> int | None:
+        """Set or retrieve a LoRa firmware setting.
+
+        Args:
+            setting_id: The setting to read or write to.
+            value: The new value of the setting. If None, reads the specified setting.
+
+        Returns:
+            If writing a setting, None.
+            If reading a setting, the value of the setting.
+
+        Raises:
+            TimeoutError: No response from the firmware within the configured timeout.
+            LoraException: Firmware responded with an error code.
+        """
         if value is None:
             ret, err_code = self._dev.setting_get(setting_id.value)
             self._check_ret_code(err_code)
@@ -280,10 +304,25 @@ class LoraSerial:
 
     @lora_serial_command
     def start(self, sec: int, nsec: int, timeout: float = 20.0, broadcast: bool = True,
-              destination_id: int | None = None):
+              destination_id: int | None = None) -> None:
+        """Send start time over LoRa
+
+        Args:
+            sec: The seconds part of the time to start.
+            nsec: The nanoseconds part of the time to start.
+            timeout: The timeout of the transmission.
+            broadcast: Broadcast the message to all the nodes.
+            destination_id: The destination node if not broadcasting. This field is ignored if broadcasting.
+
+        Raises:
+            ValueError: The destination ID is invalid.
+            ValueError: The start time is invalid.
+            TimeoutError: No response from the firmware within the timeout.
+            LoraException: Firmware responded with an error code.
+        """
         if not broadcast and (destination_id is None or destination_id <= 0):
             raise ValueError("Direct messages must have a valid destination specified")
-        if sec < 0:
+        if sec < 0 or nsec < 0:
             raise ValueError("Time must be positive")
         if destination_id is None:
             destination_id = 0
@@ -300,6 +339,15 @@ class LoraSerial:
 
     @lora_serial_command
     def lora_config(self, config: LoraConfig):
+        """Configure the LoRa modem.
+
+        Args:
+            config: The LoRa modem configurations.
+
+        Raises:
+            TimeoutError: No response from the firmware within the configured timeout.
+            LoraException: Firmware responded with an error code.
+        """
         args = asdict(config)
         for key in args.keys():
             if not isinstance(args[key], int):
@@ -310,6 +358,19 @@ class LoraSerial:
 
     @lora_serial_command
     def led(self, state: LoraLedState = LoraLedState.FETCH) -> LoraLedState | None:
+        """Set or retrieve the state of the LED.
+
+        Args:
+            state: The new state of the LED. If set to LoraLedState.FETCH, then retrieves the current state of the
+                   LED. (Default: LoraLedState.FETCH)
+
+        Returns:
+            The current LED state if state is LoraLedState.FETCH. None otherwise.
+
+        Raises:
+            TimeoutError: No response from the firmware within the configured timeout.
+            LoraException: Firmware responded with an error code.
+        """
         ret, err_code = self._dev.led(state.value)
         self._check_ret_code(err_code)
         if state == LoraLedState.FETCH:
@@ -318,6 +379,18 @@ class LoraSerial:
 
     @lora_serial_command
     def send_heartbeat(self, ready: bool, strobe_count: int = 3, timeout: float = 20.0) -> None:
+        """Send a heartbeat over LoRa.
+
+        Args:
+            ready: Flag indicating that the system is ready to start collecting data.
+            strobe_count: The number of times to transmit the heartbeat.
+            timeout: The timeout of the transmission.
+
+        Raises:
+            ValueError: The strobe count is invalid.
+            TimeoutError: No response from the firmware within the configured timeout.
+            LoraException: Firmware responded with an error code.
+        """
         if strobe_count <= 0:
             raise ValueError("strobe_count must be a positive, non-zero integer")
         prev_timeout = self._dev.get_response_timeout()
@@ -332,10 +405,34 @@ class LoraSerial:
         self._check_ret_code(code)
 
     @lora_serial_command
-    def send_log(self, log_msg: str, broadcast: bool = False, dst_id: int = 0, strobe_count: int = 3,
+    def send_log(self, log_msg: str, broadcast: bool = False, dst_id: int | None = None, strobe_count: int = 3,
                  timeout: float = 15.0):
+        """Send a log message over LoRa.
+
+        Args:
+            log_msg: The log message to send over LoRa.
+            broadcast: Flag indicating if the message should be broadcasted to all nodes on the network.
+            dst_id: The destination for the log message. Ignored if the broadcast flag is set.
+            strobe_count: The number of times to send the broadcast message. The number of attempts per chunk if a
+                          directed message.
+            timeout: The timeout per a transmission.
+
+        Raises:
+            ValueError: The strobe count is invalid.
+            TimeoutError: No response from the firmware within the timeout.
+            LoraException: Firmware responded with an error code.
+
+        Notes:
+            - If the message is chunked, then timeout is the timeout for each chunk (Not the timeout for all the
+              chunks to be transmitted in).
+            - If broadcast is set to `False` and the destination is `None`, then the destination will be set to the
+              master node. If the master node has not been claimed, then the broadcast flag will be overridden to
+              be `True`.
+        """
         if strobe_count <= 0:
             raise ValueError("strobe_count must be a positive, non-zero integer")
+        if dst_id is None:
+            dst_id = 0
         prev_timeout = self._dev.get_response_timeout()
         self._dev.set_response_timeout(timeout)
         try:
@@ -349,15 +446,48 @@ class LoraSerial:
 
     @lora_serial_command
     def version(self) -> tuple[tuple[int, int, int], tuple[int, int, int], tuple[int, int, int]]:
+        """Retrieves all the firmware version information.
+
+        Returns:
+            A tuple of versions. The first tuple is the application version, the second tuple is the ncs version, and
+            the third tuple is the kernel version.
+
+        Raises:
+            TimeoutError: No response from the firmware within the configured timeout.
+            LoraException: Firmware responded with an error code.
+
+        Notes:
+            A version tuple is as follows: (major, minor, patch).
+        """
         return self._dev.version()
 
     def set_logging_level(self, level: int):
+        """Set the logging level of the LoRa driver core library.
+
+        Args:
+            level: The new logging level of the core library.
+
+        Raises:
+            ValueError: If the logging level is invalid.
+
+        Notes:
+            This is compatible with the logging levels found in the python logging module.
+
+            - `10`: DEBUG
+            - `20`: INFO
+            - `30`: WARNING
+            - `40`: ERROR
+            - `50`: CRITICAL
+            - `60`: OFF
+        """
         self._dev.set_logging_level(level)
 
     def start_driver(self):
+        """Starts execution of the LoRa driver."""
         self._dev.start_driver()
 
     def stop_driver(self):
+        """Stops execution of the LoRa driver."""
         self._dev.stop_driver()
 
     def __enter__(self):
