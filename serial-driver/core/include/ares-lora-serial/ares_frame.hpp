@@ -34,32 +34,40 @@ class AresFrameError : public std::exception {
 
 class AresFrame {
   public:
+    /**
+     * @enum AresFrameType
+     *
+     * Frame types for communication with the LoRa module.
+     */
     enum AresFrameType : unsigned int {
-        SETTING = 0,
-        START = 1,
-        LORA_CONFIG = 2,
-        LED = 3,
-        HEARTBEAT = 4,
-        CLAIM = 5,
-        LOG = 6,
-        LOG_ACK = 7,
-        VERSION = 8,
-        ACK = 9,
-        FRAMING_ERROR = 10,
-        DBG = 11,
-        UNKNOWN,
+        SETTING = 0,        ///< Setting get/set
+        START = 1,          ///< Start time
+        LORA_CONFIG = 2,    ///< LoRa modem configuration
+        LED = 3,            ///< LED state get/set
+        HEARTBEAT = 4,      ///< Send heartbeat
+        CLAIM = 5,          ///< Master claim
+        LOG = 6,            ///< Log message
+        LOG_ACK = 7,        ///< Log acknowledge
+        VERSION = 8,        ///< Firmware version
+        ACK = 9,            ///< Command acknowledge
+        FRAMING_ERROR = 10, ///< Framing error
+        DBG = 11,           ///< Debug message
+        UNKNOWN,            /// Unknown frame
     };
 
-    struct AresFrameSetting {
-        AresFrameSetting() = default;
+    /**
+     * @struct Setting
+     */
+    struct Setting {
+        Setting() = default;
 
         bool set = false;
         uint16_t setting_id = 0;
         uint32_t value = 0;
     };
 
-    struct AresFrameStart {
-        AresFrameStart() = default;
+    struct Start {
+        Start() = default;
 
         int64_t sec = -1;
         uint64_t nsec = 0;
@@ -69,8 +77,8 @@ class AresFrame {
         uint8_t seq_cnt = 0;
     };
 
-    struct AresFrameLoraConfig {
-        AresFrameLoraConfig() = default;
+    struct LoraConfig {
+        LoraConfig() = default;
 
         uint32_t frequency = 0;
         uint16_t preamble_length = 0;
@@ -84,7 +92,7 @@ class AresFrame {
         uint8_t cad_det_min = 0;
     };
 
-    struct AresFrameLed {
+    struct Led {
         enum LedState : uint8_t {
             OFF = 0,
             ON = 1,
@@ -95,8 +103,8 @@ class AresFrame {
         LedState state = FETCH;
     };
 
-    struct AresFrameHeartbeat {
-        AresFrameHeartbeat() = default;
+    struct Heartbeat {
+        Heartbeat() = default;
 
         bool ready = false;
         bool broadcast = false;
@@ -104,16 +112,16 @@ class AresFrame {
         uint16_t id = 0;
     };
 
-    struct AresFrameClaim {
+    struct Claim {
         uint16_t id = 0;
     };
 
-    struct AresFrameLog {
-        AresFrameLog(bool broadcast, uint8_t tx_cnt, uint16_t id,
-                     uint16_t log_id, std::string msg)
+    struct Log {
+        Log(bool broadcast, uint8_t tx_cnt, uint16_t id, uint16_t log_id,
+            std::string msg)
             : broadcast(broadcast), tx_cnt(tx_cnt), id(id), log_id(log_id),
               msg(std::move(msg)) {}
-        AresFrameLog() = default;
+        Log() = default;
 
         bool broadcast = false;
         uint8_t tx_cnt = 1;
@@ -137,56 +145,51 @@ class AresFrame {
                                             sizeof(tx_cnt) + sizeof(log_id);
     };
 
-    struct AresFrameLogAck {
+    struct LogAck {
         uint8_t part = 0;
         uint8_t num_parts = 0;
         uint16_t id = 0;
         uint16_t log_id = 0;
 
-        bool operator==(const AresFrameLogAck &other) const {
+        bool operator==(const LogAck &other) const {
             return (part == other.part) && (num_parts == other.num_parts) &&
                    (id == other.id) && (log_id == other.log_id);
         }
     };
 
-    struct AresFrameVersion {
+    struct Version {
         uint32_t app = 0;
         uint32_t ncs = 0;
         uint32_t kernel = 0;
     };
 
-    using AresFrameAckErrorCode = int32_t;
+    using AckErrorCode = int32_t;
 
-    enum AresFrameFramingError : uint8_t {
+    enum FramingError : uint8_t {
         BAD_FRAME = 0,
         BAD_TYPE = 1,
         NOT_IMPLEMENTED = 2,
     };
 
-    struct AresFrameDbg {
+    struct Dbg {
         int32_t code;
     };
 
-    using AresFrameTxTypes =
-        std::variant<std::monostate, AresFrameSetting, AresFrameStart,
-                     AresFrameLoraConfig, AresFrameLed, AresFrameHeartbeat,
-                     AresFrameClaim, AresFrameLog, AresFrameVersion>;
-    using AresFrameRxTypes =
-        std::variant<std::monostate, AresFrameSetting, AresFrameStart,
-                     AresFrameAckErrorCode, AresFrameFramingError, AresFrameLed,
-                     AresFrameHeartbeat, AresFrameClaim, AresFrameLog,
-                     AresFrameVersion, AresFrameLogAck, AresFrameDbg>;
+    using TxTypes = std::variant<std::monostate, Setting, Start, LoraConfig,
+                                 Led, Heartbeat, Claim, Log, Version>;
+    using RxTypes =
+        std::variant<std::monostate, Setting, Start, AckErrorCode, FramingError,
+                     Led, Heartbeat, Claim, Log, Version, LogAck, Dbg>;
 
-    using AresFrameResponseTypes =
-        std::variant<std::monostate, AresFrameSetting, AresFrameAckErrorCode,
-                     AresFrameFramingError, AresFrameLed, AresFrameVersion>;
+    using ResponseTypes = std::variant<std::monostate, Setting, AckErrorCode,
+                                       FramingError, Led, Version>;
 
-    struct AresFrameDecoded {
+    struct Decoded {
         AresFrameType type;
-        AresFrameRxTypes payload;
+        RxTypes payload;
     };
 
-    explicit AresFrame(AresFrameType type, AresFrameTxTypes payload);
+    explicit AresFrame(AresFrameType type, TxTypes payload);
     explicit AresFrame(const std::vector<uint8_t> &bytearray);
     AresFrame();
     AresFrame(const AresFrame &other);
@@ -203,7 +206,7 @@ class AresFrame {
     void parse(const uint8_t *serial_data, size_t start_index, size_t len);
     void parse(const std::vector<uint8_t> &bytearray, size_t start_index);
 
-    [[nodiscard]] AresFrameDecoded get_parsed_frame() const;
+    [[nodiscard]] Decoded get_parsed_frame() const;
 
     [[nodiscard]] bool frame_available() const;
 
@@ -215,29 +218,29 @@ class AresFrame {
 
     FrameDirection _direction;
     AresFrameType _type;
-    AresFrameTxTypes _tx_payload;
-    AresFrameRxTypes _rx_payload;
+    TxTypes _tx_payload;
+    RxTypes _rx_payload;
 
     [[nodiscard]] uint16_t _payload_size() const;
 
     void _preprocess_serialize();
-    static void _preprocess_log(AresFrameLog &payload);
+    static void _preprocess_log(Log &payload);
 
-    static void _serialize_setting(const AresFrameSetting &payload,
+    static void _serialize_setting(const Setting &payload,
                                    std::vector<uint8_t> &buffer);
-    static void _serialize_start(const AresFrameStart &payload,
+    static void _serialize_start(const Start &payload,
                                  std::vector<uint8_t> &buffer);
-    static void _serialize_lora_config(const AresFrameLoraConfig &payload,
+    static void _serialize_lora_config(const LoraConfig &payload,
                                        std::vector<uint8_t> &buffer);
-    static void _serialize_led(const AresFrameLed &payload,
+    static void _serialize_led(const Led &payload,
                                std::vector<uint8_t> &buffer);
-    static void _serialize_heartbeat(const AresFrameHeartbeat &payload,
+    static void _serialize_heartbeat(const Heartbeat &payload,
                                      std::vector<uint8_t> &buffer);
-    static void _serialize_claim(const AresFrameClaim &payload,
+    static void _serialize_claim(const Claim &payload,
                                  std::vector<uint8_t> &buffer);
-    static void _serialize_log(const AresFrameLog &payload,
+    static void _serialize_log(const Log &payload,
                                std::vector<uint8_t> &buffer);
-    static void _serialize_version(const AresFrameVersion &payload,
+    static void _serialize_version(const Version &payload,
                                    std::vector<uint8_t> &buffer);
 
     void _deserialize_setting(const uint8_t *buf, size_t len);

@@ -141,10 +141,10 @@ class AresSerial {
         };
 
         ResponseType type;
-        AresFrame::AresFrameResponseTypes payload;
+        AresFrame::ResponseTypes payload;
     };
 
-    void _publish_response(const AresFrame::AresFrameDecoded &frame);
+    void _publish_response(const AresFrame::Decoded &frame);
     void _send_frame(const std::vector<uint8_t> &tx);
     AresResponse _send_frame(AresFrame &frame,
                              const std::chrono::milliseconds &timeout);
@@ -159,7 +159,7 @@ class AresSerial {
     std::atomic_bool _tasks_running = false;
 
     Task<void()> _rx_task;
-    ares::bounded_queue<AresFrame::AresFrameDecoded, 10, true> _frame_q;
+    ares::bounded_queue<AresFrame::Decoded, 10, true> _frame_q;
 
     Task<void()> _processing_task;
     ares::bounded_queue<AresResponse> _response_queue;
@@ -168,7 +168,7 @@ class AresSerial {
 
     std::function<void(int64_t, uint64_t, uint16_t, bool, uint8_t, uint16_t)>
         _start_callback = nullptr;
-    void _start_event(const AresFrame::AresFrameStart &start_frame) const;
+    void _start_event(const AresFrame::Start &start_frame) const;
 
     static void _handle_bad_frame(const AresResponse &response);
 
@@ -185,18 +185,18 @@ class AresSerial {
     bool _master;
     uint16_t _claimed_host = 0;
     std::function<void(uint16_t, bool, bool)> _heartbeat_callback = nullptr;
-    void _heartbeat_event(const AresFrame::AresFrameHeartbeat &heartbeat);
+    void _heartbeat_event(const AresFrame::Heartbeat &heartbeat);
     static void _heartbeat_handler(Work *work);
     HeartbeatWork _heartbeat_work;
     int _heartbeat_claim_host(uint16_t destination_id);
 
     std::function<void(uint16_t)> _claim_callback = nullptr;
-    void _claim_event(const AresFrame::AresFrameClaim &claim);
+    void _claim_event(const AresFrame::Claim &claim);
 
     SpinLock _log_spinlock;
     uint16_t _log_id = 0;
-    ares::bounded_queue<AresFrame::AresFrameLogAck> _log_ack_signal;
-    void _log_ack_event(const AresFrame::AresFrameLogAck &ack);
+    ares::bounded_queue<AresFrame::LogAck> _log_ack_signal;
+    void _log_ack_event(const AresFrame::LogAck &ack);
     bool _log_ack_event_wait(const std::chrono::milliseconds &timeout,
                              size_t part, size_t num_parts, uint16_t id);
     void _send_log_frame_directed(AresFrame &frame,
@@ -211,11 +211,11 @@ class AresSerial {
     std::function<void(uint16_t, uint16_t, uint8_t, uint8_t,
                        const std::string &msg)>
         _log_callback = nullptr;
-    void _log_event(const AresFrame::AresFrameLog &log) const;
+    void _log_event(const AresFrame::Log &log) const;
 
     static py::tuple _decode_version(uint32_t version_num);
 
-    static void _debug_event(const AresFrame::AresFrameDbg &msg);
+    static void _debug_event(const AresFrame::Dbg &msg);
 };
 
 #endif // ARES_ARES_LORA_SERIAL_HPP
