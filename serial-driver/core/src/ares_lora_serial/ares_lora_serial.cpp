@@ -142,13 +142,27 @@ AresSerial::_send_frame(AresFrame &frame,
     return _wait_response(timeout);
 }
 
+static void check_python_errors() {
+    if (PyErr_CheckSignals() != 0) {
+        throw py::error_already_set();
+    }
+}
+
 void AresSerial::_send_multi_frame(AresFrame &frame,
                                    const std::chrono::milliseconds &timeout,
                                    std::vector<AresResponse> &responses) {
     do {
         AresResponse response = _send_frame(frame, timeout);
         responses.emplace_back(response);
+        check_python_errors();
     } while (frame.frame_available());
+}
+
+static void handle_ack(bool acked) {
+    check_python_errors();
+    if (!acked) {
+        // todo
+    }
 }
 
 void AresSerial::_send_log_frame_directed(
@@ -169,8 +183,10 @@ void AresSerial::_send_log_frame_directed(
             _response_queue.clear();
             _send_frame(tx);
             last_response = _wait_response(_response_timeout);
+            check_python_errors();
             acked = _log_ack_event_wait(ack_timeout, acked_frames, tot_frames,
                                         target);
+            handle_ack(acked);
         }
         responses.emplace_back(last_response);
 
