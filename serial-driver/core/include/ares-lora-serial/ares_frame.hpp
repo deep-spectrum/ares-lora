@@ -134,7 +134,7 @@ class AresFrame {
         bool _preprocessed = false;
         static constexpr size_t _overhead = sizeof(broadcast) + sizeof(part) +
                                             sizeof(num_parts) + sizeof(id) +
-                                            sizeof(tx_cnt);
+                                            sizeof(tx_cnt) + sizeof(log_id);
     };
 
     struct AresFrameLogAck {
