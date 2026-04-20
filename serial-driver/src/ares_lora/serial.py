@@ -6,7 +6,6 @@ import functools
 from .errno import strerror
 import logging
 
-
 logger = logging.getLogger("ares_lora")
 
 
@@ -154,15 +153,14 @@ class LoraSerial:
         elif log_id != self._log_msg[src_id].msg_id:
             self._log_msg[src_id] = LogMessage(log_id, chunk, num_chunks, msg)
         elif self._log_msg[src_id].last_part != chunk and (self._log_msg[src_id].last_part + 1) == chunk:
-            print(msg)
             self._log_msg[src_id].msg = f"{self._log_msg[src_id].msg}{msg}"
             self._log_msg[src_id].last_part = chunk
 
-        if self._log_msg[src_id].last_part == self._log_msg[src_id].total_parts and not self._log_msg[src_id].transmitted:
+        if (self._log_msg[src_id].last_part == self._log_msg[src_id].total_parts and
+                not self._log_msg[src_id].transmitted):
             self._log_msg[src_id].transmitted = True
             if self._log_cb is not None:
                 self._log_cb(src_id, msg)
-            print(self._log_msg[src_id].msg)
 
     @staticmethod
     def _check_ret_code(code: int | tuple[int, ...]):
@@ -185,7 +183,8 @@ class LoraSerial:
         return None
 
     @lora_serial_command
-    def start(self, sec: int, nsec: int, timeout: float = 20.0, broadcast: bool = True, destination_id: int | None = None):
+    def start(self, sec: int, nsec: int, timeout: float = 20.0, broadcast: bool = True,
+              destination_id: int | None = None):
         if not broadcast and (destination_id is None or destination_id <= 0):
             raise ValueError("Direct messages must have a valid destination specified")
         if sec < 0:
@@ -237,7 +236,8 @@ class LoraSerial:
         self._check_ret_code(code)
 
     @lora_serial_command
-    def send_log(self, log_msg: str, broadcast: bool = False, dst_id: int = 0, strobe_count: int = 3, timeout: float = 15.0):
+    def send_log(self, log_msg: str, broadcast: bool = False, dst_id: int = 0, strobe_count: int = 3,
+                 timeout: float = 15.0):
         if strobe_count <= 0:
             raise ValueError("strobe_count must be a positive, non-zero integer")
         prev_timeout = self._dev.get_response_timeout()
@@ -254,6 +254,9 @@ class LoraSerial:
     @lora_serial_command
     def version(self) -> tuple[tuple[int, int, int], tuple[int, int, int], tuple[int, int, int]]:
         return self._dev.version()
+
+    def set_logging_level(self, level: int):
+        self._dev.set_logging_level(level)
 
     def start_driver(self):
         self._dev.start_driver()

@@ -55,6 +55,8 @@ PYBIND11_MODULE(_ares_lora_serial, m, py::mod_gil_not_used()) {
         .def("send_log", &AresSerial::send_log,
              "Send a logging message over LoRa")
         .def("version", &AresSerial::version, "Retrieve the firmware version")
+        .def("set_logging_level", &AresSerial::set_logging_level,
+             "Set the logging level of the C++ logger")
         .def("start_driver", &AresSerial::start, "Start the serial driver")
         .def("stop_driver", &AresSerial::stop, "Stop the serial driver")
         .def("set_response_timeout", &AresSerial::set_response_timeout,
@@ -468,6 +470,40 @@ py::tuple AresSerial::version() {
     return py::make_tuple(_decode_version(version.app),
                           _decode_version(version.ncs),
                           _decode_version(version.kernel));
+}
+
+void AresSerial::set_logging_level(uint32_t level) {
+    _check_crash();
+
+    switch (level) {
+    case 10: {
+        SET_LOG_LEVEL(LOG_LEVEL_DBG);
+        break;
+    }
+    case 20: {
+        SET_LOG_LEVEL(LOG_LEVEL_INFO);
+        break;
+    }
+    case 30: {
+        SET_LOG_LEVEL(LOG_LEVEL_WARN);
+        break;
+    }
+    case 40: {
+        SET_LOG_LEVEL(LOG_LEVEL_ERROR);
+        break;
+    }
+    case 50: {
+        SET_LOG_LEVEL(LOG_LEVEL_CRITICAL);
+        break;
+    }
+    case 60: {
+        SET_LOG_LEVEL(LOG_LEVEL_OFF);
+        break;
+    }
+    default: {
+        throw std::invalid_argument("Invalid logging level");
+    }
+    }
 }
 
 void AresSerial::start() {

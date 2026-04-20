@@ -105,6 +105,8 @@ class AresSerial {
 
     py::tuple version();
 
+    void set_logging_level(uint32_t level);
+
     void start();
     void stop();
 
