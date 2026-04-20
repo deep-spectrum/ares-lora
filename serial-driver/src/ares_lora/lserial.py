@@ -183,6 +183,7 @@ def lora_serial_command(func):
 
 
 class LoraSerial:
+    """LoRa serial driver python implementation. Works only on Linux."""
     def __init__(self, config: LoraSerialConfig = LoraSerialConfig()):
         if not config.port:
             raise ValueError("Invalid port")
