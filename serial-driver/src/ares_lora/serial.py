@@ -10,11 +10,22 @@ logger = logging.getLogger("ares_lora")
 
 
 class LoraException(Exception):
+    """Exception class for LoRa related exceptions."""
+
     def __init__(self, code: int):
         super().__init__(strerror(code))
 
 
 class SettingId(IntEnum):
+    """Firmware settings for LoRa.
+
+    Attributes:
+        ID: The ID of the node. This should be unique to each node. [1, 65535].
+        WAIT_USB_HOST: Flag for telling the firmware to wait for a USB connection. [0,1].
+        PANID: The personal area network ID. [0, 65535].
+        REPETITION_CNT: The default number of times a LoRa message is transmitted. [1, 4294967295].
+    """
+
     ID = 0
     WAIT_USB_HOST = 1
     PANID = 2
@@ -22,12 +33,42 @@ class SettingId(IntEnum):
 
 
 class LoraBandwidth(IntEnum):
+    """LoRa signal bandwidth.
+
+    This enumeration defines the bandwidth of a LoRa signal.
+
+    The bandwidth determines how much spectrum is used to transmit data.
+    Wider bandwidths enable higher data rates but typically reduce sensitivity and range.
+
+    Attributes:
+        BW_125_KHZ: 125 kHz.
+        BW_250_KHZ: 250 kHz.
+        BW_500_KHZ: 500 kHz.
+    """
+
     BW_125_KHZ = 0
     BW_250_KHZ = 1
     BW_500_KHZ = 2
 
 
 class LoraSpreadingFactor(IntEnum):
+    """LoRa data rate.
+
+    This enumeration represents the data rate of a LoRa signal, expressed as a Spreading Factor (SF).
+
+    The Spreading Factor determines how many chirps are used to encode each symbol (2^SF chips per symbol).
+    Higher values result in lower data rates but increased range and robustness.
+
+    Attributes:
+        SF_6: Spreading factor 6 (fastest, shortest range).
+        SF_7: Spreading factor 7.
+        SF_8: Spreading factor 8.
+        SF_9: Spreading factor 9.
+        SF_10: Spreading factor 10.
+        SF_11: Spreading factor 11.
+        SF_12: Spreading factor 12 (slowest, longest range).
+    """
+
     SF_6 = 6
     SF_7 = 7
     SF_8 = 8
@@ -38,6 +79,21 @@ class LoraSpreadingFactor(IntEnum):
 
 
 class LoraCodingRate(IntEnum):
+    """LoRa coding rate.
+
+    This enumeration defines the LoRa coding rate, used for forward error correction (FEC).
+
+    The coding rate is expressed as 4/x, where a lower denominator (e.g., 4/5) means less redundancy,
+    resulting in a higher data rate but reduced robustness. Higher redundancy (e.g., 4/8) improves error
+    tolerance at the cost of data rate.
+
+    Attributes:
+        CR_4_5: Coding rate 4/5 (4 information bits, 1 error correction bit).
+        CR_4_6: Coding rate 4/6 (4 information bits, 2 error correction bits).
+        CR_4_7: Coding rate 4/7 (4 information bits, 3 error correction bits).
+        CR_4_8: Coding rate 4/8 (4 information bits, 4 error correction bits).
+    """
+
     CR_4_5 = 1
     CR_4_6 = 2
     CR_4_7 = 3
@@ -46,6 +102,17 @@ class LoraCodingRate(IntEnum):
 
 @dataclass
 class LoraConfig:
+    """Configurations for the LoRa modem.
+
+    Attributes:
+        frequency: Frequency in Hz to use for transceiving. Default is 915 MHz.
+        bandwidth: The bandwidth to use for transceiving. Default is 125 kHz.
+        datarate: The data-rate to use for transceiving. Default is SF_12.
+        coding_rate: The coding rate to use for transceiving. Default is CR_4_5.
+        preamble_length: Length of the preamble. Default is 8.
+        tx_power: TX-power in dBm to use for transmission. Default is 10 dBm.
+    """
+
     frequency: int = 915000000
     bandwidth: LoraBandwidth = LoraBandwidth.BW_125_KHZ
     datarate: LoraSpreadingFactor = LoraSpreadingFactor.SF_12
@@ -55,6 +122,14 @@ class LoraConfig:
 
 
 class LoraLedState(IntEnum):
+    """Different states the LED can be in (except for fetch).
+
+    Attributes:
+        OFF: LED is turned off.
+        ON: LED is solid on.
+        BLINK: LED is blinking at 1 Hz.
+        FETCH: Fetch the current LED state from the firmware.
+    """
     OFF = 0
     ON = 1
     BLINK = 2
@@ -63,6 +138,19 @@ class LoraLedState(IntEnum):
 
 @dataclass
 class LoraSerialConfig:
+    """Configurations for the LoRa serial driver.
+
+    Attributes:
+        port: The serial port to connect to.
+        response_timeout: The amount of time (in seconds) to wait for a response from the firmware.
+        rx_period: How often (in seconds) the serial driver polls the serial receive buffer.
+        serial_timeout: The serial RX timeout (in seconds).
+        start_callback: Event handler for start events. Signature: [seconds: int, nsecs: int] -> None
+        heartbeat_callback: Event handler for heartbeat events. Signature: [source_id: int, read: bool] -> None
+        claim_callback: Event handler for claim master events. Signature: [source_id: int] -> None
+        master: Designate the connected node as the master node.
+        log_callback: Event handler for log events. Signature: [source_id: int, msg: str] -> None
+    """
     port: str = ""
     response_timeout: float = 2.0
     rx_period: float = 0.1
