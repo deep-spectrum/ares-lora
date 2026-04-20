@@ -25,6 +25,7 @@
 #include <future>
 #include <mutex>
 #include <pybind11/pybind11.h>
+#include <random>
 #include <string>
 #include <utility>
 
@@ -59,6 +60,9 @@ struct AresSerialConfigs {
     std::function<void(uint16_t, uint16_t, uint8_t, uint8_t,
                        const std::string &)>
         log_callback = nullptr;
+
+    double alpha = 1.0;
+    double beta = 2.0;
 };
 
 struct AresLoraConfig {
@@ -200,6 +204,10 @@ class AresSerial {
                                   size_t max_attempts,
                                   std::vector<AresResponse> &responses,
                                   uint16_t target);
+    std::gamma_distribution<double> _mac_backoff;
+    std::random_device _rd;
+    std::mt19937 _generator;
+    void _handle_ack(uint16_t target, bool acked);
     std::function<void(uint16_t, uint16_t, uint8_t, uint8_t,
                        const std::string &msg)>
         _log_callback = nullptr;

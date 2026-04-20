@@ -85,7 +85,8 @@ PYBIND11_MODULE(_ares_lora_serial, m, py::mod_gil_not_used()) {
 AresSerialConfigs::AresSerialConfigs(const py::kwargs &kwargs) {
     from_kwargs(kwargs, SP(port), SP(response_timeout), SP(rx_period),
                 SP(start_callback), SP(serial_timeout), SP(master),
-                SP(heartbeat_callback), SP(claim_callback), SP(log_callback));
+                SP(heartbeat_callback), SP(claim_callback), SP(log_callback),
+                SP(alpha), SP(beta));
 }
 
 AresLoraConfig::AresLoraConfig(const py::kwargs &kwargs) {
@@ -104,7 +105,8 @@ AresSerial::AresSerial(const AresSerialConfigs &configs)
     : _response_timeout(configs.response_timeout),
       _rx_period(configs.rx_period), _rx_task([this] { _read_serial(); }),
       _processing_task([this] { _process_frames(); }), _master(configs.master),
-      _heartbeat_work(_heartbeat_handler, this) {
+      _heartbeat_work(_heartbeat_handler, this),
+      _mac_backoff(configs.alpha, configs.beta), _generator(_rd()) {
     SerialInternal::SerialAttributes attr;
 
     _serial.port(configs.port);
@@ -158,13 +160,6 @@ void AresSerial::_send_multi_frame(AresFrame &frame,
     } while (frame.frame_available());
 }
 
-static void handle_ack(bool acked) {
-    check_python_errors();
-    if (!acked) {
-        // todo
-    }
-}
-
 void AresSerial::_send_log_frame_directed(
     AresFrame &frame, const std::chrono::milliseconds &ack_timeout,
     size_t max_attempts, std::vector<AresResponse> &responses,
@@ -186,7 +181,7 @@ void AresSerial::_send_log_frame_directed(
             check_python_errors();
             acked = _log_ack_event_wait(ack_timeout, acked_frames, tot_frames,
                                         target);
-            handle_ack(acked);
+            _handle_ack(target, acked);
         }
         responses.emplace_back(last_response);
 
@@ -194,6 +189,25 @@ void AresSerial::_send_log_frame_directed(
             throw std::runtime_error("Did not receive an ACK");
         }
     } while (frame.frame_available());
+}
+
+void AresSerial::_handle_ack(uint16_t target, bool acked) {
+    check_python_errors();
+
+    if (acked) {
+        return;
+    }
+
+    py::tuple ret = setting_get(0);
+    uint16_t id = static_cast<uint16_t>(ret[0].cast<uint32_t>());
+    constexpr double min_delay = 100.0;
+    const double lambda = 5.0 / static_cast<double>(id + target);
+    double delay = _mac_backoff(_generator);
+    delay = ((-std::log(1.0 - delay)) / lambda) + min_delay;
+    auto sleep_for = delay * 1ms;
+
+    LOG_DBG("ACK not received. Sleeping for %f ms", delay);
+    std::this_thread::sleep_for(sleep_for);
 }
 
 AresSerial::AresResponse
