@@ -5,6 +5,7 @@ from dataclasses import dataclass, asdict
 import functools
 from .errno import strerror
 import logging
+from .utils import check_serial_port
 
 logger = logging.getLogger("ares_lora")
 
@@ -187,6 +188,8 @@ class LoraSerial:
     def __init__(self, config: LoraSerialConfig = LoraSerialConfig()):
         if not config.port:
             raise ValueError("Invalid port")
+        if not check_serial_port(config.port):
+            raise IOError(f"Cannot open port {config.port}: Does not exist")
         configs = _SerialConfigs(
             port=config.port,
             response_timeout=config.response_timeout,
