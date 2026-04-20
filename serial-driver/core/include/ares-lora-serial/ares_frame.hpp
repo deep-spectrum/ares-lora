@@ -57,62 +57,175 @@ class AresFrame {
 
     /**
      * @struct Setting
+     *
+     * Data for AresFrame::SETTING frames.
      */
     struct Setting {
         Setting() = default;
 
-        bool set = false;
-        uint16_t setting_id = 0;
-        uint32_t value = 0;
+        bool set = false;        ///< Set flag for settings.
+        uint16_t setting_id = 0; ///< The setting ID.
+        uint32_t value = 0;      ///< The value of the setting.
     };
 
+    /**
+     * @struct Start
+     *
+     * Data for AresFrame::START frames.
+     */
     struct Start {
         Start() = default;
 
-        int64_t sec = -1;
-        uint64_t nsec = 0;
-        uint16_t id = 0;
-        uint16_t packet_id = 0;
-        bool broadcast = false;
-        uint8_t seq_cnt = 0;
+        int64_t sec = -1;       ///< Seconds part for start time.
+        uint64_t nsec = 0;      ///< Nanoseconds part for start time.
+        uint16_t id = 0;        ///< The destination ID on transmissions. The
+                                ///< source ID on reception.
+        uint16_t packet_id = 0; ///< Packet ID of the received packet.
+                                ///< Ignored on transmissions.
+        bool broadcast = false; ///< On transmission, tells firmware to use a
+                                ///< broadcast packet. On reception, indicates
+                                ///< if received packet was a broadcast.
+        uint8_t seq_cnt = 0;    ///< The packet sequence count. Ignored on
+                                ///< transmission.
     };
 
+    /**
+     * @struct LoraConfig
+     *
+     * Data for AresFrame::LORA_CONFIG frames.
+     */
     struct LoraConfig {
         LoraConfig() = default;
 
+        /**
+         * Frequency in Hz to use for transceiving.
+         */
         uint32_t frequency = 0;
+
+        /**
+         * Length of the preamble.
+         */
         uint16_t preamble_length = 0;
+
+        /**
+         * The bandwidth to use for transceiving.
+         */
         uint8_t bandwidth = 0;
+
+        /**
+         * The data-rate to use for transceiving.
+         */
         uint8_t data_rate = 0;
+
+        /**
+         * The coding rate to use for transceiving.
+         */
         uint8_t coding_rate = 0;
+
+        /**
+         * TX-power in dBm to use for transmission.
+         */
         int8_t tx_power = 0;
+
+        /**
+         * Channel Activity Detection mode.
+         *
+         * Controls whether send/recv operations perform CAD before the actual
+         * operation.
+         *
+         * - `0`: No CAD (default).
+         * - `1`: CAD before receive.
+         * - `2`: Listen Before Talk. Performs CAD before transmitting.
+         *
+         * @note Not implemented in firmware.
+         */
         uint8_t cad_mode = 0;
+
+        /**
+         * Number of symbols for CAD detection.
+         *
+         * @note Not implemented in firmware.
+         */
         uint8_t cad_num_symbols = 0;
+
+        /**
+         * Detection peak threshold (hardware-specific, dimensionless).
+         *
+         * @note Not implemented in firmware.
+         */
         uint8_t cad_det_peak = 0;
+
+        /**
+         * Minimum detection threshold (hardware-specific, dimensionless).
+         *
+         * @note Not implemented in firmware.
+         */
         uint8_t cad_det_min = 0;
     };
 
+    /**
+     * @struct Led
+     *
+     * Data for AresFrame::LED frames.
+     */
     struct Led {
+        /**
+         * @enum LedState
+         *
+         * LED states.
+         */
         enum LedState : uint8_t {
-            OFF = 0,
-            ON = 1,
-            BLINK = 2,
-            FETCH = 3,
+            OFF = 0,   ///< LED off.
+            ON = 1,    ///< LED on.
+            BLINK = 2, ///< LED blinking at 1 Hz.
+            FETCH = 3, ///< Retrieve LED state from firmware.
         };
 
+        /**
+         * The LED state frame data.
+         */
         LedState state = FETCH;
     };
 
+    /**
+     * @struct Heartbeat
+     *
+     * Data for AresFrame::HEARTBEAT frames.
+     */
     struct Heartbeat {
         Heartbeat() = default;
 
+        /**
+         * System ready for data collection.
+         */
         bool ready = false;
+
+        /**
+         * Broadcast the heartbeat frame.
+         */
         bool broadcast = false;
+
+        /**
+         * The number of times to send the heartbeat.
+         */
         uint8_t tx_cnt = 0;
+
+        /**
+         * The destination for the heartbeat.
+         */
         uint16_t id = 0;
     };
 
+    /**
+     * @struct Claim
+     *
+     * Data for AresFrame::CLAIM frames
+     */
     struct Claim {
+        /**
+         * When transmitting, the ID of the node to send the claim notification
+         * to. When receiving, the claimed master node ID.
+         */
         uint16_t id = 0;
     };
 
