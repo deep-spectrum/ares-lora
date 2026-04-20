@@ -68,7 +68,7 @@ class LoraSerialConfig:
     rx_period: float = 0.1
     serial_timeout: float = 0.1
     start_callback: Callable[[int, int], None] | None = None
-    heartbeat_callback: Callable[[int, bool, bool], None] | None = None
+    heartbeat_callback: Callable[[int, bool], None] | None = None
     claim_callback: Callable[[int], None] | None = None
     master: bool = False
     log_callback: Callable[[int, str], None] = None
@@ -135,17 +135,20 @@ class LoraSerial:
 
     def _handle_start(self, sec: int, nsec: int, src: int, broadcast: bool, seq_cnt: int, packet_id: int):
         if self._should_event_be_dispatched(src, seq_cnt, packet_id):
+            logger.info(f"Received start message (sec: {sec}, nsec: {nsec}, src: {src}, "
+                        f"broadcast: {broadcast}, sequence count: {seq_cnt}, packet id: {packet_id})")
             if self._start_cb is not None:
                 self._start_cb(sec, nsec)
-            else:
-                logger.info(f"Received start message (sec: {sec}, nsec: {nsec}, src: {src}, "
-                            f"broadcast: {broadcast}, sequence count: {seq_cnt}, packet id: {packet_id})")
 
     def _handle_heartbeat(self, src_id: int, ready: bool, broadcast: bool):
-        pass
+        logger.info(f"Received heartbeat message: (source: {src_id}, ready: {ready}, broadcasted: {broadcast}")
+        if self._heartbeat_cb is not None:
+            self._heartbeat_cb(src_id, ready)
 
     def _handle_claim(self, src_id: int):
-        pass
+        logger.info(f"Received host claim message from {src_id}")
+        if self._claim_cb is not None:
+            self._claim_cb(src_id)
 
     def _handle_log(self, src_id: int, log_id: int, chunk: int, num_chunks: int, msg: str):
         if src_id not in self._log_msg:
@@ -158,9 +161,10 @@ class LoraSerial:
 
         if (self._log_msg[src_id].last_part == self._log_msg[src_id].total_parts and
                 not self._log_msg[src_id].transmitted):
+            logger.info(f"Received log message: {self._log_msg[src_id].msg}")
             self._log_msg[src_id].transmitted = True
             if self._log_cb is not None:
-                self._log_cb(src_id, msg)
+                self._log_cb(src_id, self._log_msg[src_id].msg)
 
     @staticmethod
     def _check_ret_code(code: int | tuple[int, ...]):
