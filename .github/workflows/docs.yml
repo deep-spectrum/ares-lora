@@ -27,6 +27,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
 
+      - name: Pull in dependencies
+        run: git submodule update --init
+
       - name: install-pkgs
         run: |
           sudo apt update
