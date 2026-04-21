@@ -1,8 +1,18 @@
 site_name: Ares-LoRa
-repo_url: https://github.com/deep-spectrum/ares-lora/tree/master?tab=readme-ov-file
+repo_url: https://github.com/deep-spectrum/ares-lora/
 repo_name: deep-spectrum/ares-lora
 nav:
   - Home: index.md
+  - Communication:
+      - Home: communications/index.md
+      - Frames: communications/ares-frame.md
+      - Packets: communications/ares-packet.md
+  - Serial Driver:
+      - Home: serial-driver/index.md
+      - Python API:
+          - Serial Driver: serial-driver/python-api/serial_driver.md
+          - Device Firmware Update: serial-driver/python-api/dfu.md
+          - Utilities: serial-driver/python-api/utils.md
 
 extra_css:
   - stylesheets/extra.css
