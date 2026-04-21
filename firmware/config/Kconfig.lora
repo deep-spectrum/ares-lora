@@ -5,8 +5,20 @@ config ARES_LORA_STACK_SIZE
     default 4096
 
 config ARES_LORA_PRIO
-    int "LoEa task priority"
+    int "LoRa task priority"
     default 1
+
+config ARES_LORA_TX_RINGBUF_SIZE
+    int "LoRa TX ring buffer size"
+    default 512
+
+config ARES_LORA_RX_RINGBUF_SIZE
+    int "LoRa RX ring buffer size"
+    default 512
+
+config ARES_LORA_TRX_BUF_SIZE
+    int "LoRa TRX buffer size"
+    default 512
 
 menu "CRC Configurations"
 

@@ -39,8 +39,14 @@ enum ares_frame_type {
     ARES_FRAME_START,         ///< Start time frame.
     ARES_FRAME_LORA_CONFIG,   ///< LoRa configuration frame.
     ARES_FRAME_LED,           ///< Control LED state.
+    ARES_FRAME_HEARTBEAT,     ///< LoRa Heart Beat frame.
+    ARES_FRAME_CLAIM,         ///< LoRa host claim frame.
+    ARES_FRAME_LOG,           ///< Log message.
+    ARES_FRAME_LOG_ACK,       ///< Log message ACK from LoRa.
+    ARES_FRAME_VERSION,       ///< Version information.
     ARES_FRAME_ACK,           ///< ACK frame.
     ARES_FRAME_FRAMING_ERROR, ///< Framing error frame. TX only.
+    ARES_FRAME_DBG,           ///< Debug frames, TX only.
 
     ARES_FRAME_TYPE_INVALID,
 };
@@ -70,13 +76,56 @@ struct ares_frame {
             uint8_t data_rate;
             uint8_t coding_rate;
             int8_t tx_pow_dbm;
+            uint8_t cad_mode;
+            uint8_t cad_symbol_num;
+            uint8_t cad_detection_peak;
+            uint8_t cad_detection_min;
         } LORA_CONFIG; ///< ARES_FRAME_LORA_CONFIG
 
+        struct {
+            struct {
+                uint8_t ready : 1;
+                uint8_t broadcast : 1;
+                uint8_t padding : 6;
+            } flags;
+            uint8_t tx_count;
+            uint16_t id;
+        } HEARTBEAT; ///< ARES_FRAME_HEARTBEAT
+
         uint8_t LED; ///< ARES_FRAME_LED
+
+        uint16_t CLAIM; ///< ARES_FRAME_CLAIM
+
+        struct {
+            bool broadcast;
+            uint8_t tx_cnt;
+            uint8_t part;
+            uint8_t num_parts;
+            uint16_t id;
+            uint16_t log_id;
+            size_t msg_len;
+            const char *msg; // This must remain valid for
+                             // the lifetime of the frame.
+        } LOG;               ///< ARES_FRAME_LOG
+
+        struct {
+            uint8_t part;
+            uint8_t num_parts;
+            uint16_t id;
+            uint16_t log_id;
+        } LOG_ACK; ///< ARES_FRAME_LOG_ACK
+
+        struct {
+            uint32_t app;
+            uint32_t ncs;
+            uint32_t kernel;
+        } VERSION; ///< ARES_FRAME_VERSION
 
         int ACK; ///< ARES_FRAME_ACK
 
         enum ares_frame_error FRAMING_ERROR; ///< ARES_FRAME_FRAMING_ERROR
+
+        int DBG; ///< ARES_FRAME_DBG
     } payload;
 };
 

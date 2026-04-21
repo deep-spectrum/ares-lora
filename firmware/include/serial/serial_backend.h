@@ -12,12 +12,10 @@
 #define ARES_SERIAL_BACKEND_H
 
 #include <serial/serial.h>
+#include <serial/serial_common.h>
 #include <zephyr/sys/ring_buffer.h>
 
 extern const struct ares_serial_transport_api ares_serial_uart_transport_api;
-
-#define SERIAL_BACKEND_TX_RINGBUF_SIZE 256
-#define SERIAL_BACKEND_RX_RINGBUF_SIZE 256
 
 struct serial_uart_common {
     const struct device *dev;

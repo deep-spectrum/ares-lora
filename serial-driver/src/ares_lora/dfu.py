@@ -19,11 +19,23 @@ logger.setLevel(logging.CRITICAL + 10)
 
 
 class ImageManagerException(Exception):
-    pass
+    """Base class for DFU exceptions"""
 
 
 @dataclass
 class AresImageStates:
+    """Data class for image states.
+
+    Attributes:
+        slot: The image slot.
+        version: The version of the image.
+        hash: The hash of the image.
+        bootable: Flag indicating if the image is bootable.
+        pending: Flag indicating image is pending.
+        confirmed: Flag indicating image has been confirmed.
+        active: Flag indicating image is active.
+        permanent: Flag indicating the image is permanent.
+    """
     slot: int = 0
     version: str = ''
     hash: bytes = b''
@@ -35,12 +47,26 @@ class AresImageStates:
 
     @classmethod
     def from_smp_lib(cls, states: ImageState) -> 'AresImageStates':
+        """Construct an `AresImageStates` object from an `ImageState` object.
+
+        Args:
+            states: The `ImageStates` object.
+
+        Returns: A constructed `AresImageStates` object.
+        """
         return cls(slot=states.slot, version=states.version, hash=states.hash, bootable=states.bootable,
                    pending=states.pending, confirmed=states.confirmed, active=states.active, permanent=states.permanent)
 
 
 class AresUploadStatusBase(ABC):
+    """Base class for upload status CLI utilities. This must be subclassed."""
+
     def __init__(self, image_len: int):
+        """Initializes the base class.
+
+        Args:
+            image_len: The length of the image in bytes.
+        """
         self._len = image_len
 
     def __enter__(self):
@@ -51,6 +77,11 @@ class AresUploadStatusBase(ABC):
 
     @abstractmethod
     def update(self, offset: int) -> None:
+        """Update method of the base class. This method must be overridden.
+
+        Args:
+            offset: The current offset for image writing.
+        """
         pass
 
 
@@ -73,8 +104,17 @@ class AresUploadStatus(AresUploadStatusBase):
 
 
 class AresDfu:
+    """Device firmware update manager for Ares LoRa."""
+
     def __init__(self, port: str, verbose: bool = False,
                  upload_status_cls: Type[AresUploadStatusBase] = AresUploadStatus):
+        """Initializes AresDfu.
+
+        Args:
+            port: The port that supports the Dfu protocol.
+            verbose: Run DFU in verbose mode.
+            upload_status_cls: The upload status class.
+        """
         self._port = port
         self._verbose = verbose
         self._upload_status_cls = upload_status_cls
@@ -90,6 +130,16 @@ class AresDfu:
                 raise ImageManagerException(f"Unknown response: {response}")
 
     def read_image_states(self, timeout: float = 2.0) -> tuple[AresImageStates, ...]:
+        """Read the images and their states from the microcontroller.
+
+        Args:
+            timeout: Timeout in seconds to complete this operation.
+
+        Returns: A tuple of AresImageStates objects.
+
+        Raises:
+            ImageManagerException: SMP Response errors or unknown responses.
+        """
         states = asyncio.run(self._read_image_states(timeout))
         ret = [AresImageStates.from_smp_lib(state) for state in states]
         return tuple(ret)
@@ -129,7 +179,18 @@ class AresDfu:
             else:
                 break
 
-    def upload_image(self, image_path: str | Path, slot: int = 0, retries: int = 3, timeout: float = 2.5) -> None:
+    def upload_image(self, image_path: str | Path, slot: int = 0, retries: int = 3, timeout: float = 40.0) -> None:
+        """Upload an image to the microcontroller.
+
+        Args:
+            image_path: The file path to the image to upload.
+            slot: The slot to upload the image to.
+            retries: The maximum amount of retries.
+            timeout: Timeout of the first write request in seconds.
+
+        Raises:
+            ImageManagerException: Upload image failed.
+        """
         asyncio.run(self._upload_image(image_path, slot, retries, timeout))
 
     async def _reset_mcu(self, force: Literal[0, 1] = 0, timeout: float = 2.5):
@@ -143,6 +204,15 @@ class AresDfu:
                     raise ImageManagerException("Response is not OK")
 
     def reset_mcu(self, force: bool = False, timeout: float = 2.5):
+        """Reset the microcontroller.
+
+        Args:
+            force: Force the reset. This will cause a cold restart as opposed to a warm restart.
+            timeout: The timeout of the reset request in seconds.
+
+        Raises:
+            ImageManagerException: Reset request failed.
+        """
         if force:
             force: Literal[0, 1] = 1
         else:
@@ -167,6 +237,16 @@ class AresDfu:
             await client.request(ImageStatesWrite(hash=image.hash, confirm=True), timeout_s=timeout)
 
     def confirm_image(self, slot: int = 0, force: bool = False, timeout: float = 2.5):
+        """Confirm an image.
+
+        Args:
+            slot: The image to confirm (index).
+            force: Force the confirmation.
+            timeout: The response timeout in seconds.
+
+        Raises:
+            ImageManagerException: Unable to confirm image.
+        """
         asyncio.run(self._confirm_image(slot, force, timeout))
 
     async def _mark_image_pending(self, slot: int = 1, timeout: float = 2.5):
@@ -177,4 +257,13 @@ class AresDfu:
             await client.request(ImageStatesWrite(hash=images[slot].hash), timeout_s=timeout)
 
     def mark_image_pending(self, slot: int = 1, timeout: float = 2.5):
+        """Mark an image as pending.
+
+        Args:
+            slot: The image to mark as pending (index).
+            timeout: The timeout for the request in seconds.
+
+        Raises:
+            ImageManagerException: Unable to mark image as pending.
+        """
         asyncio.run(self._mark_image_pending(slot, timeout))

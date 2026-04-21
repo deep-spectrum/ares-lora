@@ -12,6 +12,8 @@
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
 
+#include "../../cmake-build-debug-nrf-connect-v3.2.2/zephyr/include/generated/zephyr/autoconf.h"
+
 LOG_MODULE_REGISTER(ares_serial);
 
 #define SERIAL_API_CALL(_serial, _api, ...)                                    \
@@ -263,7 +265,7 @@ static int ares_write(const struct ares_serial *serial, const void *data,
 
 int ares_serial_write_frame(const struct ares_serial *serial,
                             const struct ares_frame *frame) {
-    uint8_t buffer[ARES_FRAME_OVERHEAD + sizeof(frame->payload) + 1];
+    uint8_t buffer[ARES_SERIAL_TRX_BUF_SIZE];
     int len;
 
     if (serial == NULL || frame == NULL) {

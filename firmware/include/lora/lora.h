@@ -53,9 +53,14 @@ enum ares_lora_signal {
     ARES_LORA_SIGNALS,
 };
 
-#define ARES_LORA_TRX_BUF_SIZE 256
+#if defined(CONFIG_ARES_LORA_TRX_BUF_SIZE)
+#define ARES_LORA_TRX_BUF_SIZE CONFIG_ARES_LORA_TRX_BUF_SIZE
+#else
+#define ARES_LORA_TRX_BUF_SIZE 512
+#endif
+
 struct ares_lora_buf {
-    uint8_t buf[ARES_LORA_TRX_BUF_SIZE + 1];
+    uint8_t buf[ARES_LORA_TRX_BUF_SIZE];
     size_t len;
 };
 
@@ -110,6 +115,7 @@ int ares_lora_write_packet(const struct ares_lora *lora,
                            const struct ares_packet *packet);
 int ares_lora_configure_lora(const struct ares_lora *lora,
                              const struct lora_modem_config *config);
-int ares_lora_get_new_packet_id(const struct ares_lora *lora, uint16_t *id);
+int ares_lora_set_packet_id(const struct ares_lora *lora,
+                            struct ares_packet *packet);
 
 #endif // ARES_LORA_H

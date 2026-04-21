@@ -29,5 +29,5 @@ python_module(_core src/core.cpp
         DEFINITIONS VERSION_INFO=${PROJECT_VERSION})
 python_module(_ares_lora_serial src/ares_lora_serial/ares_lora_serial.cpp src/ares_lora_serial/ares_frame.cpp
         DESTINATION ${PACKAGE_NAME}
-        DEPENDENCIES serial ares_data_structures logging
-        LIBS serial ares_data_structures logging)
+        DEPENDENCIES serial ares_data_structures logging ares_work_q
+        LIBS serial ares_data_structures logging ares_work_q)

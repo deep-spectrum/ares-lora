@@ -9,6 +9,7 @@
  */
 
 #include <serial/frame.h>
+#include <serial/serial_common.h>
 #include <zephyr/kernel.h>
 
 #define ARES_FRAME_HEADER_OFFSET UINT32_C(0)
@@ -20,22 +21,11 @@
 #define ARES_FRAME_FOOTER_OFFSET(payload_len)                                  \
     (ARES_FRAME_PAYLOAD_OFFSET + (uint64_t)(payload_len))
 
-static size_t ares_strlen(const char *s, size_t max_cnt) {
-    size_t len = 0;
-    if (s == NULL) {
-        return 0;
-    }
+#define ARES_FRAME_MAX_SIZE                                                    \
+    MIN(SERIAL_BACKEND_RX_RINGBUF_SIZE, SERIAL_BACKEND_TX_RINGBUF_SIZE)
+#define ARES_FRAME_MAX_PAYLOAD_SIZE (ARES_FRAME_MAX_SIZE - ARES_FRAME_OVERHEAD)
 
-    if (max_cnt == 0) {
-        max_cnt = UINT16_MAX;
-    }
-
-    for (const char *buf = s; *buf != '\0' && len < max_cnt; buf++) {
-        len++;
-    }
-
-    return len;
-}
+#define FSIZEOF_FIELD(field)        SIZEOF_FIELD(struct ares_frame, payload.field)
 
 static size_t calculate_frame_length(const struct ares_frame *frame) {
     size_t payload_len = 0;
@@ -44,29 +34,59 @@ static size_t calculate_frame_length(const struct ares_frame *frame) {
 
     switch (frame->type) {
     case ARES_FRAME_SETTING: {
-        payload_len = SIZEOF_FIELD(struct ares_frame, payload.SETTING.setting) +
-                      SIZEOF_FIELD(struct ares_frame, payload.SETTING.value);
+        payload_len =
+            FSIZEOF_FIELD(SETTING.setting) + FSIZEOF_FIELD(SETTING.value);
         break;
     }
     case ARES_FRAME_START: {
-        payload_len = SIZEOF_FIELD(struct ares_frame, payload.START.sec) +
-                      SIZEOF_FIELD(struct ares_frame, payload.START.ns) +
-                      SIZEOF_FIELD(struct ares_frame, payload.START.id) +
-                      SIZEOF_FIELD(struct ares_frame, payload.START.broadcast) +
-                      SIZEOF_FIELD(struct ares_frame, payload.START.seq_cnt) +
-                      SIZEOF_FIELD(struct ares_frame, payload.START.packet_id);
+        payload_len = FSIZEOF_FIELD(START.sec) + FSIZEOF_FIELD(START.ns) +
+                      FSIZEOF_FIELD(START.id) + FSIZEOF_FIELD(START.broadcast) +
+                      FSIZEOF_FIELD(START.seq_cnt) +
+                      FSIZEOF_FIELD(START.packet_id);
         break;
     }
     case ARES_FRAME_ACK: {
-        payload_len = SIZEOF_FIELD(struct ares_frame, payload.ACK);
+        payload_len = FSIZEOF_FIELD(ACK);
         break;
     }
     case ARES_FRAME_LED: {
-        payload_len = SIZEOF_FIELD(struct ares_frame, payload.LED);
+        payload_len = FSIZEOF_FIELD(LED);
         break;
     }
     case ARES_FRAME_FRAMING_ERROR: {
-        payload_len = SIZEOF_FIELD(struct ares_frame, payload.FRAMING_ERROR);
+        payload_len = FSIZEOF_FIELD(FRAMING_ERROR);
+        break;
+    }
+    case ARES_FRAME_HEARTBEAT: {
+        payload_len = FSIZEOF_FIELD(HEARTBEAT.flags) +
+                      FSIZEOF_FIELD(HEARTBEAT.tx_count) +
+                      FSIZEOF_FIELD(HEARTBEAT.id);
+        break;
+    }
+    case ARES_FRAME_CLAIM: {
+        payload_len = FSIZEOF_FIELD(CLAIM);
+        break;
+    }
+    case ARES_FRAME_LOG: {
+        payload_len = FSIZEOF_FIELD(LOG.broadcast) + FSIZEOF_FIELD(LOG.id) +
+                      FSIZEOF_FIELD(LOG.tx_cnt) + FSIZEOF_FIELD(LOG.part) +
+                      FSIZEOF_FIELD(LOG.num_parts) + FSIZEOF_FIELD(LOG.log_id);
+        payload_len += frame->payload.LOG.msg_len;
+        break;
+    }
+    case ARES_FRAME_LOG_ACK: {
+        payload_len = FSIZEOF_FIELD(LOG_ACK.part) +
+                      FSIZEOF_FIELD(LOG_ACK.num_parts) +
+                      FSIZEOF_FIELD(LOG_ACK.id) + FSIZEOF_FIELD(LOG_ACK.log_id);
+        break;
+    }
+    case ARES_FRAME_VERSION: {
+        payload_len = FSIZEOF_FIELD(VERSION.app) + FSIZEOF_FIELD(VERSION.ncs) +
+                      FSIZEOF_FIELD(VERSION.kernel);
+        break;
+    }
+    case ARES_FRAME_DBG: {
+        payload_len = FSIZEOF_FIELD(DBG);
         break;
     }
     default: {
@@ -77,6 +97,28 @@ static size_t calculate_frame_length(const struct ares_frame *frame) {
 
     return payload_len + ARES_FRAME_OVERHEAD;
 }
+
+#define Z_FSERIALIZE_LEN(field, len)                                           \
+    do {                                                                       \
+        (void)memcpy(payload, &frame.payload.field, (len));                    \
+        payload += (len);                                                      \
+    } while (0)
+#define Z_FSERIALIZE_FIELD(field)                                              \
+    do {                                                                       \
+        (void)memcpy(payload, &frame->payload.field,                           \
+                     SIZEOF_FIELD(struct ares_frame, payload.field));          \
+        payload += SIZEOF_FIELD(struct ares_frame, payload.field);             \
+    } while (0)
+
+#define FSERIALIZE(field, len...)                                              \
+    COND_CODE_0(IS_EMPTY(len), (Z_FSERIALIZE_LEN(field, len)),                 \
+                (Z_FSERIALIZE_FIELD(field)))
+
+#define FSERIALIZE_PTR(field, len)                                             \
+    do {                                                                       \
+        (void)memcpy(payload, frame->payload.field, (len));                    \
+        payload += (len);                                                      \
+    } while (0)
 
 static void serialize(uint8_t *buf, const struct ares_frame *frame,
                       size_t frame_len) {
@@ -89,57 +131,52 @@ static void serialize(uint8_t *buf, const struct ares_frame *frame,
 
     switch (frame->type) {
     case ARES_FRAME_SETTING: {
-        (void)memcpy(payload, &frame->payload.SETTING.setting,
-                     SIZEOF_FIELD(struct ares_frame, payload.SETTING.setting));
-        (void)memcpy(
-            payload + SIZEOF_FIELD(struct ares_frame, payload.SETTING.setting),
-            &frame->payload.SETTING.value,
-            SIZEOF_FIELD(struct ares_frame, payload.SETTING.value));
+        FSERIALIZE(SETTING.setting);
+        FSERIALIZE(SETTING.value);
         break;
     }
     case ARES_FRAME_START: {
-        (void)memcpy(payload, &frame->payload.START.sec,
-                     SIZEOF_FIELD(struct ares_frame, payload.START.sec));
-        (void)memcpy(payload +
-                         SIZEOF_FIELD(struct ares_frame, payload.START.sec),
-                     &frame->payload.START.ns,
-                     SIZEOF_FIELD(struct ares_frame, payload.START.ns));
-        (void)memcpy(payload +
-                         SIZEOF_FIELD(struct ares_frame, payload.START.sec) +
-                         SIZEOF_FIELD(struct ares_frame, payload.START.ns),
-                     &frame->payload.START.id,
-                     SIZEOF_FIELD(struct ares_frame, payload.START.id));
-        (void)memcpy(payload +
-                         SIZEOF_FIELD(struct ares_frame, payload.START.sec) +
-                         SIZEOF_FIELD(struct ares_frame, payload.START.ns) +
-                         SIZEOF_FIELD(struct ares_frame, payload.START.id),
-                     &frame->payload.START.broadcast,
-                     SIZEOF_FIELD(struct ares_frame, payload.START.broadcast));
-        (void)memcpy(
-            payload + SIZEOF_FIELD(struct ares_frame, payload.START.sec) +
-                SIZEOF_FIELD(struct ares_frame, payload.START.ns) +
-                SIZEOF_FIELD(struct ares_frame, payload.START.id) +
-                SIZEOF_FIELD(struct ares_frame, payload.START.broadcast),
-            &frame->payload.START.seq_cnt,
-            SIZEOF_FIELD(struct ares_frame, payload.START.seq_cnt));
-        (void)memcpy(
-            payload + SIZEOF_FIELD(struct ares_frame, payload.START.sec) +
-                SIZEOF_FIELD(struct ares_frame, payload.START.ns) +
-                SIZEOF_FIELD(struct ares_frame, payload.START.id) +
-                SIZEOF_FIELD(struct ares_frame, payload.START.broadcast) +
-                SIZEOF_FIELD(struct ares_frame, payload.START.seq_cnt),
-            &frame->payload.START.packet_id,
-            SIZEOF_FIELD(struct ares_frame, payload.START.packet_id));
+        FSERIALIZE(START.sec);
+        FSERIALIZE(START.ns);
+        FSERIALIZE(START.id);
+        FSERIALIZE(START.broadcast);
+        FSERIALIZE(START.seq_cnt);
+        FSERIALIZE(START.packet_id);
+        break;
+    }
+    case ARES_FRAME_LOG: {
+        FSERIALIZE(LOG.broadcast);
+        FSERIALIZE(LOG.id);
+        FSERIALIZE(LOG.tx_cnt);
+        FSERIALIZE(LOG.part);
+        FSERIALIZE(LOG.num_parts);
+        FSERIALIZE(LOG.log_id);
+        FSERIALIZE_PTR(LOG.msg, frame->payload.LOG.msg_len);
+        break;
+    }
+    case ARES_FRAME_LOG_ACK: {
+        FSERIALIZE(LOG_ACK.part);
+        FSERIALIZE(LOG_ACK.num_parts);
+        FSERIALIZE(LOG_ACK.id);
+        FSERIALIZE(LOG_ACK.log_id);
         break;
     }
     case ARES_FRAME_ACK: {
-        (void)memcpy(payload, &frame->payload.ACK,
-                     SIZEOF_FIELD(struct ares_frame, payload.ACK));
+        FSERIALIZE(ACK);
         break;
     }
     case ARES_FRAME_LED: {
-        (void)memcpy(payload, &frame->payload.LED,
-                     SIZEOF_FIELD(struct ares_frame, payload.LED));
+        FSERIALIZE(LED);
+        break;
+    }
+    case ARES_FRAME_HEARTBEAT: {
+        FSERIALIZE(HEARTBEAT.flags);
+        FSERIALIZE(HEARTBEAT.tx_count);
+        FSERIALIZE(HEARTBEAT.id);
+        break;
+    }
+    case ARES_FRAME_CLAIM: {
+        FSERIALIZE(CLAIM);
         break;
     }
     case ARES_FRAME_FRAMING_ERROR: {
@@ -147,7 +184,18 @@ static void serialize(uint8_t *buf, const struct ares_frame *frame,
         (void)memcpy(payload, &error_code, sizeof(error_code));
         break;
     }
+    case ARES_FRAME_VERSION: {
+        FSERIALIZE(VERSION.app);
+        FSERIALIZE(VERSION.ncs);
+        FSERIALIZE(VERSION.kernel);
+        break;
+    }
+    case ARES_FRAME_DBG: {
+        FSERIALIZE(DBG);
+        break;
+    }
     default:
+        // ARES_FRAME_LORA_CONFIG is RX only
         __ASSERT(false, "Invalid frame type received");
     }
 
@@ -180,6 +228,32 @@ static uint16_t retrieve_payload_length(const uint8_t *buf) {
     return len;
 }
 
+#define FDESERIALIZE_INIT() size_t z_offset = 0
+
+#define Z_FDESERIALIZE_FIELD(field)                                            \
+    do {                                                                       \
+        (void)memcpy(&frame->payload.field, &payload[z_offset],                \
+                     SIZEOF_FIELD(struct ares_frame, payload.field));          \
+        z_offset += SIZEOF_FIELD(struct ares_frame, payload.field);            \
+    } while (0)
+
+#define Z_FDESERIALIZE_LEN(field, len)                                         \
+    do {                                                                       \
+        (void)memcpy(&frame->payload.field, &payload[z_offset], (len));        \
+        z_offset += (len);                                                     \
+    } while (0)
+
+#define FDESERIALIZE(field, len...)                                            \
+    COND_CODE_0(IS_EMPTY(len), (Z_FDESERIALIZE_LEN(field, len)),               \
+                (Z_FDESERIALIZE_FIELD(field)))
+
+#define FDESERIALIZE_BUF(field, type_cast, len_field)                          \
+    do {                                                                       \
+        frame->payload.field = (type_cast)(payload + z_offset);                \
+        frame->payload.len_field =                                             \
+            payload_len - ((const uint8_t *)frame->payload.field - payload);   \
+    } while (0)
+
 static void deserialize(struct ares_frame *frame, const uint8_t *buf) {
     __ASSERT_NO_MSG(buf != NULL);
     const uint8_t *payload = &buf[ARES_FRAME_PAYLOAD_OFFSET];
@@ -187,53 +261,62 @@ static void deserialize(struct ares_frame *frame, const uint8_t *buf) {
 
     frame->type = (enum ares_frame_type)buf[ARES_FRAME_TYPE_OFFSET];
 
+    FDESERIALIZE_INIT();
     switch (frame->type) {
     case ARES_FRAME_SETTING: {
-        (void)memcpy(&frame->payload.SETTING.setting, payload,
-                     SIZEOF_FIELD(struct ares_frame, payload.SETTING.setting));
-        if (payload_len ==
-            SIZEOF_FIELD(struct ares_frame, payload.SETTING.setting)) {
+        FDESERIALIZE(SETTING.setting);
+        if (payload_len == FSIZEOF_FIELD(SETTING.setting)) {
             frame->payload.SETTING.set = false;
         } else {
             frame->payload.SETTING.set = true;
-            (void)memcpy(
-                &frame->payload.SETTING.value,
-                payload +
-                    SIZEOF_FIELD(struct ares_frame, payload.SETTING.setting),
-                SIZEOF_FIELD(struct ares_frame, payload.SETTING.value));
+            FDESERIALIZE(SETTING.value);
         }
         break;
     }
     case ARES_FRAME_START: {
-        (void)memcpy(&frame->payload.START.sec, payload,
-                     SIZEOF_FIELD(struct ares_frame, payload.START.sec));
-        (void)memcpy(&frame->payload.START.ns,
-                     payload +
-                         SIZEOF_FIELD(struct ares_frame, payload.START.sec),
-                     SIZEOF_FIELD(struct ares_frame, payload.START.ns));
-        (void)memcpy(&frame->payload.START.id,
-                     payload +
-                         SIZEOF_FIELD(struct ares_frame, payload.START.sec) +
-                         SIZEOF_FIELD(struct ares_frame, payload.START.ns),
-                     SIZEOF_FIELD(struct ares_frame, payload.START.id));
-        (void)memcpy(&frame->payload.START.broadcast,
-                     payload +
-                         SIZEOF_FIELD(struct ares_frame, payload.START.sec) +
-                         SIZEOF_FIELD(struct ares_frame, payload.START.ns) +
-                         SIZEOF_FIELD(struct ares_frame, payload.START.id),
-                     SIZEOF_FIELD(struct ares_frame, payload.START.broadcast));
+        FDESERIALIZE(START.sec);
+        FDESERIALIZE(START.ns);
+        FDESERIALIZE(START.id);
+        FDESERIALIZE(START.broadcast);
         // receive side: we don't care about the seq_cnt or packet_id...
         break;
     }
     case ARES_FRAME_LORA_CONFIG: {
-        (void)memcpy(&frame->payload.LORA_CONFIG, payload, payload_len);
+        FDESERIALIZE(LORA_CONFIG, payload_len);
         break;
     }
     case ARES_FRAME_LED: {
-        (void)memcpy(&frame->payload.LED, payload, payload_len);
+        FDESERIALIZE(LED, payload_len);
+        break;
+    }
+    case ARES_FRAME_HEARTBEAT: {
+        FDESERIALIZE(HEARTBEAT.flags);
+        FDESERIALIZE(HEARTBEAT.tx_count);
+        FDESERIALIZE(HEARTBEAT.id);
+        break;
+    }
+    case ARES_FRAME_CLAIM: {
+        FDESERIALIZE(CLAIM);
+        break;
+    }
+    case ARES_FRAME_LOG: {
+        FDESERIALIZE(LOG.broadcast);
+        FDESERIALIZE(LOG.id);
+        FDESERIALIZE(LOG.tx_cnt);
+        FDESERIALIZE(LOG.part);
+        FDESERIALIZE(LOG.num_parts);
+        FDESERIALIZE(LOG.log_id);
+        FDESERIALIZE_BUF(LOG.msg, const char *, LOG.msg_len);
+        break;
+    }
+    case ARES_FRAME_VERSION: {
+        // nop: This is a request so it doesn't make sense to look at the
+        // payload
         break;
     }
     default: {
+        // ARES_FRAME_LOG_ACK, ARES_FRAME_ACK, ARES_FRAME_FRAMING_ERROR,
+        // and ARES_FRAME_DBG are TX only
         __ASSERT(false, "Invalid frame type for deserialization.");
         break;
     }

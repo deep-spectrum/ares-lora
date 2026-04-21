@@ -17,8 +17,17 @@
 
 extern const struct ares_lora_transport_api ares_lora_transport_api;
 
-#define LORA_BACKEND_TX_RINGBUF_SIZE 256
-#define LORA_BACKEND_RX_RINGBUF_SIZE 256
+#if defined(CONFIG_ARES_LORA_TX_RINGBUF_SIZE)
+#define LORA_BACKEND_TX_RINGBUF_SIZE CONFIG_ARES_LORA_TX_RINGBUF_SIZE
+#else
+#define LORA_BACKEND_TX_RINGBUF_SIZE 512
+#endif
+
+#if defined(CONFIG_ARES_LORA_RX_RINGBUF_SIZE)
+#define LORA_BACKEND_RX_RINGBUF_SIZE CONFIG_ARES_LORA_RX_RINGBUF_SIZE
+#else
+#define LORA_BACKEND_RX_RINGBUF_SIZE 512
+#endif
 
 struct lora_common {
     const struct device *dev;

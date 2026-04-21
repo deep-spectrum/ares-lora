@@ -8,4 +8,12 @@ config ARES_SERIAL_PRIO
     int "Serial thread priority"
     default 2
 
+config ARES_SERIAL_TX_RINGBUF_LEN
+    int "Serial TX ring buffer size"
+    default 256
+
+config ARES_SERIAL_RX_RINGBUF_LEN
+    int "Serial RX ring buffer size"
+    default 256
+
 endmenu  # Ares Serial

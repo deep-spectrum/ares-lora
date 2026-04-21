@@ -108,15 +108,43 @@ static void reflect(void *data, size_t size) {
 }
 #endif // IS_ENABLED(CONFIG_LORA_REFLECT_CRC_OUTPUT)
 
+static inline size_t packet_overhead(const struct ares_packet *packet) {
+    __ASSERT_NO_MSG(packet != NULL);
+    return (packet->type == ARES_PKT_TYPE_BROADCAST)
+               ? ARES_PACKET_BROADCAST_OVERHEAD
+               : ARES_PACKET_DIRECT_OVERHEAD;
+}
+
+#define PSIZEOF_FIELD(field)                                                   \
+    SIZEOF_FIELD(struct ares_packet_payload, payload.field)
+
 static size_t calculate_packet_size(const struct ares_packet *packet) {
     __ASSERT_NO_MSG(packet != NULL);
-    size_t overhead = (packet->type == ARES_PKT_TYPE_BROADCAST)
-                          ? ARES_PACKET_BROADCAST_OVERHEAD
-                          : ARES_PACKET_DIRECT_OVERHEAD;
+    size_t overhead = packet_overhead(packet);
 
     switch (packet->payload.type) {
     case ARES_PKT_PAYLOAD_START: {
-        overhead += sizeof(packet->payload.payload.timespec);
+        overhead += PSIZEOF_FIELD(START);
+        break;
+    }
+    case ARES_PKT_PAYLOAD_HEARTBEAT: {
+        overhead += PSIZEOF_FIELD(HEARTBEAT);
+        break;
+    }
+    case ARES_PKT_PAYLOAD_LOG: {
+        overhead += PSIZEOF_FIELD(LOG.part) + PSIZEOF_FIELD(LOG.num_parts) +
+                    PSIZEOF_FIELD(LOG.log_id) +
+                    packet->payload.payload.LOG.msg_len;
+        break;
+    }
+    case ARES_PKT_PAYLOAD_LOG_ACK: {
+        overhead += PSIZEOF_FIELD(LOG_ACK.part) +
+                    PSIZEOF_FIELD(LOG_ACK.num_parts) +
+                    PSIZEOF_FIELD(LOG_ACK.log_id);
+        break;
+    }
+    case ARES_PKT_PAYLOAD_CLAIM: {
+        // nop
         break;
     }
     default: {
@@ -138,13 +166,35 @@ static crc16_t compute_crc(const uint8_t *buf, size_t len) {
     return crc ^ CONFIG_LORA_CRC_XOR_OUTPUT;
 }
 
+#define Z_PSERIALIZE_LEN(field, len)                                           \
+    do {                                                                       \
+        (void)memcpy(payload, &packet->payload.payload.field, (len));          \
+        payload += (len);                                                      \
+    } while (0)
+#define Z_PSERIALIZE_FIELD(field)                                              \
+    do {                                                                       \
+        (void)memcpy(payload, &packet->payload.payload.field,                  \
+                     SIZEOF_FIELD(struct ares_packet, payload.payload.field)); \
+        payload += SIZEOF_FIELD(struct ares_packet, payload.payload.field);    \
+    } while (0)
+
+#define PSERIALIZE(field, len...)                                              \
+    COND_CODE_0(IS_EMPTY(len), (Z_PSERIALIZE_LEN(field, len)),                 \
+                (Z_PSERIALIZE_FIELD(field)))
+
+#define PSERIALIZE_PTR(field, len)                                             \
+    do {                                                                       \
+        (void)memcpy(payload, packet->payload.payload.field, (len));           \
+        payload += (len);                                                      \
+    } while (0)
+
 static void serialize(uint8_t *buf, size_t len,
                       const struct ares_packet *packet, size_t packet_length,
                       uint8_t seq_num) {
     __ASSERT_NO_MSG(buf != NULL);
     __ASSERT_NO_MSG(packet != NULL);
     crc16_t crc;
-    size_t payload_len = packet_length - ARES_PACKET_BROADCAST_OVERHEAD;
+    size_t payload_len = packet_length - packet_overhead(packet);
     uint8_t *payload = &buf[ARES_PACKET_PAYLOAD_OFFSET(packet->type)];
 
     uint16_t su_payload_len = (uint16_t)payload_len;
@@ -166,7 +216,7 @@ static void serialize(uint8_t *buf, size_t len,
                  ARES_PACKET_SRC_ID_OVERHEAD);
 
     if (packet->type == ARES_PKT_TYPE_DIRECT) {
-        (void)memcpy(&buf[ARES_PACKET_HEADER_OFFSET], &packet->destination_id,
+        (void)memcpy(&buf[ARES_PACKET_DST_ID_OFFSET], &packet->destination_id,
                      ARES_PACKET_DST_ID_OVERHEAD);
     }
 
@@ -174,7 +224,28 @@ static void serialize(uint8_t *buf, size_t len,
 
     switch (packet->payload.type) {
     case ARES_PKT_PAYLOAD_START: {
-        (void)memcpy(payload, &packet->payload.payload.timespec, payload_len);
+        (void)memcpy(payload, &packet->payload.payload.START, payload_len);
+        break;
+    }
+    case ARES_PKT_PAYLOAD_HEARTBEAT: {
+        (void)memcpy(payload, &packet->payload.payload.HEARTBEAT, payload_len);
+        break;
+    }
+    case ARES_PKT_PAYLOAD_LOG: {
+        PSERIALIZE(LOG.part);
+        PSERIALIZE(LOG.num_parts);
+        PSERIALIZE(LOG.log_id);
+        PSERIALIZE_PTR(LOG.msg, packet->payload.payload.LOG.msg_len);
+        break;
+    }
+    case ARES_PKT_PAYLOAD_LOG_ACK: {
+        PSERIALIZE(LOG_ACK.part);
+        PSERIALIZE(LOG_ACK.num_parts);
+        PSERIALIZE(LOG_ACK.log_id);
+        break;
+    }
+    case ARES_PKT_PAYLOAD_CLAIM: {
+        // nop
         break;
     }
     default: {
@@ -211,6 +282,23 @@ int serialize_ares_packet(uint8_t *buf, size_t len,
     return (int)packet_len;
 }
 
+#define PDESERIALIZE_INIT() size_t z_offset = 0
+
+#define PDESERIALIZE(field)                                                    \
+    do {                                                                       \
+        (void)memcpy(&packet->payload.payload.field, &payload[z_offset],       \
+                     SIZEOF_FIELD(struct ares_packet, payload.payload.field)); \
+        z_offset += SIZEOF_FIELD(struct ares_packet, payload.payload.field);   \
+    } while (0)
+
+#define PDESERIALIZE_BUF(field, type_cast, len_field)                          \
+    do {                                                                       \
+        packet->payload.payload.field = (type_cast)(payload + z_offset);       \
+        packet->payload.payload.len_field =                                    \
+            payload_len -                                                      \
+            ((const uint8_t *)packet->payload.payload.field - payload);        \
+    } while (0)
+
 static void deserialize(struct ares_packet *packet, const uint8_t *buf) {
     size_t payload_len;
     const uint8_t *payload;
@@ -236,7 +324,30 @@ static void deserialize(struct ares_packet *packet, const uint8_t *buf) {
 
     switch (packet->payload.type) {
     case ARES_PKT_PAYLOAD_START: {
-        (void)memcpy(&packet->payload.payload.timespec, payload, payload_len);
+        (void)memcpy(&packet->payload.payload.START, payload, payload_len);
+        break;
+    }
+    case ARES_PKT_PAYLOAD_HEARTBEAT: {
+        (void)memcpy(&packet->payload.payload.HEARTBEAT, payload, payload_len);
+        break;
+    }
+    case ARES_PKT_PAYLOAD_LOG: {
+        PDESERIALIZE_INIT();
+        PDESERIALIZE(LOG.part);
+        PDESERIALIZE(LOG.num_parts);
+        PDESERIALIZE(LOG.log_id);
+        PDESERIALIZE_BUF(LOG.msg, const char *, LOG.msg_len);
+        break;
+    }
+    case ARES_PKT_PAYLOAD_LOG_ACK: {
+        PDESERIALIZE_INIT();
+        PDESERIALIZE(LOG_ACK.part);
+        PDESERIALIZE(LOG_ACK.num_parts);
+        PDESERIALIZE(LOG_ACK.log_id);
+        break;
+    }
+    case ARES_PKT_PAYLOAD_CLAIM: {
+        // nop
         break;
     }
     default: {

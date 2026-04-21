@@ -301,12 +301,13 @@ int ares_lora_configure_lora(const struct ares_lora *lora,
     return ret;
 }
 
-int ares_lora_get_new_packet_id(const struct ares_lora *lora, uint16_t *id) {
-    if (lora == NULL || id == NULL) {
+int ares_lora_set_packet_id(const struct ares_lora *lora,
+                            struct ares_packet *packet) {
+    if (lora == NULL || packet == NULL) {
         return -EINVAL;
     }
 
-    *id = lora->ctx->packet_id;
+    packet->packet_id = lora->ctx->packet_id;
     lora->ctx->packet_id++;
 
     return 0;
