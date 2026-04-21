@@ -1,0 +1,71 @@
+name: Deploy Docs
+on:
+  push:
+    branches:
+      - master
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: true
+
+env:
+  DOXYGEN_VERSION: 1.15.0
+  DOXYGEN_SHA256SUM: 0ec2e5b2c3cd82b7106d19cb42d8466450730b8cb7a9e85af712be38bf4523a1
+  JOB_COUNT: 8
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: install-pkgs
+        run: |
+          sudo apt update
+          sudo apt install --no-install-recommends graphviz librsvg2-bin
+          wget --no-verbose "https://github.com/doxygen/doxygen/releases/download/Release_${DOXYGEN_VERSION//./_}/doxygen-${DOXYGEN_VERSION}.linux.bin.tar.gz"
+          echo "${DOXYGEN_MD5SUM}  doxygen-${DOXYGEN_VERSION}.linux.bin.tar.gz" | md5sum -c
+          if [ $? -ne 0 ]; then
+            echo "Failed to verify doxygen tarball"
+            exit 1
+          fi
+          sudo tar xf doxygen-${DOXYGEN_VERSION}.linux.bin.tar.gz -C /opt
+          echo "/opt/doxygen-${DOXYGEN_VERSION}/bin" >> $GITHUB_PATH
+
+      - name: Build C++ Docs
+        shell: bash
+        run: |
+          doxygen serial-driver-core.doxygen
+          
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v6
+
+      - name: Initialize environment
+        run: uv pip install -r requirements.txt
+
+      - name: Build MkDocs site
+        run: uv run mkdocs build --strict
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
