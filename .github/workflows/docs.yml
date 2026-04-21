@@ -30,23 +30,23 @@ jobs:
       - name: Pull in dependencies
         run: git submodule update --init
 
-#      - name: install-pkgs
-#        run: |
-#          sudo apt update
-#          sudo apt install --no-install-recommends graphviz librsvg2-bin
-#          wget --no-verbose "https://github.com/doxygen/doxygen/releases/download/Release_${DOXYGEN_VERSION//./_}/doxygen-${DOXYGEN_VERSION}.linux.bin.tar.gz"
-#          echo "${DOXYGEN_SHA256SUM}  doxygen-${DOXYGEN_VERSION}.linux.bin.tar.gz" | sha256sum -c
-#          if [ $? -ne 0 ]; then
-#            echo "Failed to verify doxygen tarball"
-#            exit 1
-#          fi
-#          sudo tar xf doxygen-${DOXYGEN_VERSION}.linux.bin.tar.gz -C /opt
-#          echo "/opt/doxygen-${DOXYGEN_VERSION}/bin" >> $GITHUB_PATH
-#
-#      - name: Build C++ Docs
-#        shell: bash
-#        run: |
-#          doxygen serial-driver-core.doxygen
+      - name: install-pkgs
+        run: |
+          sudo apt update
+          sudo apt install --no-install-recommends graphviz librsvg2-bin
+          wget --no-verbose "https://github.com/doxygen/doxygen/releases/download/Release_${DOXYGEN_VERSION//./_}/doxygen-${DOXYGEN_VERSION}.linux.bin.tar.gz"
+          echo "${DOXYGEN_SHA256SUM}  doxygen-${DOXYGEN_VERSION}.linux.bin.tar.gz" | sha256sum -c
+          if [ $? -ne 0 ]; then
+            echo "Failed to verify doxygen tarball"
+            exit 1
+          fi
+          sudo tar xf doxygen-${DOXYGEN_VERSION}.linux.bin.tar.gz -C /opt
+          echo "/opt/doxygen-${DOXYGEN_VERSION}/bin" >> $GITHUB_PATH
+
+      - name: Build C++ Docs
+        shell: bash
+        run: |
+          doxygen serial-driver-core.doxygen
           
       - name: Set up uv
         uses: astral-sh/setup-uv@v6
