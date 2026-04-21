@@ -239,7 +239,13 @@ AresFrame::Decoded AresFrame::get_parsed_frame() const {
     return decoded;
 }
 
-bool AresFrame::frame_available() const { return _new_frame; }
+bool AresFrame::frame_available() const {
+    if (_direction != TX) {
+        return false;
+    }
+
+    return _new_frame;
+}
 
 size_t AresFrame::total_frames() const {
     if (_direction != TX) {

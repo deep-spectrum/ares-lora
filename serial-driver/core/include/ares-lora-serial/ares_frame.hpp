@@ -364,7 +364,7 @@ class AresFrame {
     };
 
     /**
-     * @struct AckErrorCode
+     * @typedef AckErrorCode
      *
      * Data for AresFrame::ACK frames.
      */
@@ -393,49 +393,152 @@ class AresFrame {
         int32_t code;
     };
 
+    /**
+     * @typedef TxTypes
+     *
+     * A variant representing all the transmission frame types.
+     */
     using TxTypes = std::variant<std::monostate, Setting, Start, LoraConfig,
                                  Led, Heartbeat, Claim, Log, Version>;
+
+    /**
+     * @typedef RxTypes
+     *
+     * A variant representing all the reception frame types.
+     */
     using RxTypes =
         std::variant<std::monostate, Setting, Start, AckErrorCode, FramingError,
                      Led, Heartbeat, Claim, Log, Version, LogAck, Dbg>;
 
+    /**
+     * @typedef ResponseTypes
+     *
+     * A variant representing all the response frame types.
+     */
     using ResponseTypes = std::variant<std::monostate, Setting, AckErrorCode,
                                        FramingError, Led, Version>;
 
+    /**
+     * @struct Decoded
+     *
+     * Struct containing the deserialized frame data.
+     */
     struct Decoded {
+        /**
+         * The frame type.
+         */
         AresFrameType type;
+
+        /**
+         * The payload data. This is linked to the frame type.
+         */
         RxTypes payload;
     };
 
+    /**
+     * Constructs a frame object from deserialized data.
+     * @param type The type of the frame.
+     * @param payload The payload for the frame.
+     */
     explicit AresFrame(AresFrameType type, TxTypes payload);
+
+    /**
+     * Constructs a frame object from serial data.
+     * @param bytearray The serial data.
+     */
     explicit AresFrame(const std::vector<uint8_t> &bytearray);
+
+    /**
+     * Default constructor.
+     */
     AresFrame();
+
+    /**
+     * Copy constructor.
+     * @param other Other object to copy.
+     */
     AresFrame(const AresFrame &other);
+
+    /**
+     * Destructor.
+     */
     ~AresFrame() = default;
 
+    /**
+     * Checks if there is a frame present in the given buffer.
+     * @param serial_data The serial data buffer to check.
+     * @param len The length of the serial data buffer.
+     * @param error_no_footer Return an error if there is no footer.
+     * @return std::tuple<header index, frame size, bytes left> if frame found.
+     * @return std::tuple<-1, -1, -1> on no frame found.
+     */
     static std::tuple<ssize_t, ssize_t, ssize_t>
     frame_present(const uint8_t *serial_data, size_t len,
                   bool error_no_footer = true);
+
+    /**
+     * Checks if there is a frame present in the given buffer.
+     * @param bytearray The buffer to check.
+     * @param error_no_footer Return an error if there is no footer.
+     * @return std::tuple<header index, frame size, bytes left> if frame found.
+     * @return std::tuple<-1, -1, -1> on no frame found.
+     */
     static std::tuple<ssize_t, ssize_t, ssize_t>
     frame_present(const std::vector<uint8_t> &bytearray,
                   bool error_no_footer = true);
 
+    /**
+     * Serialize the frame into a buffer. If a frame is split into chunks, then
+     * places the next frame into the buffer.
+     * @param bytearray The buffer to store the serialized frame in.
+     */
     void serialize(std::vector<uint8_t> &bytearray);
+
+    /**
+     * Parse a frame from the given buffer.
+     * @param serial_data The buffer to parse a frame from.
+     * @param start_index The start index of the frame.
+     * @param len The length of the buffer.
+     */
     void parse(const uint8_t *serial_data, size_t start_index, size_t len);
+
+    /**
+     * Parse a frame from the given buffer.
+     * @param bytearray The buffer to parse a frame from
+     * @param start_index The start index of the frame.
+     */
     void parse(const std::vector<uint8_t> &bytearray, size_t start_index);
 
+    /**
+     * Retrieve the parsed frame.
+     * @return The decoded or parsed frame.
+     *
+     * @note AresFrame::parse must be called first.
+     */
     [[nodiscard]] Decoded get_parsed_frame() const;
 
+    /**
+     * Check if a new frame is available for serialization. Useful for messages
+     * split into multiple frames.
+     * @return `true` if a new frame is available for serialization. `false`
+     * otherwise.
+     */
     [[nodiscard]] bool frame_available() const;
 
+    /**
+     * Retrieve the number of frames a message is split up into.
+     * @return The number of frames that can be serialized and sent.
+     *
+     * @note AresFrame::serialize must be called first.
+     */
     [[nodiscard]] size_t total_frames() const;
 
   private:
     enum FrameDirection { TX, RX, UNSPECIFIED };
     bool _new_frame = true;
 
-    FrameDirection _direction;
-    AresFrameType _type;
+    FrameDirection _direction = UNSPECIFIED;
+    AresFrameType _type = UNKNOWN;
     TxTypes _tx_payload;
     RxTypes _rx_payload;
 
