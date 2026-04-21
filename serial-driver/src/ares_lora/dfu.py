@@ -52,7 +52,8 @@ class AresImageStates:
         Args:
             states: The `ImageStates` object.
 
-        Returns: A constructed `AresImageStates` object.
+        Returns:
+            A constructed `AresImageStates` object.
         """
         return cls(slot=states.slot, version=states.version, hash=states.hash, bootable=states.bootable,
                    pending=states.pending, confirmed=states.confirmed, active=states.active, permanent=states.permanent)
@@ -135,7 +136,8 @@ class AresDfu:
         Args:
             timeout: Timeout in seconds to complete this operation.
 
-        Returns: A tuple of AresImageStates objects.
+        Returns:
+            A tuple of AresImageStates objects.
 
         Raises:
             ImageManagerException: SMP Response errors or unknown responses.
