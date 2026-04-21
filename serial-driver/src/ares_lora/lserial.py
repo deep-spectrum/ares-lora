@@ -287,8 +287,7 @@ class LoraSerial:
             value: The new value of the setting. If None, reads the specified setting.
 
         Returns:
-            If writing a setting, None.
-            If reading a setting, the value of the setting.
+            If writing a setting, None. If reading a setting, the value of the setting.
 
         Raises:
             TimeoutError: No response from the firmware within the configured timeout.
@@ -449,8 +448,7 @@ class LoraSerial:
         """Retrieves all the firmware version information.
 
         Returns:
-            A tuple of versions. The first tuple is the application version, the second tuple is the ncs version, and
-            the third tuple is the kernel version.
+            A tuple of versions. The first tuple is the application version, the second tuple is the ncs version, and the third tuple is the kernel version.
 
         Raises:
             TimeoutError: No response from the firmware within the configured timeout.
