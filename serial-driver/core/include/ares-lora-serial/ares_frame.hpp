@@ -40,19 +40,19 @@ class AresFrame {
      * Frame types for communication with the LoRa module.
      */
     enum AresFrameType : unsigned int {
-        SETTING = 0,        ///< Setting get/set
-        START = 1,          ///< Start time
-        LORA_CONFIG = 2,    ///< LoRa modem configuration
-        LED = 3,            ///< LED state get/set
-        HEARTBEAT = 4,      ///< Send heartbeat
-        CLAIM = 5,          ///< Master claim
-        LOG = 6,            ///< Log message
-        LOG_ACK = 7,        ///< Log acknowledge
-        VERSION = 8,        ///< Firmware version
-        ACK = 9,            ///< Command acknowledge
-        FRAMING_ERROR = 10, ///< Framing error
-        DBG = 11,           ///< Debug message
-        UNKNOWN,            /// Unknown frame
+        SETTING = 0,        ///< Setting get/set (TX/RX)
+        START = 1,          ///< Start time (TX/RX)
+        LORA_CONFIG = 2,    ///< LoRa modem configuration (TX)
+        LED = 3,            ///< LED state get/set (TX/RX)
+        HEARTBEAT = 4,      ///< Send heartbeat (TX/RX)
+        CLAIM = 5,          ///< Master claim (TX/RX)
+        LOG = 6,            ///< Log message (TX/RX)
+        LOG_ACK = 7,        ///< Log acknowledge (RX)
+        VERSION = 8,        ///< Firmware version (TX/RX)
+        ACK = 9,            ///< Command acknowledge (RX)
+        FRAMING_ERROR = 10, ///< Framing error (RX)
+        DBG = 11,           ///< Debug message (RX)
+        UNKNOWN,            ///< Unknown frame
     };
 
     /**
@@ -219,7 +219,7 @@ class AresFrame {
     /**
      * @struct Claim
      *
-     * Data for AresFrame::CLAIM frames
+     * Data for AresFrame::CLAIM frames.
      */
     struct Claim {
         /**
@@ -229,19 +229,65 @@ class AresFrame {
         uint16_t id = 0;
     };
 
+    /**
+     * @struct Log
+     *
+     * Data for AresFrame::LOG frames.
+     */
     struct Log {
+        /**
+         * .
+         * @param broadcast Flag indicating if the message should be
+         * broadcasted.
+         * @param tx_cnt The number of times to send the message over LoRa.
+         * @param id The destination or source ID.
+         * @param log_id The ID of the log message.
+         * @param msg The log message.
+         */
         Log(bool broadcast, uint8_t tx_cnt, uint16_t id, uint16_t log_id,
             std::string msg)
             : broadcast(broadcast), tx_cnt(tx_cnt), id(id), log_id(log_id),
               msg(std::move(msg)) {}
         Log() = default;
 
+        /**
+         * Flag indicating if the message was/should be broadcasted.
+         */
         bool broadcast = false;
+
+        /**
+         * The number of times to transmit the message.
+         */
         uint8_t tx_cnt = 1;
-        uint8_t part = 1;      // 1 indexed. Automatically managed.
-        uint8_t num_parts = 1; // starts at 1. Automatically managed.
+
+        /**
+         * The chunk ID of the message. 1 indexed and automatically managed on
+         * serialization.
+         */
+        uint8_t part = 1;
+
+        /**
+         * The number of chunks in the log message. Automatically managed on
+         * serialization.
+         */
+        uint8_t num_parts = 1;
+
+        /**
+         * On transmission, the ID of the node to send the message to if not
+         * broadcasting. On reception, the ID of the node the message was sent
+         * from.
+         */
         uint16_t id = 0;
+
+        /**
+         * The ID of the log message.
+         */
         uint16_t log_id = 0;
+
+        /**
+         * The entire log message on transmission. The log message chunk on
+         * reception.
+         */
         std::string msg;
 
         friend class AresFrame;
@@ -258,33 +304,92 @@ class AresFrame {
                                             sizeof(tx_cnt) + sizeof(log_id);
     };
 
+    /**
+     * @struct LogAck
+     *
+     * Data for AresFrame::LOG_ACK frames.
+     */
     struct LogAck {
+        /**
+         * The message part that was acknowledged.
+         */
         uint8_t part = 0;
+
+        /**
+         * The total number of parts in the acked message.
+         */
         uint8_t num_parts = 0;
+
+        /**
+         * The ID of the node that acknowledged the message.
+         */
         uint16_t id = 0;
+
+        /**
+         * The ID of the log message that got acked.
+         */
         uint16_t log_id = 0;
 
+        /**
+         * Equivalence operator.
+         * @param other The other object to compare against.
+         * @return `true` if all the fields are equal, `false` otherwise.
+         */
         bool operator==(const LogAck &other) const {
             return (part == other.part) && (num_parts == other.num_parts) &&
                    (id == other.id) && (log_id == other.log_id);
         }
     };
 
+    /**
+     * @struct Version
+     *
+     * Data for AresFrame::VERSION frames.
+     */
     struct Version {
+        /**
+         * The application version.
+         */
         uint32_t app = 0;
+
+        /**
+         * The Nordic Connect SDK version.
+         */
         uint32_t ncs = 0;
+
+        /**
+         * The Zephyr RTOS kernel version.
+         */
         uint32_t kernel = 0;
     };
 
+    /**
+     * @struct AckErrorCode
+     *
+     * Data for AresFrame::ACK frames.
+     */
     using AckErrorCode = int32_t;
 
+    /**
+     * @enum FramingError
+     *
+     * Data for AresFrame::FRAMING_ERROR frames.
+     */
     enum FramingError : uint8_t {
-        BAD_FRAME = 0,
-        BAD_TYPE = 1,
-        NOT_IMPLEMENTED = 2,
+        BAD_FRAME = 0,       ///< Bad frame.
+        BAD_TYPE = 1,        ///< Bad frame type.
+        NOT_IMPLEMENTED = 2, ///< Frame type not implemented.
     };
 
+    /**
+     * @struct Dbg
+     *
+     * Data for AresFrame::DBG frames.
+     */
     struct Dbg {
+        /**
+         * Error code from firmware.
+         */
         int32_t code;
     };
 
