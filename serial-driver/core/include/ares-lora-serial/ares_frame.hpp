@@ -1,7 +1,7 @@
 /**
  * @file ares_frame.hpp
  *
- * @brief
+ * @brief Ares Frame Library for host computers.
  *
  * @date 3/31/26
  *
@@ -20,10 +20,23 @@
 #include <variant>
 #include <vector>
 
+/**
+ * @class AresFrameError
+ *
+ * Exception class for AresFrame.
+ */
 class AresFrameError : public std::exception {
   public:
+    /**
+     * Constructor.
+     * @param msg The error message.
+     */
     explicit AresFrameError(std::string msg) : msg_(std::move(msg)) {}
 
+    /**
+     * Retrieve the error message.
+     * @return The error message.
+     */
     [[nodiscard]] const char *what() const noexcept override {
         return msg_.c_str();
     }
@@ -32,6 +45,12 @@ class AresFrameError : public std::exception {
     std::string msg_;
 };
 
+/**
+ * @class AresFrame
+ *
+ * Framing class for Ares frames. These frames are used for communication with
+ * the Ares LoRa platform.
+ */
 class AresFrame {
   public:
     /**
@@ -236,7 +255,7 @@ class AresFrame {
      */
     struct Log {
         /**
-         * .
+         * Constructor.
          * @param broadcast Flag indicating if the message should be
          * broadcasted.
          * @param tx_cnt The number of times to send the message over LoRa.
@@ -248,6 +267,10 @@ class AresFrame {
             std::string msg)
             : broadcast(broadcast), tx_cnt(tx_cnt), id(id), log_id(log_id),
               msg(std::move(msg)) {}
+
+        /**
+         * Default constructor.
+         */
         Log() = default;
 
         /**
@@ -390,7 +413,7 @@ class AresFrame {
         /**
          * Error code from firmware.
          */
-        int32_t code;
+        int32_t code = 0;
     };
 
     /**
@@ -445,6 +468,8 @@ class AresFrame {
     /**
      * Constructs a frame object from serial data.
      * @param bytearray The serial data.
+     *
+     * @throws AresFrameError if frame is not found in buffer.
      */
     explicit AresFrame(const std::vector<uint8_t> &bytearray);
 
@@ -491,6 +516,12 @@ class AresFrame {
      * Serialize the frame into a buffer. If a frame is split into chunks, then
      * places the next frame into the buffer.
      * @param bytearray The buffer to store the serialized frame in.
+     *
+     * @throws AresFrameError if frame type cannot be serialized (meant for
+     * reception only).
+     * @throws AresFrameError if log message is empty.
+     * @throws AresFrameError if log message is too long.
+     * @throws AresFrameError if frame payload length cannot be calculated.
      */
     void serialize(std::vector<uint8_t> &bytearray);
 
@@ -499,6 +530,9 @@ class AresFrame {
      * @param serial_data The buffer to parse a frame from.
      * @param start_index The start index of the frame.
      * @param len The length of the buffer.
+     *
+     * @throws AresFrameError if frame type cannot be parsed (meant for
+     * transmission only).
      */
     void parse(const uint8_t *serial_data, size_t start_index, size_t len);
 
@@ -506,6 +540,9 @@ class AresFrame {
      * Parse a frame from the given buffer.
      * @param bytearray The buffer to parse a frame from
      * @param start_index The start index of the frame.
+     *
+     * @throws AresFrameError if frame type cannot be parsed (meant for
+     * transmission only).
      */
     void parse(const std::vector<uint8_t> &bytearray, size_t start_index);
 
