@@ -32,7 +32,7 @@ jobs:
           sudo apt update
           sudo apt install --no-install-recommends graphviz librsvg2-bin
           wget --no-verbose "https://github.com/doxygen/doxygen/releases/download/Release_${DOXYGEN_VERSION//./_}/doxygen-${DOXYGEN_VERSION}.linux.bin.tar.gz"
-          echo "${DOXYGEN_MD5SUM} doxygen-${DOXYGEN_VERSION}.linux.bin.tar.gz" | md5sum -c
+          echo "${DOXYGEN_SHA256SUM}  doxygen-${DOXYGEN_VERSION}.linux.bin.tar.gz" | sha256sum -c
           if [ $? -ne 0 ]; then
             echo "Failed to verify doxygen tarball"
             exit 1
