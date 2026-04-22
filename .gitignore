@@ -5,3 +5,4 @@ build*/
 __pycache__
 firmware/lora_private_key.pem
 /docs/serial-driver/cpp-api/
+/docs/firmware/firmware-docs/

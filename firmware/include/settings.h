@@ -42,6 +42,11 @@
  * @enum ares_setting
  *
  * Represents various settings for Ares-LoRa.
+ *
+ * @note This enumeration is automatically with @ref FOREACH_ARES_SETTING
+ * "FOREACH_ARES_SETTING" and
+ * @ref GENERATE_ENUM "GENERATE_ENUM". Please refer to @ref FOREACH_ARES_SETTING
+ * "FOREACH_ARES_SETTING" to get a complete list of settings generated.
  */
 enum ares_setting {
     FOREACH_ARES_SETTING(GENERATE_ENUM)
