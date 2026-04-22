@@ -221,7 +221,7 @@ struct ares_packet_info {
     /**
      * Start index.
      *
-     * @note -1 if no header packet found.
+     * @note -1 if no packet header found.
      */
     int start;
 
