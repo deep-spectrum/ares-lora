@@ -1,7 +1,7 @@
 /**
  * @file frame.h
  *
- * @brief
+ * @brief Ares frame library.
  *
  * | Field | Header | Length  | Type   | Payload       | Footer |
  * | Size  | 1 byte | 2 bytes | 1 byte | 0-65535 bytes | 1 byte |
@@ -17,23 +17,57 @@
 
 #include <zephyr/kernel.h>
 
-#define ARES_FRAME_HEADER          '^'
-#define ARES_FRAME_FOOTER          '@'
+/**
+ * Header for Ares frames.
+ */
+#define ARES_FRAME_HEADER '^'
 
+/**
+ * Footer for Ares frames.
+ */
+#define ARES_FRAME_FOOTER '@'
+
+/**
+ * Number of bytes needed for the header field.
+ */
 #define ARES_FRAME_HEADER_OVERHEAD UINT32_C(1)
-#define ARES_FRAME_TYPE_OVERHEAD   UINT32_C(1)
-#define ARES_FRAME_LEN_OVERHEAD    UINT32_C(2)
+
+/**
+ * Number of bytes needed for the type field.
+ */
+#define ARES_FRAME_TYPE_OVERHEAD UINT32_C(1)
+
+/**
+ * Number of bytes needed for the length field.
+ */
+#define ARES_FRAME_LEN_OVERHEAD UINT32_C(2)
+
+/**
+ * Number of bytes needed for the footer field.
+ */
 #define ARES_FRAME_FOOTER_OVERHEAD UINT32_C(1)
+
+/**
+ * Number of bytes needed for an Ares frame.
+ */
 #define ARES_FRAME_OVERHEAD                                                    \
     (uint64_t)(ARES_FRAME_HEADER_OVERHEAD + ARES_FRAME_TYPE_OVERHEAD +         \
                ARES_FRAME_LEN_OVERHEAD + ARES_FRAME_FOOTER_OVERHEAD)
 
+/**
+ * @enum ares_frame_error
+ * @brief Frame related errors.
+ */
 enum ares_frame_error {
-    ARES_FRAME_ERROR_BAD_FRAME = 0,
-    ARES_FRAME_ERROR_BAD_TYPE = 1,
-    ARES_FRAME_ERROR_NOT_IMPLEMENTED = 2,
+    ARES_FRAME_ERROR_BAD_FRAME = 0, ///< Frame could not be deserialized.
+    ARES_FRAME_ERROR_BAD_TYPE = 1,  ///< Frame type not valid for reception.
+    ARES_FRAME_ERROR_NOT_IMPLEMENTED = 2, ///< Frame handler not implemented.
 };
 
+/**
+ * @enum ares_frame_type
+ * @brief Frame types.
+ */
 enum ares_frame_type {
     ARES_FRAME_SETTING,       ///< SETTING frame.
     ARES_FRAME_START,         ///< Start time frame.
@@ -48,11 +82,22 @@ enum ares_frame_type {
     ARES_FRAME_FRAMING_ERROR, ///< Framing error frame. TX only.
     ARES_FRAME_DBG,           ///< Debug frames, TX only.
 
-    ARES_FRAME_TYPE_INVALID,
+    ARES_FRAME_TYPE_INVALID, ///< Invalid frame.
 };
 
+/**
+ * @struct ares_frame
+ * @brief Structured representation of an ares frame.
+ */
 struct ares_frame {
+    /**
+     * Frame type.
+     */
     enum ares_frame_type type;
+
+    /**
+     * Frame payload.
+     */
     union {
         struct {
             uint16_t setting;
@@ -129,18 +174,86 @@ struct ares_frame {
     } payload;
 };
 
+/**
+ * @struct ares_frame_info
+ * @brief Serial buffer metadata that describes the location of a frame in a
+ * buffer, the size of the frame, and how many bytes need to be read before
+ * deserialization is possible.
+ */
 struct ares_frame_info {
+    /**
+     * Start index.
+     *
+     * @note -1 If no frame header was found.
+     */
     int start_index;
+
+    /**
+     * Size of the frame.
+     *
+     * @note -1 if no frame header was found.
+     */
     int frame_size;
+
+    /**
+     * Number of additional bytes needed for a complete frame.
+     *
+     * @note -1 if no frame header found.
+     */
     int bytes_left;
 };
 
+/**
+ * @brief Function to serialize an ares frame into a buffer.
+ *
+ * @param[out] buf Pointer to the destination buffer.
+ * @param[in] len The length of the destination buffer.
+ * @param[in] frame Pointer to the source frame.
+ *
+ * @return The number of bytes written to the buffer.
+ * @return -EINVAL if invalid parameters.
+ * @return -ENOBUFS buffer size is too small.
+ */
 int ares_serialize_frame(uint8_t *buf, size_t len,
                          const struct ares_frame *frame);
+
+/**
+ * @brief Function to deserialize an ares frame from a buffer.
+ *
+ * @param[out] frame Pointer to the destination frame.
+ * @param[in] buf Pointer to the start of the buffered frame.
+ * @param[in] len The length of the buffered frame.
+ *
+ * @return 0 on success.
+ * @return -EBADMSG if frame is not valid.
+ * @return -EINVAL on invalid parameters.
+ */
 int ares_deserialize_frame(struct ares_frame *frame, const uint8_t *buf,
                            size_t len);
+
+/**
+ * @brief Function to check if there is an ares frame in the buffer.
+ *
+ * @param[in] buf Pointer to source buffer.
+ * @param[in] len The number of valid bytes in the buffer.
+ * @param[out] info The metadata for finding the frame in the buffer.
+ *
+ * @return 1 if frame was found.
+ * @return 0 if no frame was found.
+ * @return -EINVAL if parameters are invalid.
+ */
 int ares_serial_frame_present(const uint8_t *buf, size_t len,
                               struct ares_frame_info *info);
+
+/**
+ * @brief Check if the frame in the buffer is valid.
+ *
+ * @param[in] buf Pointer to source buffer.
+ * @param[in] len The length of the serialized frame.
+ *
+ * @return `true` if the frame is valid.
+ * @return `false` otherwise.
+ */
 bool ares_check_if_frame(const uint8_t *buf, size_t len);
 
 #endif // ARES_SERIAL_FRAME_H
