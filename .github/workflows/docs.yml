@@ -43,10 +43,10 @@ jobs:
           sudo tar xf doxygen-${DOXYGEN_VERSION}.linux.bin.tar.gz -C /opt
           echo "/opt/doxygen-${DOXYGEN_VERSION}/bin" >> $GITHUB_PATH
 
-      - name: Build C++ Docs
+      - name: Build C/C++ Docs
         shell: bash
         run: |
-          doxygen serial-driver-core.doxygen
+          make docs
           
       - name: Set up uv
         uses: astral-sh/setup-uv@v6
