@@ -13,10 +13,10 @@ nav:
           - Serial Driver: serial-driver/python-api/serial_driver.md
           - Device Firmware Update: serial-driver/python-api/dfu.md
           - Utilities: serial-driver/python-api/utils.md
-      - C++ API: serial-driver/cpp-api/html/index.html
+      - C++ API: 'serial-driver/cpp-api/html/index.html" target="_blank'
   - Firmware:
       - Home: firmware/index.md
-      - Code Documentation: firmware/firmware-docs/html/index.html
+      - Code Documentation: 'firmware/firmware-docs/html/index.html" target="_blank'
 
 extra_css:
   - stylesheets/extra.css
