@@ -15,11 +15,21 @@
 #include <zephyr/drivers/lora.h>
 #include <zephyr/kernel.h>
 
+/**
+ * @enum lora_transport_evt
+ * LoRa transport events.
+ */
 enum lora_transport_evt {
-    LORA_TRANSPORT_EVT_RX_RDY,
-    LORA_TRANSPORT_EVT_TX_RDY,
+    LORA_TRANSPORT_EVT_RX_RDY, ///< LoRa Rx data ready.
+    LORA_TRANSPORT_EVT_TX_RDY, ///< LoRa Tx ready
 };
 
+/**
+ * @brief LoRa transport event handler prototype.
+ *
+ * @param[in] evt The event that occurred.
+ * @param[in] ctx Pointer to the event context.
+ */
 typedef void (*lora_transport_handler_t)(enum lora_transport_evt evt,
                                          void *ctx);
 
@@ -28,15 +38,87 @@ typedef void (*lora_transport_handler_t)(enum lora_transport_evt evt,
 struct ares_lora;
 struct ares_lora_transport;
 
+/**
+ * @struct ares_lora_transport_api
+ * @brief Unified LoRa transport interface.
+ */
 struct ares_lora_transport_api {
+    /**
+     * @brief Function for initializing the LoRa transport interface.
+     *
+     * @param[in] transport Pointer to the transfer instance.
+     * @param[in] config Pointer to the instance configuration.
+     * @param[in] evt_handler Event handler.
+     * @param[in] context Pointer to the context passed to event handler.
+     *
+     * @return 0 on success.
+     * @return negative error code otherwise.
+     */
     int (*init)(const struct ares_lora_transport *transport, const void *config,
                 lora_transport_handler_t evt_handler, void *context);
+
+    /**
+     * @brief Function for uninitializing the LoRa transport interface.
+     *
+     * @param[in] transport Pointer to the transfer instance.
+     *
+     * @return 0 on success.
+     * @return negative error code otherwise.
+     */
     int (*uninit)(const struct ares_lora_transport *transport);
+
+    /**
+     * @brief Function for enabling transport in given TX mode.
+     *
+     * Function can be used to reconfigure TX to work in blocking mode.
+     *
+     * @param[in] transport Pointer to transfer instance.
+     * @param[in] block_tx If true, the transport TX is enabled in blocking
+     * mode.
+     *
+     * @return 0 on success.
+     * @return negative error code otherwise.
+     */
     int (*enable)(const struct ares_lora_transport *transport, bool block_tx);
+
+    /**
+     * @brief Function for writing data to the transfer interface.
+     *
+     * @param[in] transport Pointer to the transfer interface.
+     * @param[in] data Pointer to the source buffer.
+     * @param[in] length Source buffer length.
+     * @param[out] cnt Pointer to the sent bytes counter.
+     *
+     * @return 0 on success.
+     * @return negative error code otherwise.
+     */
     int (*write)(const struct ares_lora_transport *transport, const void *data,
                  size_t length, size_t *cnt);
+
+    /**
+     * @brief Function for reading data from the transport interface.
+     *
+     * @param[in] transport Pointer to the transfer instance.
+     * @param[in] data Pointer to the destination buffer.
+     * @param[in] length Destination buffer length.
+     * @param[out] cnt Pointer to the received bytes counter.
+     *
+     * @return 0 on success.
+     * @return negative error code otherwise.
+     */
     int (*read)(const struct ares_lora_transport *transport, void *data,
                 size_t length, size_t *cnt);
+
+    /**
+     * @brief Function for reconfiguring the LoRa modem defined in the transport
+     * interface.
+     *
+     * @param[in] transport Pointer to the transfer instance.
+     * @param[in] config Pointer to the new LoRa modem configurations.
+     *
+     * @return 0 on success.
+     * @return negative error code otherwise.
+     */
     int (*configure)(const struct ares_lora_transport *transport,
                      const struct lora_modem_config *config);
 };
