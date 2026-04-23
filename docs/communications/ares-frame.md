@@ -114,18 +114,18 @@ payload structure is as follows:
 | __Field__ | Frequency  | Preamble Length | Bandwidth | Data Rate | Coding Rate | Tx Power | CAD Mode  | CAD Symbol Number | Detection Peak | Detection Minimum |
 | __Type__  | `uint32_t` |   `uint16_t`    | `uint8_t` | `uint8_t` |  `uint8_t`  | `int8_t` | `uint8_t` |     `uint8_t`     |   `uint8_t`    |     `uint8_t`     |
 
-| Field             |  Default  | Description                                                     |
-|:------------------|:---------:|:----------------------------------------------------------------|
-| Frequency         | 915000000 | Frequency in Hz to use for transceiving.                        |
-| Preamble Length   |     8     | Length of the preamble.                                         |
-| Bandwidth         |     0     | The bandwidth to use for transceiving.                          |
-| Data Rate         |    12     | The data-rate to use for transceiving.                          |
-| Coding Rate       |     1     | The coding rate to use for transceiving.                        |
-| Tx Power          |     4     | TX-power in dBm to use for transmission.                        |
-| CAD Mode          |     0     | Channel Activity Detection mode.                                |
-| CAD Symbol Number |     0     | Number of symbols used for Channel Activity Detection.          |
-| Detection Peak    |     0     | Detection peak threshold (hardware-specific, dimensionless).    |
-| Detection Minimum |     0     | Minimum detection threshold (hardware-specific, dimensionless). |
+| Field             | Default Configuration | Description                                                     |
+|:------------------|:---------------------:|:----------------------------------------------------------------|
+| Frequency         |       915000000       | Frequency in Hz to use for transceiving.                        |
+| Preamble Length   |           8           | Length of the preamble.                                         |
+| Bandwidth         |           0           | The bandwidth to use for transceiving.                          |
+| Data Rate         |          12           | The data-rate to use for transceiving.                          |
+| Coding Rate       |           1           | The coding rate to use for transceiving.                        |
+| Tx Power          |           4           | TX-power in dBm to use for transmission.                        |
+| CAD Mode          |           0           | Channel Activity Detection mode.                                |
+| CAD Symbol Number |           0           | Number of symbols used for Channel Activity Detection.          |
+| Detection Peak    |           0           | Detection peak threshold (hardware-specific, dimensionless).    |
+| Detection Minimum |           0           | Minimum detection threshold (hardware-specific, dimensionless). |
 
 * __Payload size__: 14 bytes
 
@@ -133,3 +133,167 @@ payload structure is as follows:
 
     CAD Mode, CAD Symbol Number, Detection Peak, and Detection Minimum are unused (for future use). Zephyr RTOS kernel 
     version v4.4.0 or newer is required for these fields.
+
+
+## LED Frame
+
+LED frames are used to either get the current state/action of the LED or to set a new state/action of the LED. The
+payload is structured as follows:
+
+|           |              |
+|-----------|:------------:|
+| __Field__ | State/Action |
+| __Type__  |  `uint8_t`   |
+
+| State/Action | Value | Description                                      |
+|:-------------|:-----:|:-------------------------------------------------|
+| OFF          |   0   | Turn LED off.                                    |
+| ON           |   1   | Turn LED on.                                     |
+| BLINK        |   2   | Blink LED at 1 Hz.                               |
+| FETCH        |   3   | Retrieve the current LED state/action. (RX only) |
+
+* __Payload size__: 1 byte
+
+
+## HEARTBEAT Frame
+
+The heartbeat frame is used to serve 2 purposes:
+
+1. Indicate if a node is live
+2. Indicate if a node is ready to collect data
+
+The payload is structured as follows:
+
+|           |           |           |            |
+|-----------|:---------:|:---------:|:----------:|
+| __Field__ |   Flags   | TX Count  |  Node ID   |
+| __Type__  | `uint8_t` | `uint8_t` | `uint16_t` |
+
+| Field    | Description                                                       |
+|:---------|:------------------------------------------------------------------|
+| Flags    | `bit 0`: ready <br> `bit 1`: broadcast <br> `bit 7:2`: Reserved   |
+| TX Count | How many times to send the heartbeat message.                     |
+| Node ID  | The node ID the message is directed to, or the node ID of source. |
+
+* __Payload size__: 4 bytes
+
+!!! note
+
+    When receiving, if the `broadcast` flag is set, the `Node ID` field is ignored. 
+
+    When transmitting, the `broadcast` flag indicates if the message was broadcasted, and the `Node ID` is the source 
+    of the message.
+
+
+## CLAIM Frame
+
+The claim frame is used to indicate which node is the master node in the network. The payload is structured as follows:
+
+|           |            |
+|-----------|:----------:|
+| __Field__ |     id     |
+| __Type__  | `uint16_t` |
+
+* __Payload size__: 2 bytes
+
+!!! note
+
+    When receiving the frame, `id` is the node id that the message should be directed to. 
+
+    When sending the frame, `id` is the node ID of the message source.
+
+## LOG Frame
+
+Log frames are used to send logging messages to other nodes, either through a broadcast or a direct message. The payload
+is structured as follows:
+
+|           |           |            |           |           |                 |            |          |
+|-----------|:---------:|:----------:|:---------:|:---------:|:---------------:|:----------:|:--------:|
+| __Field__ | broadcast |     id     | tx count  |   part    | number of parts |   log Id   | message  |
+| __Type__  |  `bool`   | `uint16_t` | `uint8_t` | `uint8_t` |    `uint8_t`    | `uint16_t` | `char[]` |
+
+* __Payload size__: 8 + `len(message)`
+
+!!! note
+
+    When receiving, if `broadcast` is set to `true`, `id` is ignored. If `broadcast` is set to `false`, then `id` is the
+    destination ID.
+
+    When transmitting, the `broadcast` flag indicates if the message received was a broadcast message, and `id` is the
+    source ID of the message. `tx count` is ignored.
+
+!!! Warning
+
+    To avoid network congestion, log messages should be kept short and sent rarely.
+
+
+## LOG_ACK Frame
+
+Log ACK frames are used to indicate that a log message was acknowledged by the node that it was directed to. The 
+payload is structured as follows:
+
+|           |           |                 |            |
+|-----------|:---------:|:---------------:|:----------:|
+| __Field__ |   part    | number of parts |   log id   |
+| __Type__  | `uint8_t` |    `uint8_t`    | `uint16_t` |
+
+* __Payload size__: 4 bytes
+
+!!! note
+
+    This frame is expected if the LOG frame sent was directed to another node.
+
+## VERSION Frames
+
+Version frames are used to indicate the firmware versions. The payload is structured as follows:
+
+|           |             |             |                     |
+|-----------|:-----------:|:-----------:|:-------------------:|
+| __Field__ | App version | NCS version | Zephyr RTOS version |
+| __Type__  | `uint32_t`  | `uint32_t`  |     `uint32_t`      |
+
+!!! note
+
+    On reception, the payload is ignored.
+
+## ACK Frame
+
+The ACK frame is one of the ways for the firmware to acknowledge the received frame. Additionally, it provides
+an error code to indicate if the previous request from the host succeeded or not. The payload is structured as follows:
+
+|           |            |
+|-----------|:----------:|
+| __Field__ | error code |
+| __Type__  | `int32_t`  |
+
+* __Payload size__: 4 bytes
+
+!!! note
+
+    An error code of 0 indicates success.
+
+## FRAMING_ERROR Frame
+
+The Framing error frame is used by the firmware to indicate if there was an error deserializing or deploying a frame. 
+The payload is structured as follows:
+
+|           |            |
+|-----------|:----------:|
+| __Field__ |   error    |
+| __Type__  | `uint32_t` |
+
+| Error           | Value | Description                 |
+|:----------------|:-----:|:----------------------------|
+| Bad frame       |   0   | Not framed correctly.       |
+| Bad type        |   1   | Frame type invalid.         |
+| Not implemented |   2   | Frame type not implemented. |
+
+## DBG Frame
+
+The debug frame is used to indicate errors in the firmware that are not related to other frames. The payload is 
+structures as follows:
+
+|           |           |
+|-----------|:---------:|
+| __Field__ |   code    |
+| __Type__  | `int32_t` |
