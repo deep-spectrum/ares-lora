@@ -17,6 +17,6 @@ PYBIND11_MODULE(_core, m, py::mod_gil_not_used()) {
 #if defined(VERSION_INFO)
     m.attr("__version__") = MACRO_STRINGIFY(VERSION_INFO);
 #else
-    m.attr(__version__) = "dev";
+    m.attr("__version__") = "dev";
 #endif
 }
