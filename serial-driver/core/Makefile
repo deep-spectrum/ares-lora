@@ -14,7 +14,21 @@ format:
 	@find . $(PRUNE_ARGS) -type f \( $(FORMAT_FILES) \) -print | xargs clang-format -i
 
 style:
-	clang-tidy -header-filter='^((?!extern/).)*$$' \
+	@clang-tidy -header-filter='^((?!extern/).)*$$' \
     		$$(find . -path "./extern" -prune -o -path "./.*" -prune -o $(FORMAT_FILES) -print) \
     		-- -std=c++17 $(PYTHON_INCLUDES) $(INCLUDE_FLAGS) \
     		-isystem extern/pybind11/include -isystem extern/ares-common/include -isystem extern/ares-common/include/common
+
+scc:
+	@bash -c 'CODE_FILES=$$(find src include */src */include \( -name "*.cpp" -o -name "*.hpp" -o -name "*.h" \) 2>/dev/null); \
+	printf "SCC Report:\n"; \
+	printf "Status\tSCC\tfilename(definition line number):function\n"; \
+	pmccabe $$CODE_FILES 2>/dev/null | awk -v r="$$(tput setaf 1)" -v g="$$(tput setaf 2)" -v y="$$(tput setaf 3)" -v n="$$(tput sgr0)" " \
+	{ \
+		if (\$$1 <= 10) \
+			printf \"%sOK\t%s\t%s %s%s\n\", g, \$$1, \$$6, \$$7, n; \
+		else if (\$$1 <= 15) \
+			printf \"%sWARNING\t%s\t%s %s%s\n\", y, \$$1, \$$6, \$$7, n; \
+		else \
+			printf \"%sERROR\t%s\t%s %s%s\n\", r, \$$1, \$$6, \$$7, n; \
+	}"'
