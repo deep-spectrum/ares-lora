@@ -288,6 +288,8 @@ The payload is structured as follows:
 | Bad type        |   1   | Frame type invalid.         |
 | Not implemented |   2   | Frame type not implemented. |
 
+* __Payload size__: 4 bytes
+
 ## DBG Frame
 
 The debug frame is used to indicate errors in the firmware that are not related to other frames. The payload is 
@@ -297,3 +299,5 @@ structures as follows:
 |-----------|:---------:|
 | __Field__ |   code    |
 | __Type__  | `int32_t` |
+
+* __Payload size__: 4 bytes
