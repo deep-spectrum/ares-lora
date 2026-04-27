@@ -2,7 +2,10 @@ site_name: Ares-LoRa
 repo_url: https://github.com/deep-spectrum/ares-lora/
 repo_name: deep-spectrum/ares-lora
 nav:
-  - Home: index.md
+  - Home:
+      - Home: index.md
+      - License: license.md
+      - AI Usage Policy: ai-usage.md
   - Communication:
       - Home: communications/index.md
       - Frames: communications/ares-frame.md
