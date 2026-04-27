@@ -7,6 +7,7 @@ style:
 
 scc:
 	@cd serial-driver/core; make scc
+	@cd firmware; make scc
 
 docs:
 	@doxygen serial-driver-core.doxygen
