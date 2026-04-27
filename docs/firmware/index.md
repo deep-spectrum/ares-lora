@@ -29,9 +29,9 @@ for installing NCS.
 
 These are the hardware platforms used:
 
-| Module/Board        | Microcontroller | LoRa Module    |
-|:--------------------|:----------------|:---------------|
-| RAKwireless RAK4631 | Nordic nRF52840 | Semtech SX1262 |
+| Module/Board                                                                                                              | Microcontroller | LoRa Module    |
+|:--------------------------------------------------------------------------------------------------------------------------|:----------------|:---------------|
+| [RAKwireless RAK4631](https://store.rakwireless.com/products/rak4631-lpwan-node?variant=37505443987654){:target="_blank"} | Nordic nRF52840 | Semtech SX1262 |
 
 ## How to build
 
