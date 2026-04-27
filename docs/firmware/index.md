@@ -35,3 +35,25 @@ These are the hardware platforms used:
 
 ## How to build
 
+Release builds are available on GitHub, however, if you need to build locally, this section will explain how to do that.
+Also, see the [Firmware Builds](firmware-builds.md) page to see the build parameters and commands.
+
+### In VS code
+
+1. Click on "Add build configuration."
+2. Select SDK and toolchain to be "nRF Connect SDK v3.2.2" and "nRF Connect SDK Toolchain v3.2.2" respectively.
+3. Select your target board.
+4. Add any overlays and Kconfig fragments needed for the build.
+5. Select optimization level.
+6. Press "Generate and Build."
+
+### CLI
+
+Run the following commands to get into the correct environment:
+
+``` {.bash .copy}
+$ cd firmware
+$ nrfutil sdk-manager toolchain launch --ncs-version v3.2.2 --shell
+$ source <path to ncs directory>/v3.2.2/zephyr/zephyr-env.sh
+$ <west build command (refer to build configs>
+```

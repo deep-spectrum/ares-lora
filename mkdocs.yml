@@ -21,6 +21,7 @@ nav:
           - Code Documentation: 'serial-driver/cpp-api/html/index.html" target="_blank'
   - Firmware:
       - Home: firmware/index.md
+      - Build Configurations: firmware/build-configs.md
       - Flashing: firmware/flashing.md
       - Code Standards: firmware/standards.md
       - Code Documentation: 'firmware/firmware-docs/html/index.html" target="_blank'
