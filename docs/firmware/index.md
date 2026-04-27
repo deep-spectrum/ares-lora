@@ -36,7 +36,7 @@ These are the hardware platforms used:
 ## How to build
 
 Release builds are available on GitHub, however, if you need to build locally, this section will explain how to do that.
-Also, see the [Firmware Builds](firmware-builds.md) page to see the build parameters and commands.
+Also, see the [Build Configurations](build-configs.md) page to see the build parameters and commands.
 
 ### In VS code
 
