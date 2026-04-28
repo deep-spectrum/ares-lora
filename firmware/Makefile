@@ -23,3 +23,6 @@ scc:
 		else \
 			printf \"%sERROR\t%s\t%s %s%s\n\", r, \$$1, \$$6, \$$7, n; \
 	}"'
+
+style:
+	@bash -i sca-check.bash

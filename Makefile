@@ -3,6 +3,7 @@ format:
 	@cd serial-driver/core; make format
 
 style:
+	@cd firmware; make style
 	@cd serial-driver/core; make style
 
 scc:
