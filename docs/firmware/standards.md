@@ -257,7 +257,7 @@ a PR.
 
 Run the following command:
 
-``` {.bash}
+``` {.bash .copy}
 make scc
 ```
 
@@ -269,7 +269,7 @@ between 11 and 15.
 
 Run the following command:
 
-``` {.bash}
+``` {.bash .copy}
 make style
 ```
 
@@ -283,7 +283,7 @@ Consistent formatting is necessary to maintain readability of the code
 base. Luckily, there\'s a tool that does it for you already. Just run
 the following command:
 
-``` {.bash}
+``` {.bash .copy}
 make format
 ```
 
