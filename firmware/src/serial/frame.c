@@ -89,6 +89,12 @@ static size_t calculate_frame_length(const struct ares_frame *frame) {
         payload_len = FSIZEOF_FIELD(DBG);
         break;
     }
+    case ARES_FRAME_PKT_RX: {
+        payload_len = FSIZEOF_FIELD(PKT_RX.seq_cnt) +
+                      FSIZEOF_FIELD(PKT_RX.packet_id) +
+                      FSIZEOF_FIELD(PKT_RX.src_id);
+        break;
+    }
     default: {
         __ASSERT(false, "Invalid frame type received");
         break;
@@ -192,6 +198,12 @@ static void serialize(uint8_t *buf, const struct ares_frame *frame,
     }
     case ARES_FRAME_DBG: {
         FSERIALIZE(DBG);
+        break;
+    }
+    case ARES_FRAME_PKT_RX: {
+        FSERIALIZE(PKT_RX.seq_cnt);
+        FSERIALIZE(PKT_RX.packet_id);
+        FSERIALIZE(PKT_RX.src_id);
         break;
     }
     default:
