@@ -18,16 +18,19 @@ nav:
           - Utilities: serial-driver/python-api/utils.md
       - C++ API:
           - Code Standards: serial-driver/standards.md
-          - Code Documentation: 'serial-driver/cpp-api/html/index.html" target="_blank'
+          - Code Documentation: serial-driver/cpp-api/html/index.html
   - Firmware:
       - Home: firmware/index.md
       - Build Configurations: firmware/build-configs.md
       - Flashing: firmware/flashing.md
       - Code Standards: firmware/standards.md
-      - Code Documentation: 'firmware/firmware-docs/html/index.html" target="_blank'
+      - Code Documentation: firmware/firmware-docs/html/index.html
 
 extra_css:
   - stylesheets/extra.css
+
+extra_javascript:
+  - javascript/doxygen_links.js
 
 theme:
   name: material
