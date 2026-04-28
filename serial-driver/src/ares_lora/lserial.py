@@ -213,6 +213,7 @@ class LoraSerial:
             claim_callback=self._handle_claim,
             log_callback=self._handle_log,
             packet_rx_callback=self._handle_packet_rx,
+            packet_tx_callback=self._handle_tx_done_event,
         )
 
         self._start_cb = config.start_callback
@@ -249,7 +250,6 @@ class LoraSerial:
     def _handle_tx_done_event(self, count: int):
         with self._tx_stats_lock:
             self._tx_stats += count
-
 
     def _handle_start(self, sec: int, nsec: int, src: int, broadcast: bool, seq_cnt: int, packet_id: int):
         if self._should_event_be_dispatched(src, packet_id):
