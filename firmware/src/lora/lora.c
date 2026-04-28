@@ -9,7 +9,6 @@
  */
 
 #include <lora/lora.h>
-#include <serial/serial.h>
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
 
@@ -132,6 +131,9 @@ int ares_lora_register_command_callbacks(
     return 0;
 }
 
+#if IS_ENABLED(CONFIG_ARES_LORA_NOTIF_RX_PACKETS)
+#include <serial/serial.h>
+
 static void notify_received_packet(const struct ares_packet *packet) {
     const struct ares_serial *serial = ares_serial_backend_uart_get_ptr();
     struct ares_frame frame = {
@@ -146,6 +148,9 @@ static void notify_received_packet(const struct ares_packet *packet) {
 
     (void)ares_serial_write_frame(serial, &frame);
 }
+#else
+#define notify_received_packet(...) (void)0
+#endif
 
 static void dispatch(const struct ares_lora *lora, int start_index,
                      size_t length) {

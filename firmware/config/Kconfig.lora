@@ -40,4 +40,8 @@ config LORA_CRC_POLYNOMIAL
 
 endmenu # CRC Configurations
 
+config ARES_LORA_NOTIF_RX_PACKETS
+    bool "Notify serial when packets are received"
+    default y
+
 endmenu  # LoRa Configurations
