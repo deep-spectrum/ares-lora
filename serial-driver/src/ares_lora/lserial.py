@@ -210,6 +210,7 @@ class LoraSerial:
             heartbeat_callback=self._handle_heartbeat,
             claim_callback=self._handle_claim,
             log_callback=self._handle_log,
+            packet_rx_callback=self._handle_packet_rx,
         )
 
         self._start_cb = config.start_callback
@@ -234,6 +235,9 @@ class LoraSerial:
             self._nodes[src]["packet"] = packet_id
             return True
         return False
+
+    def _handle_packet_rx(self, seq_cnt: int, packet_id: int, source_id: int):
+        pass
 
     def _handle_start(self, sec: int, nsec: int, src: int, broadcast: bool, seq_cnt: int, packet_id: int):
         if self._should_event_be_dispatched(src, seq_cnt, packet_id):

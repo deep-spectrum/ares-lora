@@ -132,6 +132,13 @@ struct AresSerialConfigs {
      * Beta parameter for the Gamma distribution.
      */
     double beta = 2.0;
+
+    /**
+     * Packet Received callback.
+     * Parameters: (Sequence Count, Packet ID, Source ID).
+     */
+    std::function<void(uint8_t, uint16_t, uint16_t)> packet_rx_callback =
+        nullptr;
 };
 
 /**
@@ -410,6 +417,9 @@ class AresSerial {
     static py::tuple _decode_version(uint32_t version_num);
 
     static void _debug_event(const AresFrame::Dbg &msg);
+
+    std::function<void(uint8_t, uint16_t, uint16_t)> _pkt_rx_cb = nullptr;
+    void _packet_rx_event(const AresFrame::PktRx &msg) const;
 };
 
 #endif // ARES_ARES_LORA_SERIAL_HPP

@@ -86,7 +86,7 @@ AresSerialConfigs::AresSerialConfigs(const py::kwargs &kwargs) {
     from_kwargs(kwargs, SP(port), SP(response_timeout), SP(rx_period),
                 SP(start_callback), SP(serial_timeout), SP(master),
                 SP(heartbeat_callback), SP(claim_callback), SP(log_callback),
-                SP(alpha), SP(beta));
+                SP(alpha), SP(beta), SP(packet_rx_callback));
 }
 
 AresLoraConfig::AresLoraConfig(const py::kwargs &kwargs) {
@@ -119,6 +119,7 @@ AresSerial::AresSerial(const AresSerialConfigs &configs)
     _heartbeat_callback = configs.heartbeat_callback;
     _claim_callback = configs.claim_callback;
     _log_callback = configs.log_callback;
+    _pkt_rx_cb = configs.packet_rx_callback;
 }
 
 AresSerial::~AresSerial() {
@@ -639,6 +640,10 @@ void AresSerial::_process_frames_helper() {
             _debug_event(std::get<AresFrame::Dbg>(frame.payload));
             break;
         }
+        case AresFrame::PKT_RX: {
+            _packet_rx_event(std::get<AresFrame::PktRx>(frame.payload));
+            break;
+        }
         default: {
             LOG_ERR("Invalid frame received: %d", static_cast<int>(frame.type));
             break;
@@ -906,4 +911,16 @@ py::tuple AresSerial::_decode_version(uint32_t version_num) {
 
 void AresSerial::_debug_event(const AresFrame::Dbg &msg) {
     LOG_DBG("Received debug event: %d", msg.code);
+}
+
+void AresSerial::_packet_rx_event(const AresFrame::PktRx &msg) const {
+    LOG_DBG("Received packet (%u, %u, %u)", msg.seq_cnt, msg.packet_id,
+            msg.src_id);
+
+    if (!_pkt_rx_cb) {
+        LOG_DBG("Packet received handler not registered");
+        return;
+    }
+
+    _pkt_rx_cb(msg.seq_cnt, msg.packet_id, msg.src_id);
 }
