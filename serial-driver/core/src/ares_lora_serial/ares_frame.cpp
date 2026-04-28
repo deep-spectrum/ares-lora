@@ -233,6 +233,11 @@ void AresFrame::parse(const std::vector<uint8_t> &bytearray,
                             payload_len);
         break;
     }
+    case PKT_TX: {
+        _deserialize_pkt_tx(&bytearray[start_index + payload_offset],
+                            payload_len);
+        break;
+    }
     default: {
         throw AresFrameError("Invalid RX type");
     }
@@ -594,5 +599,12 @@ void AresFrame::_deserialize_pkt_rx(const uint8_t *buf, size_t len) {
     DESERIALIZE(seq_cnt);
     DESERIALIZE(packet_id);
     DESERIALIZE(src_id);
+    DESERIALIZE_FINALIZE();
+}
+
+void AresFrame::_deserialize_pkt_tx(const uint8_t *buf, size_t len) {
+    ARG_UNUSED(len);
+    DESERIALIZE_INIT(PktTx);
+    DESERIALIZE(count);
     DESERIALIZE_FINALIZE();
 }

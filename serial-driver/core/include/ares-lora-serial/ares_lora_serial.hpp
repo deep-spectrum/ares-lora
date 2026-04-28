@@ -139,6 +139,12 @@ struct AresSerialConfigs {
      */
     std::function<void(uint8_t, uint16_t, uint16_t)> packet_rx_callback =
         nullptr;
+
+    /**
+     * Packet Transmitted callback.
+     * Parameters: (Number of transmissions).
+     */
+    std::function<void(uint32_t)> packet_tx_callback = nullptr;
 };
 
 /**
@@ -420,6 +426,9 @@ class AresSerial {
 
     std::function<void(uint8_t, uint16_t, uint16_t)> _pkt_rx_cb = nullptr;
     void _packet_rx_event(const AresFrame::PktRx &msg) const;
+
+    std::function<void(uint32_t)> _pkt_tx_cb = nullptr;
+    void _packet_tx_event(const AresFrame::PktTx &msg) const;
 };
 
 #endif // ARES_ARES_LORA_SERIAL_HPP
