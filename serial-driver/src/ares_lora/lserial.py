@@ -218,29 +218,29 @@ class LoraSerial:
         self._claim_cb = config.claim_callback
         self._log_cb = config.log_callback
         self._dev = _AresSerial(configs)
-        self._nodes: dict[int, dict[str, int]] = {}
+        self._nodes: dict[int, int] = {}
         self._log_msg: dict[int, LogMessage] = {}
+        self._rx_stats: dict[int, int] = {}
 
-    def _should_event_be_dispatched(self, src: int, seq_cnt: int, packet_id: int) -> bool:
+    def _should_event_be_dispatched(self, src: int, packet_id: int) -> bool:
         if src not in self._nodes:
-            self._nodes[src] = {"sequence": seq_cnt, "packet": packet_id, "drops": 0}
+            self._nodes[src] = packet_id
             return True
 
-        next_seq = (self._nodes[src]["sequence"] + 1) % 256
-        if next_seq != seq_cnt:
-            self._nodes[src]["drops"] += 1
-        self._nodes[src]["sequence"] = seq_cnt
-
-        if self._nodes[src]["packet"] != packet_id:
-            self._nodes[src]["packet"] = packet_id
+        if self._nodes[src] != packet_id:
+            self._nodes[src] = packet_id
             return True
         return False
 
     def _handle_packet_rx(self, seq_cnt: int, packet_id: int, source_id: int):
-        pass
+        if source_id not in self._rx_stats:
+            self._rx_stats[source_id] = 1
+            return
+        self._rx_stats[source_id] += 1
+
 
     def _handle_start(self, sec: int, nsec: int, src: int, broadcast: bool, seq_cnt: int, packet_id: int):
-        if self._should_event_be_dispatched(src, seq_cnt, packet_id):
+        if self._should_event_be_dispatched(src, packet_id):
             logger.info(f"Received start message (sec: {sec}, nsec: {nsec}, src: {src}, "
                         f"broadcast: {broadcast}, sequence count: {seq_cnt}, packet id: {packet_id})")
             if self._start_cb is not None:
