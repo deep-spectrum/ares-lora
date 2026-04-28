@@ -6,6 +6,8 @@ import functools
 from .errno import strerror
 import logging
 from .utils import check_serial_port
+from threading import Lock
+import copy
 
 logger = logging.getLogger("ares_lora")
 
@@ -220,7 +222,12 @@ class LoraSerial:
         self._dev = _AresSerial(configs)
         self._nodes: dict[int, int] = {}
         self._log_msg: dict[int, LogMessage] = {}
+
         self._rx_stats: dict[int, int] = {}
+        self._rx_stats_lock = Lock()
+
+        self._tx_stats: int = 0
+        self._tx_stats_lock = Lock()
 
     def _should_event_be_dispatched(self, src: int, packet_id: int) -> bool:
         if src not in self._nodes:
@@ -233,10 +240,15 @@ class LoraSerial:
         return False
 
     def _handle_packet_rx(self, seq_cnt: int, packet_id: int, source_id: int):
-        if source_id not in self._rx_stats:
-            self._rx_stats[source_id] = 1
-            return
-        self._rx_stats[source_id] += 1
+        with self._rx_stats_lock:
+            if source_id not in self._rx_stats:
+                self._rx_stats[source_id] = 1
+                return
+            self._rx_stats[source_id] += 1
+
+    def _handle_tx_done_event(self, count: int):
+        with self._tx_stats_lock:
+            self._tx_stats += count
 
 
     def _handle_start(self, sec: int, nsec: int, src: int, broadcast: bool, seq_cnt: int, packet_id: int):
@@ -498,3 +510,15 @@ class LoraSerial:
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.stop_driver()
+
+    @property
+    def reception_count(self) -> dict[int, int]:
+        with self._rx_stats_lock:
+            ret = copy.deepcopy(self._rx_stats)
+        return ret
+
+    @property
+    def transmission_count(self) -> int:
+        with self._tx_stats_lock:
+            ret = self._tx_stats
+        return ret
