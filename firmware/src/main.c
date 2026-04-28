@@ -11,7 +11,8 @@ LOG_MODULE_REGISTER(main);
 #define LED_ON        0
 #define LED_OFF       1
 
-static const struct gpio_dt_spec led = GPIO_DT_SPEC_GET(LED0_NODE, gpios);
+static const struct gpio_dt_spec led = // NOLINT(*-interfaces-global-init)
+    GPIO_DT_SPEC_GET(LED0_NODE, gpios);
 
 static enum led_state state = BLINK;
 K_MUTEX_DEFINE(led_mtx);

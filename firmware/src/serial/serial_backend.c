@@ -102,7 +102,7 @@ static void ares_uart_tx_handle(const struct device *dev,
     if (len != 0) {
         int err;
 
-        len = uart_fifo_fill(dev, data, len);
+        len = uart_fifo_fill(dev, data, (int)len);
         err = ring_buf_get_finish(&uart->tx_ringbuf, len);
         __ASSERT_NO_MSG(err == 0);
         ARG_UNUSED(err);

@@ -31,7 +31,7 @@ typedef uint16_t crc16_t;
     (ARES_PACKET_SRC_ID_OFFSET + ARES_PACKET_SRC_ID_OVERHEAD)
 #define ARES_PACKET_PAYLOAD_TYPE_OFFSET(packet_type)                           \
     ((ARES_PACKET_SRC_ID_OFFSET + ARES_PACKET_SRC_ID_OVERHEAD) +               \
-     ((packet_type == ARES_PKT_TYPE_DIRECT) * ARES_PACKET_DST_ID_OVERHEAD))
+     (((packet_type) == ARES_PKT_TYPE_DIRECT) * ARES_PACKET_DST_ID_OVERHEAD))
 #define ARES_PACKET_PAYLOAD_OFFSET(packet_type)                                \
     (ARES_PACKET_PAYLOAD_TYPE_OFFSET(packet_type) +                            \
      ARES_PACKET_PAYLOAD_TYPE_OVERHEAD)
@@ -46,7 +46,7 @@ typedef uint16_t crc16_t;
 #define ARES_PACKET_MAX_OVERHEAD                                               \
     MAX(ARES_PACKET_BROADCAST_OVERHEAD, ARES_PACKET_DIRECT_OVERHEAD)
 #define ARES_PACKET_OVERHEAD(packet_type)                                      \
-    ((packet_type == ARES_PKT_TYPE_BROADCAST)                                  \
+    (((packet_type) == ARES_PKT_TYPE_BROADCAST)                                \
          ? (ARES_PACKET_BROADCAST_OVERHEAD)                                    \
          : (ARES_PACKET_DIRECT_OVERHEAD))
 

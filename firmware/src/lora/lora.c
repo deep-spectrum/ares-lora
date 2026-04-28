@@ -248,7 +248,7 @@ static int ares_lora_write(const struct ares_lora *lora, const void *data,
 
     if (err != 0) {
         if (length != nbytes) {
-            return offset;
+            return (int)offset;
         }
         return err;
     }

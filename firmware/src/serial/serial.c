@@ -265,7 +265,7 @@ static int ares_write(const struct ares_serial *serial, const void *data,
 
 int ares_serial_write_frame(const struct ares_serial *serial,
                             const struct ares_frame *frame) {
-    uint8_t buffer[ARES_SERIAL_TRX_BUF_SIZE];
+    uint8_t buffer[ARES_SERIAL_TRX_BUF_SIZE]; // NOLINT(*-branch-clone)
     int len;
 
     if (serial == NULL || frame == NULL) {

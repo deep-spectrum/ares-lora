@@ -28,9 +28,9 @@ static struct modem_id modem_id;
 
 #define CHECK_DIRECTED_PACKET(packet)                                          \
     do {                                                                       \
-        if (packet->type == ARES_PKT_TYPE_DIRECT &&                            \
-            (packet->destination_id != modem_id.id ||                          \
-             packet->pan_id != modem_id.pan_id)) {                             \
+        if ((packet)->type == ARES_PKT_TYPE_DIRECT &&                          \
+            ((packet)->destination_id != modem_id.id ||                        \
+             (packet)->pan_id != modem_id.pan_id)) {                           \
             return;                                                            \
         }                                                                      \
     } while (0)
