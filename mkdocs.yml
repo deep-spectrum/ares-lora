@@ -2,7 +2,10 @@ site_name: Ares-LoRa
 repo_url: https://github.com/deep-spectrum/ares-lora/
 repo_name: deep-spectrum/ares-lora
 nav:
-  - Home: index.md
+  - Home:
+      - Home: index.md
+      - License: license.md
+      - AI Usage Policy: ai-usage.md
   - Communication:
       - Home: communications/index.md
       - Frames: communications/ares-frame.md
@@ -13,10 +16,15 @@ nav:
           - Serial Driver: serial-driver/python-api/serial_driver.md
           - Device Firmware Update: serial-driver/python-api/dfu.md
           - Utilities: serial-driver/python-api/utils.md
-      - C++ API: serial-driver/cpp-api/html/index.html
+      - C++ API:
+          - Code Standards: serial-driver/standards.md
+          - Code Documentation: 'serial-driver/cpp-api/html/index.html" target="_blank'
   - Firmware:
       - Home: firmware/index.md
-      - Code Documentation: firmware/firmware-docs/html/index.html
+      - Build Configurations: firmware/build-configs.md
+      - Flashing: firmware/flashing.md
+      - Code Standards: firmware/standards.md
+      - Code Documentation: 'firmware/firmware-docs/html/index.html" target="_blank'
 
 extra_css:
   - stylesheets/extra.css

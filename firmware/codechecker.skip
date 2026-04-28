@@ -1,0 +1,11 @@
+-*/bootloader/*
+-*/modules/*
+-*/nrf/*
+-*/nrfxlib/*
+-*/test/*
+-*/tools/*
+-*/zephyr/*
+-*/build/*
++*/firmware/src/*
++*/firmware/include/*
+-*
