@@ -8,10 +8,10 @@
 		compatible = "pwm-leds";
 		status = "okay";
 		pwm_led0: pwm_led_0 {
-			pwms = <&pwm0 0 PWM_MSEC(20) PWM_POLARITY_INVERTED>;
+			pwms = <&pwm0 0 PWM_MSEC(20) PWM_POLARITY_NORMAL>;
 		};
 		pwm_led1: pwm_led_1 {
-			pwms = <&pwm0 1 PWM_MSEC(20) PWM_POLARITY_INVERTED>;
+			pwms = <&pwm0 1 PWM_MSEC(20) PWM_POLARITY_NORMAL>;
 		};
 	};
 
