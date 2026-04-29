@@ -6,11 +6,8 @@
 
 LOG_MODULE_REGISTER(main);
 
-#define LED0_NODE     DT_ALIAS(led0)
 #define SLEEP_TIME_MS 1000
 #define TRY_AGAIN_MS  10
-#define LED_ON        0
-#define LED_OFF       1
 
 #define PWM_SLEEP_MS  25u
 #define PWM_STEPS     50u
@@ -39,7 +36,7 @@ static struct pwm_led pwm_leds[] = {
     {
         .led = PWM_DT_SPEC_GET(DT_NODELABEL(pwm_led0)),
         .internal_state = INTERNAL_BLINK_OFF,
-        .state = BLINK,
+        .state = LED_STATE_BLINK,
     },
 };
 
@@ -78,7 +75,7 @@ static void fade_work(struct k_work *work) {
         return;
     }
 
-    if (led->state != FADE) {
+    if (led->state != LED_STATE_FADE) {
         k_mutex_unlock(&led->lock);
         return;
     }
@@ -118,7 +115,7 @@ static void blink_work(struct k_work *work) {
         return;
     }
 
-    if (led->state != BLINK) {
+    if (led->state != LED_STATE_BLINK) {
         k_mutex_unlock(&led->lock);
         return;
     }
@@ -225,19 +222,19 @@ static int update_led_state_locked(struct pwm_led *led,
     int ret;
 
     switch (new_state) {
-    case ON: {
+    case LED_STATE_ON: {
         ret = pwm_set_pulse_dt(&led->led, led->led.period);
         break;
     }
-    case OFF: {
+    case LED_STATE_OFF: {
         ret = pwm_set_pulse_dt(&led->led, 0u);
         break;
     }
-    case BLINK: {
+    case LED_STATE_BLINK: {
         ret = update_led_blink_locked(led);
         break;
     }
-    case FADE: {
+    case LED_STATE_FADE: {
         ret = update_led_fade_locked(led);
         break;
     }
@@ -264,53 +261,33 @@ static void start_leds(void) {
     }
 }
 
-static int set_new_led_state(enum led_state new_state) {
-    int ret = 0;
+static int update_led_state_(enum led led_, uint8_t new_state) {
+    int ret;
+    struct pwm_led *led = &pwm_leds[led_];
 
-    k_mutex_lock(&led_mtx, K_FOREVER);
-
-    if (new_state == state) {
-        ret = -EAGAIN;
-    } else {
-        state = new_state;
-    }
-
-    k_mutex_unlock(&led_mtx);
-
-    if (ret < 0) {
-        return ret;
+    k_mutex_lock(&led->lock, K_FOREVER);
+    if (new_state == led->state) {
+        k_mutex_unlock(&led->lock);
+        return -EALREADY;
     }
 
-    switch (new_state) {
-    case OFF: {
-        // return gpio_pin_set_dt(&led, LED_OFF);
-    }
-    case ON: {
-        // return gpio_pin_set_dt(&led, LED_ON);
-    }
-    case BLINK: {
-        ret = k_work_schedule(&blink, K_NO_WAIT);
-        break;
-    }
-    default: {
-        ret = -EINVAL;
-        break;
-    }
-    }
-
-    if (ret >= 0) {
-        return 0;
-    }
+    led->state = new_state;
+    ret = update_led_state_locked(led, new_state);
+    k_mutex_unlock(&led->lock);
 
     return ret;
 }
 
-int update_led_state(uint8_t new_state) {
-    if (new_state >= LED_INVALID) {
-        return state;
+int update_led_state(enum led led, uint8_t new_state) {
+    if (led >= LED_INVALID) {
+        return -EINVAL;
     }
 
-    return set_new_led_state(new_state);
+    if (new_state >= LED_STATE_INVALID) {
+        return pwm_leds[led].state;
+    }
+
+    return update_led_state_(led, new_state);
 }
 
 int main(void) {

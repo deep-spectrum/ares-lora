@@ -18,16 +18,26 @@
  * Different states the LED can be in.
  */
 enum led_state {
-    OFF,         ///< LED off.
-    ON,          ///< LED on.
-    BLINK,       ///< LED blinking.
-    FADE,        ///< LED Fading on and off.
-    LED_INVALID, ///< Invalid/end of enumeration.
+    LED_STATE_OFF,     ///< LED off.
+    LED_STATE_ON,      ///< LED on.
+    LED_STATE_BLINK,   ///< LED blinking.
+    LED_STATE_FADE,    ///< LED Fading on and off.
+    LED_STATE_INVALID, ///< Invalid/end of enumeration.
+};
+
+/**
+ * @enum led
+ * LEDs that can be controlled.
+ */
+enum led {
+    LED_0,       ///< LED 0
+    LED_INVALID, ///< Last LED enumerator
 };
 
 /**
  * Update or retrieve the LED state.
  *
+ * @param[in] led The LED to update the state for.
  * @param[in] new_state The new state of the LED. If invalid, retrieves the
  * current state.
  *
@@ -36,6 +46,6 @@ enum led_state {
  * @return -EAGAIN if state is unchanged from previous setting.
  * @return negative error code otherwise.
  */
-int update_led_state(uint8_t new_state);
+int update_led_state(enum led led, uint8_t new_state);
 
 #endif // ARES_LED_H
