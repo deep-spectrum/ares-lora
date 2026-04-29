@@ -24,6 +24,8 @@ described as follows:
 | ACK           |   9   |    TX     | Frame acknowledgement                                                            |
 | FRAMING_ERROR |  10   |    TX     | Framing error (internal error)                                                   |
 | DBG           |  11   |    TX     | Firmware debugging message                                                       |
+| PKT_RX        |  12   |    TX     | Notification from firmware that indicates a LoRa packet was received             |
+| PKT_TX        |  13   |    TX     | Notification from firmware that indicates how many packets were sent over LoRa   |
 
 !!! note
 
@@ -140,19 +142,20 @@ payload structure is as follows:
 LED frames are used to either get the current state/action of the LED or to set a new state/action of the LED. The
 payload is structured as follows:
 
-|           |              |
-|-----------|:------------:|
-| __Field__ | State/Action |
-| __Type__  |  `uint8_t`   |
+|           |           |              |
+|-----------|:---------:|:------------:|
+| __Field__ |    led    | State/Action |
+| __Type__  | `uint8_t` |  `uint8_t`   |
 
 | State/Action | Value | Description                                      |
 |:-------------|:-----:|:-------------------------------------------------|
 | OFF          |   0   | Turn LED off.                                    |
 | ON           |   1   | Turn LED on.                                     |
 | BLINK        |   2   | Blink LED at 1 Hz.                               |
-| FETCH        |   3   | Retrieve the current LED state/action. (RX only) |
+| FADE         |   3   | Fade LED on and off.                             |
+| FETCH        |   4   | Retrieve the current LED state/action. (RX only) |
 
-* __Payload size__: 1 byte
+* __Payload size__: 2 bytes
 
 
 ## HEARTBEAT Frame
@@ -299,5 +302,29 @@ structures as follows:
 |-----------|:---------:|
 | __Field__ |   code    |
 | __Type__  | `int32_t` |
+
+* __Payload size__: 4 bytes
+
+## PKT_RX Frame
+
+The packet received frame is a notification from firmware that a packet was received and recovered. The payload is 
+structured as follows:
+
+|           |                |            |            |
+|-----------|:--------------:|:----------:|:----------:|
+| __Field__ | sequence_count | packet_id  | source_id  |
+| __Type__  |   `uint8_t`    | `uint16_t` | `uint16_t` |
+
+* __Payload size__: 5 bytes
+
+## PKT_TX
+
+The packet transmitted frame is a notification from firmware that a packet was transmitted a certain number of times.
+The payload is structured as follows:
+
+|           |            |
+|-----------|:----------:|
+| __Field__ |   count    |
+| __Type__  | `uint32_t` |
 
 * __Payload size__: 4 bytes

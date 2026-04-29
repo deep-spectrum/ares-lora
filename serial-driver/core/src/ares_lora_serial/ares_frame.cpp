@@ -304,7 +304,7 @@ uint16_t AresFrame::_payload_size() const {
         break;
     }
     case LED: {
-        ret = sizeof(Led::state);
+        ret = sizeof(Led::state) + sizeof(Led::led);
         break;
     }
     case CLAIM: {
@@ -427,6 +427,7 @@ void AresFrame::_serialize_lora_config(const LoraConfig &payload,
 
 void AresFrame::_serialize_led(const Led &payload,
                                std::vector<uint8_t> &buffer) {
+    SERIALIZE(led);
     SERIALIZE(state);
 }
 
@@ -507,6 +508,7 @@ void AresFrame::_deserialize_setting(const uint8_t *buf, size_t len) {
 void AresFrame::_deserialize_led(const uint8_t *buf, size_t len) {
     ARG_UNUSED(len);
     DESERIALIZE_INIT(Led);
+    DESERIALIZE(led);
     DESERIALIZE(state);
     DESERIALIZE_FINALIZE();
 }

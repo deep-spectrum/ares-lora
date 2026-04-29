@@ -264,10 +264,11 @@ class AresSerial {
 
     /**
      * Set or retrieve the LED state from firmware.
+     * @param id The LED number/ID to set/fetch the state for.
      * @param state The new LED state for the firmware or a fetch state request.
      * @return py::tuple<Fetch LED state | Default LED state, ACK'ed error code>
      */
-    py::tuple led(uint8_t state);
+    py::tuple led(uint8_t id, uint8_t state);
 
     /**
      * Send a heartbeat message over the LoRa network.

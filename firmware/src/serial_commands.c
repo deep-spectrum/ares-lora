@@ -154,15 +154,16 @@ static void handle_lora_config(const struct ares_serial *serial,
 
 static void handle_led(const struct ares_serial *serial,
                        struct ares_frame *frame) {
-    int ret = update_led_state(frame->payload.LED);
+    int ret =
+        update_led_state(frame->payload.LED.led, frame->payload.LED.state);
 
-    if (frame->payload.LED >= LED_INVALID) {
-        frame->payload.LED = (uint8_t)ret;
+    if (frame->payload.LED.state >= LED_STATE_INVALID) {
+        frame->payload.LED.state = (uint8_t)ret;
         ares_serial_write_frame(serial, frame);
         return;
     }
 
-    send_ack_frame(serial, frame, 0);
+    send_ack_frame(serial, frame, ret);
 }
 
 static void handle_heartbeat(const struct ares_serial *serial,
