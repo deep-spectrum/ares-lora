@@ -162,43 +162,106 @@ static void init_leds(void) {
     }
 }
 
-// static int z_update_led_blink(struct pwm_led *led) {
-//     int ret = 0;
-//
-// }
-//
-// static int z_update_led_state(struct pwm_led *led, enum led_state new_state)
-// {
-//     int ret;
-//
-//     switch (new_state) {
-//         case ON: {
-//             ret = pwm_set_pulse_dt(&led->led, led->led.period);
-//             break;
-//         }
-//         case OFF: {
-//             ret = pwm_set_pulse_dt(&led->led, 0u);
-//             break;
-//         }
-//         case BLINK:
-//     }
-// }
+static int update_led_blink_locked(struct pwm_led *led) {
+    int ret = 0;
 
-static void start_led(void) {
-    int ret;
-
-    // if (!gpio_is_ready_dt(&led)) {
-    //     LOG_ERR("LED GPIO not ready");
-    //     return;
-    // }
-
-    // ret = gpio_pin_configure_dt(&led, GPIO_OUTPUT_ACTIVE);
-    if (ret < 0) {
-        LOG_ERR("Failed to configure LED pin");
-        return;
+    switch (led->internal_state) {
+    case INTERNAL_OFF:
+    case INTERNAL_FADE_UP: {
+        led->internal_state = INTERNAL_BLINK_ON;
+        ret = pwm_set_pulse_dt(&led->led, led->led.period);
+        break;
+    }
+    case INTERNAL_ON:
+    case INTERNAL_FADE_DOWN: {
+        led->internal_state = INTERNAL_BLINK_OFF;
+        ret = pwm_set_pulse_dt(&led->led, 0u);
+        break;
+    }
+    default: {
+        ret = -EALREADY;
+        break;
+    }
     }
 
-    k_work_schedule(&blink, K_NO_WAIT);
+    if (ret < 0) {
+        return ret;
+    }
+
+    return k_work_schedule(&led->blink_work, K_NO_WAIT);
+}
+
+static int update_led_fade_locked(struct pwm_led *led) {
+    int ret = 0;
+
+    switch (led->internal_state) {
+    case INTERNAL_OFF:
+    case INTERNAL_BLINK_OFF: {
+        led->internal_state = INTERNAL_FADE_UP;
+        ret = pwm_set_pulse_dt(&led->led, 0u);
+        break;
+    }
+    case INTERNAL_ON:
+    case INTERNAL_BLINK_ON: {
+        led->internal_state = INTERNAL_FADE_DOWN;
+        ret = pwm_set_pulse_dt(&led->led, led->led.period);
+        break;
+    }
+    default: {
+        ret = -EALREADY;
+        break;
+    }
+    }
+
+    if (ret < 0) {
+        return ret;
+    }
+
+    return k_work_schedule(&led->fade_work, K_NO_WAIT);
+}
+
+static int update_led_state_locked(struct pwm_led *led,
+                                   enum led_state new_state) {
+    int ret;
+
+    switch (new_state) {
+    case ON: {
+        ret = pwm_set_pulse_dt(&led->led, led->led.period);
+        break;
+    }
+    case OFF: {
+        ret = pwm_set_pulse_dt(&led->led, 0u);
+        break;
+    }
+    case BLINK: {
+        ret = update_led_blink_locked(led);
+        break;
+    }
+    case FADE: {
+        ret = update_led_fade_locked(led);
+        break;
+    }
+    default: {
+        ret = -EINVAL;
+        break;
+    }
+    }
+
+    if (ret > 0) {
+        return 0;
+    }
+
+    return ret;
+}
+
+static void start_leds(void) {
+    init_leds();
+
+    for (size_t i = 0u; i < ARRAY_SIZE(pwm_leds); i++) {
+        k_mutex_lock(&pwm_leds[i].lock, K_FOREVER);
+        (void)update_led_state_locked(&pwm_leds[i], pwm_leds[i].state);
+        k_mutex_unlock(&pwm_leds[i].lock);
+    }
 }
 
 static int set_new_led_state(enum led_state new_state) {
@@ -251,7 +314,7 @@ int update_led_state(uint8_t new_state) {
 }
 
 int main(void) {
-    start_led();
+    start_leds();
 
     return 0;
 }
