@@ -12,8 +12,6 @@
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
 
-#include "../../cmake-build-debug-nrf-connect-v3.2.2/zephyr/include/generated/zephyr/autoconf.h"
-
 LOG_MODULE_REGISTER(ares_serial);
 
 #define SERIAL_API_CALL(_serial, _api, ...)                                    \
