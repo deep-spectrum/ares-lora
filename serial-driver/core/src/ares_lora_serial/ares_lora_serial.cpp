@@ -16,7 +16,9 @@
 #include <cassert>
 #include <chrono>
 #include <pybind11/chrono.h>
+// ReSharper disable CppUnusedIncludeDirective
 #include <pybind11/functional.h>
+// ReSharper restore CppUnusedIncludeDirective
 #include <pybind11/pybind11.h>
 #include <sstream>
 #include <stdexcept>
@@ -48,7 +50,7 @@ PYBIND11_MODULE(_ares_lora_serial, m, py::mod_gil_not_used()) {
         .def("start", &AresSerial::send_start, py::arg("sec"), py::arg("nsec"),
              py::arg("id"), py::arg("broadcast"))
         .def("lora_config", &AresSerial::lora_config, py::arg("config"))
-        .def("led", &AresSerial::led, py::arg("state"),
+        .def("led", &AresSerial::led, py::arg("led_id"), py::arg("state"),
              "Retrieve or set the LED state")
         .def("send_heartbeat", &AresSerial::send_heartbeat, py::arg("ready"),
              py::arg("tx_cnt"), "Send heartbeat packet")
@@ -360,11 +362,12 @@ std::chrono::milliseconds AresSerial::get_response_timeout() const {
     return _response_timeout;
 }
 
-py::tuple AresSerial::led(uint8_t state) {
+py::tuple AresSerial::led(uint8_t id, uint8_t state) {
     _check_crash();
     AresFrame frame(
         AresFrame::LED,
-        AresFrame::Led{static_cast<AresFrame::Led::LedState>(state)});
+        AresFrame::Led{.led = id,
+                       .state = static_cast<AresFrame::Led::LedState>(state)});
     AresResponse response = _send_frame(frame, _response_timeout);
 
     int ret = 0;
@@ -801,7 +804,9 @@ void AresSerial::_heartbeat_handler(Work *work) {
     LOG_DBG("Claim host response: %d", ret);
 }
 
+// ReSharper disable CppDFAUnreachableFunctionCall
 int AresSerial::_heartbeat_claim_host(uint16_t destination_id) {
+    // ReSharper restore CppDFAUnreachableFunctionCall
     AresFrame frame(AresFrame::CLAIM, AresFrame::Claim{destination_id});
     AresResponse response;
     try {
@@ -878,7 +883,7 @@ bool AresSerial::_log_ack_event_wait(const std::chrono::milliseconds &timeout,
     _log_ack_signal.clear();
     try {
         response = _log_ack_signal.get(timeout);
-    } catch (const ares::queue_exception &exc) {
+    } catch ([[maybe_unused]] const ares::queue_exception &exc) {
         // nop
     }
 

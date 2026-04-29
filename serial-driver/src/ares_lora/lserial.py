@@ -8,6 +8,7 @@ import logging
 from .utils import check_serial_port
 from threading import Lock
 import copy
+import ctypes
 
 logger = logging.getLogger("ares_lora")
 
@@ -374,10 +375,11 @@ class LoraSerial:
         self._check_ret_code(ret)
 
     @lora_serial_command
-    def led(self, state: LoraLedState = LoraLedState.FETCH) -> LoraLedState | None:
+    def led(self, led_id: int, state: LoraLedState = LoraLedState.FETCH) -> LoraLedState | None:
         """Set or retrieve the state of the LED.
 
         Args:
+            led_id: The ID/number of the LED to fetch/set the state of.
             state: The new state of the LED. If set to LoraLedState.FETCH, then retrieves the current state of the
                    LED. (Default: LoraLedState.FETCH)
 
@@ -388,7 +390,9 @@ class LoraSerial:
             TimeoutError: No response from the firmware within the configured timeout.
             LoraException: Firmware responded with an error code.
         """
-        ret, err_code = self._dev.led(state.value)
+        if led_id > ctypes.c_uint8(-1).value:
+            raise ValueError(f"led_id is {led_id}. Valid range: [0, {ctypes.c_uint8(-1).value}]")
+        ret, err_code = self._dev.led(led_id, state.value)
         self._check_ret_code(err_code)
         if state == LoraLedState.FETCH:
             return LoraLedState(ret)
