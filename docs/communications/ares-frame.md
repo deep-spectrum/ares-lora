@@ -317,7 +317,7 @@ structured as follows:
 
 * __Payload size__: 5 bytes
 
-## PKT_TX
+## PKT_TX Frame
 
 The packet transmitted frame is a notification from firmware that a packet was transmitted a certain number of times.
 The payload is structured as follows:
