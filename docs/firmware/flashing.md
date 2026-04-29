@@ -84,7 +84,7 @@ dfu.reset_mcu(True)
 # Confirm the image
 input("Press enter to confirm image...")
 # Ports may have changed...
-port find_dfu_port()
+port = find_dfu_port()
 dfu = AresDfu(port)
 dfu.confirm_image()
 ```
