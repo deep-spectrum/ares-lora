@@ -49,7 +49,7 @@ struct pwm_led *pwm_led_from_fade_work(struct k_work_delayable *dwork) {
 }
 
 static void fade_up(struct pwm_led *led) {
-    led->next_width += led->led.period;
+    led->next_width += led->step;
     if (led->next_width >= led->led.period) {
         led->next_width = led->led.period;
         led->internal_state = INTERNAL_FADE_DOWN;
@@ -107,6 +107,7 @@ static void fade_work(struct k_work *work) {
 static void blink_work(struct k_work *work) {
     struct k_work_delayable *dwork = k_work_delayable_from_work(work);
     struct pwm_led *led = pwm_led_from_blink_work(dwork);
+    enum led_state_internal new_state;
     uint32_t period;
 
     int ret = k_mutex_lock(&led->lock, K_NO_WAIT);
@@ -123,10 +124,12 @@ static void blink_work(struct k_work *work) {
     switch (led->internal_state) {
     case INTERNAL_BLINK_ON: {
         period = 0u;
+        new_state = INTERNAL_BLINK_OFF;
         break;
     }
     case INTERNAL_BLINK_OFF: {
         period = led->led.period;
+        new_state = INTERNAL_BLINK_ON;
         break;
     }
     default: {
@@ -139,6 +142,8 @@ static void blink_work(struct k_work *work) {
     ret = pwm_set_pulse_dt(&led->led, period);
     if (ret < 0) {
         LOG_ERR("pwm_set_pulse_dt(): %d", ret);
+    } else {
+        led->internal_state = new_state;
     }
 
     k_mutex_unlock(&led->lock);
@@ -181,7 +186,7 @@ static int update_led_blink_locked(struct pwm_led *led) {
     }
     }
 
-    if (ret < 0) {
+    if (ret < 0 && k_work_delayable_busy_get(&led->blink_work) != 0) {
         return ret;
     }
 
@@ -210,7 +215,7 @@ static int update_led_fade_locked(struct pwm_led *led) {
     }
     }
 
-    if (ret < 0) {
+    if (ret < 0 && k_work_delayable_busy_get(&led->fade_work) != 0) {
         return ret;
     }
 
