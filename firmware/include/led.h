@@ -21,6 +21,7 @@ enum led_state {
     OFF,         ///< LED off.
     ON,          ///< LED on.
     BLINK,       ///< LED blinking.
+    FADE,        ///< LED Fading on and off.
     LED_INVALID, ///< Invalid/end of enumeration.
 };
 
