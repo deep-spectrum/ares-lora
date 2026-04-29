@@ -48,7 +48,7 @@ jobs:
         run: |
           source $(pwd)/ncs/${NCS_VERSION}/zephyr/zephyr-env.sh
           mkdir -p raw-builds
-          export cmd="west build --build-dir raw-builds/lora lora/firmware --pristine --board rak4631/nrf52840 --sysbuild -- -DCONF_FILE=prj.conf -DDTC_OVERLAY_FILE=overlay/rak4631_nrf52840.overlay -DCONFIG_SPEED_OPTIMIZATIONS=y"
+          export cmd="west build --build-dir raw-builds/lora lora/firmware --pristine --board rak4631/nrf52840 --sysbuild -- -DCONF_FILE=prj.conf -DDTC_OVERLAY_FILE=overlay/rak4631_nrf52840.overlay -DDEBUG_THREAD_INFO=Off -DCONFIG_DEBUG_OPTIMIZATIONS=y -Dfirmware_DEBUG_THREAD_INFO=Off -Dmcuboot_DEBUG_THREAD_INFO=Off"
           ./nrfutil sdk-manager toolchain launch --install-dir ./ncs --ncs-version ${NCS_VERSION} -- $cmd
 
       - name: Prep Assets
