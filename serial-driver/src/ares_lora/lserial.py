@@ -513,12 +513,22 @@ class LoraSerial:
 
     @property
     def reception_count(self) -> dict[int, int]:
+        """The number of packets received and recovered from LoRa.
+
+        Returns:
+            A dictionary of node IDs and the number of packets received from them.
+        """
         with self._rx_stats_lock:
             ret = copy.deepcopy(self._rx_stats)
         return ret
 
     @property
     def transmission_count(self) -> int:
+        """The number of packets transmitted over LoRa.
+
+        Returns:
+            The number of packets transmitted by the connected node.
+        """
         with self._tx_stats_lock:
             ret = self._tx_stats
         return ret
