@@ -131,12 +131,14 @@ class LoraLedState(IntEnum):
         OFF: LED is turned off.
         ON: LED is solid on.
         BLINK: LED is blinking at 1 Hz.
+        FADE: LED is fading on and off.
         FETCH: Fetch the current LED state from the firmware.
     """
     OFF = 0
     ON = 1
     BLINK = 2
-    FETCH = 3
+    FADE = 3
+    FETCH = 4
 
 
 @dataclass

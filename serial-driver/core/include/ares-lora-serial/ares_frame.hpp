@@ -199,7 +199,8 @@ class AresFrame {
             OFF = 0,   ///< LED off.
             ON = 1,    ///< LED on.
             BLINK = 2, ///< LED blinking at 1 Hz.
-            FETCH = 3, ///< Retrieve LED state from firmware.
+            FADE = 3,  ///< LED fading.
+            FETCH = 4, ///< Retrieve LED state from firmware.
         };
 
         /**
