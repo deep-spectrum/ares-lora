@@ -68,17 +68,27 @@ driver. a few basic steps just need to be followed:
 Below is an example program:
 
 ``` {.python .copy}
-from ares_lora import AresDfu, find_ports
+from pathlib import Path
+from ares_lora import AresDfu, find_ports, LoraSerial, LoraSerialConfig
+
+image_path = "build/.../zephyr.signed.bin"
 
 def find_dfu_port() -> Path:
     ports = find_ports()
-    ...
-    return port
+    for product in ports:
+        for port in ports[product]:
+            config = LoraSerialConfig(port)
+            with LoraSerial(config) as s:
+                try:
+                    s.version()
+                except TimeoutError:
+                    return Path(port)
+    raise IOError("No DFU port found")
 
 # Upload the image and run the image
 port = find_dfu_port()
-dfu = AresDfu(port)
-dfu.upload("build/.../zephyr.signed/hex")
+dfu = AresDfu(port, verbose=True)
+dfu.upload(image_path)
 dfu.reset_mcu(True)
 
 # Confirm the image
