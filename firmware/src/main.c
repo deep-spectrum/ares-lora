@@ -32,11 +32,19 @@ struct pwm_led {
     struct k_work_delayable fade_work;
 };
 
-static struct pwm_led pwm_leds[] = {
+// clang-format off
+static struct pwm_led pwm_leds[] = { // NOLINT(*-interfaces-global-init)
+    // clang-format on
     {
         .led = PWM_DT_SPEC_GET(DT_NODELABEL(pwm_led0)),
         .internal_state = INTERNAL_BLINK_OFF,
         .state = LED_STATE_BLINK,
+    },
+
+    {
+        .led = PWM_DT_SPEC_GET(DT_NODELABEL(pwm_led1)),
+        .internal_state = INTERNAL_OFF,
+        .state = LED_STATE_OFF,
     },
 };
 

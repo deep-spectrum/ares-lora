@@ -31,6 +31,7 @@ enum led_state {
  */
 enum led {
     LED_0,       ///< LED 0
+    LED_1,       ///< LED 1
     LED_INVALID, ///< Last LED enumerator
 };
 
