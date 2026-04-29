@@ -204,6 +204,11 @@ class AresFrame {
         };
 
         /**
+         * The LED number/ID.
+         */
+        uint8_t led = 0;
+
+        /**
          * The LED state frame data.
          */
         LedState state = FETCH;
