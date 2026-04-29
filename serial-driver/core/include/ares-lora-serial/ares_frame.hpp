@@ -71,6 +71,8 @@ class AresFrame {
         ACK = 9,            ///< Command acknowledge (RX)
         FRAMING_ERROR = 10, ///< Framing error (RX)
         DBG = 11,           ///< Debug message (RX)
+        PKT_RX = 12,        ///< Packet Received (RX)
+        PKT_TX = 13,        ///< Packet transmitted (RX)
         UNKNOWN,            ///< Unknown frame
     };
 
@@ -417,6 +419,39 @@ class AresFrame {
     };
 
     /**
+     * @struct PktRx
+     *
+     * Data for AresFrame::PKT_RX frames.
+     */
+    struct PktRx {
+        /**
+         * Packet ID.
+         */
+        uint16_t packet_id = 0;
+        /**
+         * Packet source ID.
+         */
+        uint16_t src_id = 0;
+
+        /**
+         * Sequence counter.
+         */
+        uint8_t seq_cnt = 0;
+    };
+
+    /**
+     * @struct PktRx
+     *
+     * Data for AresFrame::PKT_TX frames.
+     */
+    struct PktTx {
+        /**
+         * Transmit count.
+         */
+        uint32_t count = 0;
+    };
+
+    /**
      * @typedef TxTypes
      *
      * A variant representing all the transmission frame types.
@@ -429,9 +464,9 @@ class AresFrame {
      *
      * A variant representing all the reception frame types.
      */
-    using RxTypes =
-        std::variant<std::monostate, Setting, Start, AckErrorCode, FramingError,
-                     Led, Heartbeat, Claim, Log, Version, LogAck, Dbg>;
+    using RxTypes = std::variant<std::monostate, Setting, Start, AckErrorCode,
+                                 FramingError, Led, Heartbeat, Claim, Log,
+                                 Version, LogAck, Dbg, PktRx, PktTx>;
 
     /**
      * @typedef ResponseTypes
@@ -612,6 +647,8 @@ class AresFrame {
     void _deserialize_ack(const uint8_t *buf, size_t len);
     void _deserialize_framing_error(const uint8_t *buf, size_t len);
     void _deserialize_dbg(const uint8_t *buf, size_t len);
+    void _deserialize_pkt_rx(const uint8_t *buf, size_t len);
+    void _deserialize_pkt_tx(const uint8_t *buf, size_t len);
 };
 
 #endif // ARES_ARES_FRAME_HPP

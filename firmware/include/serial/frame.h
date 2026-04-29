@@ -81,6 +81,8 @@ enum ares_frame_type {
     ARES_FRAME_ACK,           ///< ACK frame.
     ARES_FRAME_FRAMING_ERROR, ///< Framing error frame. TX only.
     ARES_FRAME_DBG,           ///< Debug frames, TX only.
+    ARES_FRAME_PKT_RX,        ///< Packet received, TX only.
+    ARES_FRAME_PKT_TX,        ///< Packet transmitted, TX only.
 
     ARES_FRAME_TYPE_INVALID, ///< Invalid frame.
 };
@@ -171,6 +173,14 @@ struct ares_frame {
         enum ares_frame_error FRAMING_ERROR; ///< ARES_FRAME_FRAMING_ERROR
 
         int DBG; ///< ARES_FRAME_DBG
+
+        struct {
+            uint16_t packet_id;
+            uint16_t src_id;
+            uint8_t seq_cnt;
+        } PKT_RX; ///< ARES_FRAME_PKT_RX
+
+        uint32_t PKT_TX; ///< ARES_FRAME_PKT_TX
     } payload;
 };
 

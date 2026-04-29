@@ -99,15 +99,23 @@ static void send_lora_transmission(const struct ares_serial *serial,
     packet->source_id = (uint16_t)id;
     (void)ares_lora_set_packet_id(lora, packet);
 
+    uint32_t send_count = 0u;
     for (size_t i = 0; i < rep_cnt; i++) {
         ret = ares_lora_write_packet(lora, packet);
         if (ret < 0) {
             send_ack_frame(serial, frame, ret);
             return;
         }
+        send_count++;
     }
 
     send_ack_frame(serial, frame, 0);
+
+#if IS_ENABLED(CONFIG_ARES_LORA_NOTIF_RX_PACKETS)
+    frame->type = ARES_FRAME_PKT_TX;
+    frame->payload.PKT_TX = send_count;
+    (void)ares_serial_write_frame(serial, frame);
+#endif
 }
 
 static void handle_start(const struct ares_serial *serial,

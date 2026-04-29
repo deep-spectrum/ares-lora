@@ -131,6 +131,27 @@ int ares_lora_register_command_callbacks(
     return 0;
 }
 
+#if IS_ENABLED(CONFIG_ARES_LORA_NOTIF_RX_PACKETS)
+#include <serial/serial.h>
+
+static void notify_received_packet(const struct ares_packet *packet) {
+    const struct ares_serial *serial = ares_serial_backend_uart_get_ptr();
+    struct ares_frame frame = {
+        .type = ARES_FRAME_PKT_RX,
+        .payload.PKT_RX =
+            {
+                .seq_cnt = packet->sequence_cnt,
+                .packet_id = packet->packet_id,
+                .src_id = packet->source_id,
+            },
+    };
+
+    (void)ares_serial_write_frame(serial, &frame);
+}
+#else
+#define notify_received_packet(...) (void)0
+#endif
+
 static void dispatch(const struct ares_lora *lora, int start_index,
                      size_t length) {
     struct ares_packet packet;
@@ -150,6 +171,7 @@ static void dispatch(const struct ares_lora *lora, int start_index,
         }
 
         if (lora->ctx->commands[i].handler != NULL) {
+            notify_received_packet(&packet);
             lora->ctx->commands[i].handler(lora, &packet);
         } else {
             LOG_WRN("LoRa command not implemented: %d",

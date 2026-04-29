@@ -6,6 +6,8 @@ import functools
 from .errno import strerror
 import logging
 from .utils import check_serial_port
+from threading import Lock
+import copy
 
 logger = logging.getLogger("ares_lora")
 
@@ -210,6 +212,8 @@ class LoraSerial:
             heartbeat_callback=self._handle_heartbeat,
             claim_callback=self._handle_claim,
             log_callback=self._handle_log,
+            packet_rx_callback=self._handle_packet_rx,
+            packet_tx_callback=self._handle_tx_done_event,
         )
 
         self._start_cb = config.start_callback
@@ -217,26 +221,38 @@ class LoraSerial:
         self._claim_cb = config.claim_callback
         self._log_cb = config.log_callback
         self._dev = _AresSerial(configs)
-        self._nodes: dict[int, dict[str, int]] = {}
+        self._nodes: dict[int, int] = {}
         self._log_msg: dict[int, LogMessage] = {}
 
-    def _should_event_be_dispatched(self, src: int, seq_cnt: int, packet_id: int) -> bool:
+        self._rx_stats: dict[int, int] = {}
+        self._rx_stats_lock = Lock()
+
+        self._tx_stats: int = 0
+        self._tx_stats_lock = Lock()
+
+    def _should_event_be_dispatched(self, src: int, packet_id: int) -> bool:
         if src not in self._nodes:
-            self._nodes[src] = {"sequence": seq_cnt, "packet": packet_id, "drops": 0}
+            self._nodes[src] = packet_id
             return True
 
-        next_seq = (self._nodes[src]["sequence"] + 1) % 256
-        if next_seq != seq_cnt:
-            self._nodes[src]["drops"] += 1
-        self._nodes[src]["sequence"] = seq_cnt
-
-        if self._nodes[src]["packet"] != packet_id:
-            self._nodes[src]["packet"] = packet_id
+        if self._nodes[src] != packet_id:
+            self._nodes[src] = packet_id
             return True
         return False
 
+    def _handle_packet_rx(self, seq_cnt: int, packet_id: int, source_id: int):
+        with self._rx_stats_lock:
+            if source_id not in self._rx_stats:
+                self._rx_stats[source_id] = 1
+                return
+            self._rx_stats[source_id] += 1
+
+    def _handle_tx_done_event(self, count: int):
+        with self._tx_stats_lock:
+            self._tx_stats += count
+
     def _handle_start(self, sec: int, nsec: int, src: int, broadcast: bool, seq_cnt: int, packet_id: int):
-        if self._should_event_be_dispatched(src, seq_cnt, packet_id):
+        if self._should_event_be_dispatched(src, packet_id):
             logger.info(f"Received start message (sec: {sec}, nsec: {nsec}, src: {src}, "
                         f"broadcast: {broadcast}, sequence count: {seq_cnt}, packet id: {packet_id})")
             if self._start_cb is not None:
@@ -494,3 +510,25 @@ class LoraSerial:
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.stop_driver()
+
+    @property
+    def reception_count(self) -> dict[int, int]:
+        """The number of packets received and recovered from LoRa.
+
+        Returns:
+            A dictionary of node IDs and the number of packets received from them.
+        """
+        with self._rx_stats_lock:
+            ret = copy.deepcopy(self._rx_stats)
+        return ret
+
+    @property
+    def transmission_count(self) -> int:
+        """The number of packets transmitted over LoRa.
+
+        Returns:
+            The number of packets transmitted by the connected node.
+        """
+        with self._tx_stats_lock:
+            ret = self._tx_stats
+        return ret
