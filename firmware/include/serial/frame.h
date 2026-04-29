@@ -139,7 +139,10 @@ struct ares_frame {
             uint16_t id;
         } HEARTBEAT; ///< ARES_FRAME_HEARTBEAT
 
-        uint8_t LED; ///< ARES_FRAME_LED
+        struct {
+            uint8_t led;
+            uint8_t state;
+        } LED; ///< ARES_FRAME_LED
 
         uint16_t CLAIM; ///< ARES_FRAME_CLAIM
 

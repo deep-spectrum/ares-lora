@@ -50,7 +50,7 @@ static size_t calculate_frame_length(const struct ares_frame *frame) {
         break;
     }
     case ARES_FRAME_LED: {
-        payload_len = FSIZEOF_FIELD(LED);
+        payload_len = FSIZEOF_FIELD(LED.led) + FSIZEOF_FIELD(LED.state);
         break;
     }
     case ARES_FRAME_FRAMING_ERROR: {
@@ -176,7 +176,8 @@ static void serialize(uint8_t *buf, const struct ares_frame *frame,
         break;
     }
     case ARES_FRAME_LED: {
-        FSERIALIZE(LED);
+        FSERIALIZE(LED.led);
+        FSERIALIZE(LED.state);
         break;
     }
     case ARES_FRAME_HEARTBEAT: {
@@ -306,7 +307,8 @@ static void deserialize(struct ares_frame *frame, const uint8_t *buf) {
         break;
     }
     case ARES_FRAME_LED: {
-        FDESERIALIZE(LED, payload_len);
+        FDESERIALIZE(LED.led);
+        FDESERIALIZE(LED.state);
         break;
     }
     case ARES_FRAME_HEARTBEAT: {
