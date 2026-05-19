@@ -477,7 +477,7 @@ py::tuple AresSerial::send_log(const std::string &log_msg, bool broadcast,
         }
     }
 
-    return array_to_tuple(ret.data(), ret.size());
+    return ares::array_to_tuple(ret.data(), ret.size());
 }
 
 py::tuple AresSerial::version() {
@@ -553,7 +553,7 @@ void AresSerial::start() {
     }
 
     LOG_DBG("Starting Work Queue");
-    WorkQConfig config = {
+    ares::WorkQConfig config = {
         .name = "AresSerial queue",
         .essential = true,
     };
@@ -794,8 +794,8 @@ void AresSerial::_heartbeat_event(const AresFrame::Heartbeat &heartbeat) {
     }
 }
 
-void AresSerial::_heartbeat_handler(Work *work) {
-    HeartbeatWork *hwork = container_of(work, &HeartbeatWork::work);
+void AresSerial::_heartbeat_handler(ares::Work *work) {
+    HeartbeatWork *hwork = ares::container_of(work, &HeartbeatWork::work);
     uint16_t id = hwork->id;
     hwork->sem.unlock();
     LOG_DBG("Sending claim response to %d", id);
