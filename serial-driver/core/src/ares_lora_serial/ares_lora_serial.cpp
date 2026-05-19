@@ -203,6 +203,8 @@ void AresSerial::_handle_ack(uint16_t target, bool acked) {
         return;
     }
 
+    py::gil_scoped_release release;
+
     py::tuple ret = setting_get(0);
     uint16_t id = static_cast<uint16_t>(ret[0].cast<uint32_t>());
     constexpr double min_delay = 100.0;
@@ -217,6 +219,7 @@ void AresSerial::_handle_ack(uint16_t target, bool acked) {
 
 AresSerial::AresResponse
 AresSerial::_wait_response(const std::chrono::milliseconds &timeout) {
+    py::gil_scoped_release release;
     AresResponse response;
     if (timeout == std::chrono::milliseconds::max()) {
         response = _wait_response_forever();
@@ -876,6 +879,7 @@ void AresSerial::_log_ack_event(const AresFrame::LogAck &ack) {
 bool AresSerial::_log_ack_event_wait(const std::chrono::milliseconds &timeout,
                                      size_t part, size_t num_parts,
                                      uint16_t id) {
+    py::gil_scoped_release release;
     AresFrame::LogAck expected{static_cast<uint8_t>(part),
                                static_cast<uint8_t>(num_parts), id};
     AresFrame::LogAck response{};
