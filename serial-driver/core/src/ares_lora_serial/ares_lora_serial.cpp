@@ -203,6 +203,8 @@ void AresSerial::_handle_ack(uint16_t target, bool acked) {
         return;
     }
 
+    py::gil_scoped_release release;
+
     py::tuple ret = setting_get(0);
     uint16_t id = static_cast<uint16_t>(ret[0].cast<uint32_t>());
     constexpr double min_delay = 100.0;
@@ -217,6 +219,7 @@ void AresSerial::_handle_ack(uint16_t target, bool acked) {
 
 AresSerial::AresResponse
 AresSerial::_wait_response(const std::chrono::milliseconds &timeout) {
+    py::gil_scoped_release release;
     AresResponse response;
     if (timeout == std::chrono::milliseconds::max()) {
         response = _wait_response_forever();
@@ -477,7 +480,7 @@ py::tuple AresSerial::send_log(const std::string &log_msg, bool broadcast,
         }
     }
 
-    return array_to_tuple(ret.data(), ret.size());
+    return ares::array_to_tuple(ret.data(), ret.size());
 }
 
 py::tuple AresSerial::version() {
@@ -553,7 +556,7 @@ void AresSerial::start() {
     }
 
     LOG_DBG("Starting Work Queue");
-    WorkQConfig config = {
+    ares::WorkQConfig config = {
         .name = "AresSerial queue",
         .essential = true,
     };
@@ -794,8 +797,8 @@ void AresSerial::_heartbeat_event(const AresFrame::Heartbeat &heartbeat) {
     }
 }
 
-void AresSerial::_heartbeat_handler(Work *work) {
-    HeartbeatWork *hwork = container_of(work, &HeartbeatWork::work);
+void AresSerial::_heartbeat_handler(ares::Work *work) {
+    HeartbeatWork *hwork = ares::container_of(work, &HeartbeatWork::work);
     uint16_t id = hwork->id;
     hwork->sem.unlock();
     LOG_DBG("Sending claim response to %d", id);
@@ -876,6 +879,7 @@ void AresSerial::_log_ack_event(const AresFrame::LogAck &ack) {
 bool AresSerial::_log_ack_event_wait(const std::chrono::milliseconds &timeout,
                                      size_t part, size_t num_parts,
                                      uint16_t id) {
+    py::gil_scoped_release release;
     AresFrame::LogAck expected{static_cast<uint8_t>(part),
                                static_cast<uint8_t>(num_parts), id};
     AresFrame::LogAck response{};

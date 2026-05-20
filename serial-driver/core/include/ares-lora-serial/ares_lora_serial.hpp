@@ -324,8 +324,8 @@ class AresSerial {
 
   private:
     Serial::Serial _serial;
-    WorkQ _work_q;
-    SpinLock _command_lock;
+    ares::WorkQ _work_q;
+    ares::SpinLock _command_lock;
     std::exception_ptr _exception;
 
     void _check_crash();
@@ -366,10 +366,10 @@ class AresSerial {
 
     std::atomic_bool _tasks_running = false;
 
-    Task<void()> _rx_task;
+    ares::Task<void()> _rx_task;
     ares::bounded_queue<AresFrame::Decoded, 10, true> _frame_q;
 
-    Task<void()> _processing_task;
+    ares::Task<void()> _processing_task;
     ares::bounded_queue<AresResponse> _response_queue;
 
     std::recursive_mutex _serial_lock;
@@ -381,10 +381,10 @@ class AresSerial {
     static void _handle_bad_frame(const AresResponse &response);
 
     struct HeartbeatWork {
-        HeartbeatWork(work_handler_t handler, AresSerial *ctx)
+        HeartbeatWork(ares::work_handler_t handler, AresSerial *ctx)
             : work(std::move(handler)), obj(ctx) {}
         ~HeartbeatWork() { work.work_flush(); }
-        Work work;
+        ares::Work work;
         AresSerial *obj;
         uint16_t id = 0;
         ares::semaphore<> sem{};
@@ -394,14 +394,14 @@ class AresSerial {
     uint16_t _claimed_host = 0;
     std::function<void(uint16_t, bool, bool)> _heartbeat_callback = nullptr;
     void _heartbeat_event(const AresFrame::Heartbeat &heartbeat);
-    static void _heartbeat_handler(Work *work);
+    static void _heartbeat_handler(ares::Work *work);
     HeartbeatWork _heartbeat_work;
     int _heartbeat_claim_host(uint16_t destination_id);
 
     std::function<void(uint16_t)> _claim_callback = nullptr;
     void _claim_event(const AresFrame::Claim &claim);
 
-    SpinLock _log_spinlock;
+    ares::SpinLock _log_spinlock;
     uint16_t _log_id = 0;
     ares::bounded_queue<AresFrame::LogAck> _log_ack_signal;
     void _log_ack_event(const AresFrame::LogAck &ack);
