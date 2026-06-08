@@ -39,7 +39,7 @@ static size_t calculate_frame_length(const struct ares_frame *frame) {
         break;
     }
     case ARES_FRAME_START: {
-        payload_len = FSIZEOF_FIELD(START.sec) + FSIZEOF_FIELD(START.ns) +
+        payload_len = FSIZEOF_FIELD(START.sec) + FSIZEOF_FIELD(START.usec) +
                       FSIZEOF_FIELD(START.id) + FSIZEOF_FIELD(START.broadcast) +
                       FSIZEOF_FIELD(START.seq_cnt) +
                       FSIZEOF_FIELD(START.packet_id);
@@ -147,7 +147,7 @@ static void serialize(uint8_t *buf, const struct ares_frame *frame,
     }
     case ARES_FRAME_START: {
         FSERIALIZE(START.sec);
-        FSERIALIZE(START.ns);
+        FSERIALIZE(START.usec);
         FSERIALIZE(START.id);
         FSERIALIZE(START.broadcast);
         FSERIALIZE(START.seq_cnt);
@@ -296,7 +296,7 @@ static void deserialize(struct ares_frame *frame, const uint8_t *buf) {
     }
     case ARES_FRAME_START: {
         FDESERIALIZE(START.sec);
-        FDESERIALIZE(START.ns);
+        FDESERIALIZE(START.usec);
         FDESERIALIZE(START.id);
         FDESERIALIZE(START.broadcast);
         // receive side: we don't care about the seq_cnt or packet_id...

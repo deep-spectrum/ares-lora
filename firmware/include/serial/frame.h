@@ -109,7 +109,7 @@ struct ares_frame {
 
         struct {
             int64_t sec;
-            uint64_t ns;
+            uint64_t usec;
             uint16_t id;
             uint16_t packet_id;
             bool broadcast;

@@ -125,7 +125,7 @@ static void handle_start(const struct ares_serial *serial,
                     .payload.START =
                         {
                             .sec = frame->payload.START.sec,
-                            .nsec = frame->payload.START.ns,
+                            .usec = frame->payload.START.usec,
                         }},
         .destination_id = frame->payload.START.id,
         .type = (frame->payload.START.broadcast) ? ARES_PKT_TYPE_BROADCAST

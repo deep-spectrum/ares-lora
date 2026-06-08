@@ -134,7 +134,7 @@ struct ares_packet_payload {
     union {
         struct {
             int64_t sec;
-            uint64_t nsec;
+            uint64_t usec;
         } START;
 
         struct {
