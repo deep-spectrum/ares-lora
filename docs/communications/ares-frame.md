@@ -83,10 +83,10 @@ structured as such:
 Start frames are used to indicate to the other nodes on the network when to start data collection. This frame consists
 of a start time, node id, broadcast flag, sequence count, and packet ID. The payload is structured as such:
 
-|           |           |             |            |           |                |            |
-|-----------|:---------:|:-----------:|:----------:|:---------:|:--------------:|:----------:|
-| __Field__ |  second   | nanoseconds |     id     | broadcast | sequence count | packet id  |
-| __Type__  | `int64_t` | `uint64_t`  | `uint16_t` |  `bool`   |   `uint8_t`    | `uint16_t` |
+|           |           |              |            |           |                |            |
+|-----------|:---------:|:------------:|:----------:|:---------:|:--------------:|:----------:|
+| __Field__ |  second   | microseconds |     id     | broadcast | sequence count | packet id  |
+| __Type__  | `int64_t` |  `uint64_t`  | `uint16_t` |  `bool`   |   `uint8_t`    | `uint16_t` |
 
 * __Payload size__: 22 bytes
 
