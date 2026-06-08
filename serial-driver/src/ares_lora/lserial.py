@@ -256,12 +256,12 @@ class LoraSerial:
         with self._tx_stats_lock:
             self._tx_stats += count
 
-    def _handle_start(self, sec: int, nsec: int, src: int, broadcast: bool, seq_cnt: int, packet_id: int):
+    def _handle_start(self, sec: int, usec: int, src: int, broadcast: bool, seq_cnt: int, packet_id: int):
         if self._should_event_be_dispatched(src, packet_id):
-            logger.info(f"Received start message (sec: {sec}, nsec: {nsec}, src: {src}, "
+            logger.info(f"Received start message (sec: {sec}, usec: {usec}, src: {src}, "
                         f"broadcast: {broadcast}, sequence count: {seq_cnt}, packet id: {packet_id})")
             if self._start_cb is not None:
-                self._start_cb(sec, nsec)
+                self._start_cb(sec, usec)
 
     def _handle_heartbeat(self, src_id: int, ready: bool, broadcast: bool):
         logger.info(f"Received heartbeat message: (source: {src_id}, ready: {ready}, broadcasted: {broadcast}")
@@ -323,13 +323,13 @@ class LoraSerial:
         return None
 
     @lora_serial_command
-    def start(self, sec: int, nsec: int, timeout: float = 20.0, broadcast: bool = True,
+    def start(self, sec: int, usec: int, timeout: float = 20.0, broadcast: bool = True,
               destination_id: int | None = None) -> None:
         """Send start time over LoRa
 
         Args:
             sec: The seconds part of the time to start.
-            nsec: The nanoseconds part of the time to start.
+            usec: The microseconds part of the time to start.
             timeout: The timeout of the transmission.
             broadcast: Broadcast the message to all the nodes.
             destination_id: The destination node if not broadcasting. This field is ignored if broadcasting.
@@ -342,14 +342,14 @@ class LoraSerial:
         """
         if not broadcast and (destination_id is None or destination_id <= 0):
             raise ValueError("Direct messages must have a valid destination specified")
-        if sec < 0 or nsec < 0:
+        if sec < 0 or usec < 0:
             raise ValueError("Time must be positive")
         if destination_id is None:
             destination_id = 0
         prev_timeout = self._dev.get_response_timeout()
         self._dev.set_response_timeout(timeout)
         try:
-            ret = self._dev.start(sec, nsec, destination_id, broadcast)
+            ret = self._dev.start(sec, usec, destination_id, broadcast)
         except Exception:
             self._dev.set_response_timeout(prev_timeout)
             raise

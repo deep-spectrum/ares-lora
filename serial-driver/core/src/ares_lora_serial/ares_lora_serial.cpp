@@ -47,7 +47,7 @@ PYBIND11_MODULE(_ares_lora_serial, m, py::mod_gil_not_used()) {
         .def("setting_set", &AresSerial::setting_set, py::arg("setting_id"),
              py::arg("value"))
         .def("setting_get", &AresSerial::setting_get, py::arg("setting_id"))
-        .def("start", &AresSerial::send_start, py::arg("sec"), py::arg("nsec"),
+        .def("start", &AresSerial::send_start, py::arg("sec"), py::arg("usec"),
              py::arg("id"), py::arg("broadcast"))
         .def("lora_config", &AresSerial::lora_config, py::arg("config"))
         .def("led", &AresSerial::led, py::arg("led_id"), py::arg("state"),
@@ -311,11 +311,11 @@ py::tuple AresSerial::setting_get(uint16_t id) {
     return py::make_tuple(setting, ret);
 }
 
-int AresSerial::send_start(int64_t sec, uint64_t nsec, uint16_t id,
+int AresSerial::send_start(int64_t sec, uint64_t usec, uint16_t id,
                            bool broadcast) {
     _check_crash();
     AresFrame frame(AresFrame::START,
-                    AresFrame::Start{sec, nsec, id, 0, broadcast, 0});
+                    AresFrame::Start{sec, usec, id, 0, broadcast, 0});
     AresResponse response = _send_frame(frame, _response_timeout);
 
     int ret = -1;
@@ -791,7 +791,7 @@ void AresSerial::_publish_response(const AresFrame::Decoded &frame) {
 void AresSerial::_start_event(const AresFrame::Start &start_frame) const {
 
     LOG_INF("Start event received: (%ld, %lu, %u, %d, %d, %u)", start_frame.sec,
-            start_frame.nsec, start_frame.id, start_frame.broadcast,
+            start_frame.usec, start_frame.id, start_frame.broadcast,
             start_frame.seq_cnt, start_frame.packet_id);
 
     if (_start_callback == nullptr) {
@@ -801,7 +801,7 @@ void AresSerial::_start_event(const AresFrame::Start &start_frame) const {
 
     LOG_DBG("Calling registered callback for start event");
 
-    _start_callback(start_frame.sec, start_frame.nsec, start_frame.id,
+    _start_callback(start_frame.sec, start_frame.usec, start_frame.id,
                     start_frame.broadcast, start_frame.seq_cnt,
                     start_frame.packet_id);
 }

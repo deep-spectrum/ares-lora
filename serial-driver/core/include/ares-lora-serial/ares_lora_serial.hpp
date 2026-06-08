@@ -235,13 +235,13 @@ class AresSerial {
     /**
      * Send a start message over the LoRa network.
      * @param sec The seconds part of the start time.
-     * @param nsec The nanoseconds part of the start time.
+     * @param usec The microseconds part of the start time.
      * @param id The ID to send the start message to. Ignored if broadcast is
      * set.
      * @param broadcast Broadcast the start time to all the listening nodes.
      * @return The ACK'ed error code from firmware.
      */
-    int send_start(int64_t sec, uint64_t nsec, uint16_t id, bool broadcast);
+    int send_start(int64_t sec, uint64_t usec, uint16_t id, bool broadcast);
 
     /**
      * Configure the LoRa modem.

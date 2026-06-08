@@ -98,7 +98,7 @@ class AresFrame {
         Start() = default;
 
         int64_t sec = -1;       ///< Seconds part for start time.
-        uint64_t nsec = 0;      ///< Nanoseconds part for start time.
+        uint64_t usec = 0;      ///< Microseconds part for start time.
         uint16_t id = 0;        ///< The destination ID on transmissions. The
                                 ///< source ID on reception.
         uint16_t packet_id = 0; ///< Packet ID of the received packet.
