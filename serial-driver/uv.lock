@@ -25,7 +25,7 @@ wheels = [
 
 [[package]]
 name = "ares-lora"
-version = "1.0.0"
+version = "1.0.1"
 source = { editable = "." }
 dependencies = [
     { name = "ares-lora-core" },
@@ -82,7 +82,7 @@ provides-extras = ["jax", "dev", "docs"]
 
 [[package]]
 name = "ares-lora-core"
-version = "1.0.0"
+version = "1.0.1"
 source = { editable = "core" }
 
 [[package]]
