@@ -57,8 +57,13 @@ PYBIND11_MODULE(_ares_lora_serial, m, py::mod_gil_not_used()) {
         .def("send_log", &AresSerial::send_log,
              "Send a logging message over LoRa")
         .def("version", &AresSerial::version, "Retrieve the firmware version")
+        .def("register_logger_callbacks",
+             &AresSerial::register_logger_callbacks, py::arg("dbg"),
+             py::arg("info"), py::arg("warning"), py::arg("error"),
+             py::arg("critical"), py::arg("get_level"), py::arg("set_level"))
         .def("set_logging_level", &AresSerial::set_logging_level,
              "Set the logging level of the C++ logger")
+        .def("get_logging_level", &AresSerial::get_log_level)
         .def("start_driver", &AresSerial::start, "Start the serial driver")
         .def("stop_driver", &AresSerial::stop, "Stop the serial driver")
         .def("set_response_timeout", &AresSerial::set_response_timeout,
@@ -509,6 +514,20 @@ py::tuple AresSerial::version() {
                           _decode_version(version.kernel));
 }
 
+void AresSerial::register_logger_callbacks(
+    const std::function<void(const std::string &)> &dbg,
+    const std::function<void(const std::string &)> &info,
+    const std::function<void(const std::string &)> &warn,
+    const std::function<void(const std::string &)> &error,
+    const std::function<void(const std::string &)> &crit,
+    const std::function<long()> &get_level,
+    const std::function<void(long)> &set_level) {
+    _check_crash();
+
+    LOG_MODULE_REGISTER_CALLBACKS(dbg, info, warn, error, crit, set_level,
+                                  get_level);
+}
+
 void AresSerial::set_logging_level(uint32_t level) {
     _check_crash();
 
@@ -541,6 +560,12 @@ void AresSerial::set_logging_level(uint32_t level) {
         throw std::invalid_argument("Invalid logging level");
     }
     }
+}
+
+long AresSerial::get_log_level() {
+    _check_crash();
+
+    return static_cast<long>(LOG_MODULE_CURRENT_LEVEL);
 }
 
 void AresSerial::start() {
