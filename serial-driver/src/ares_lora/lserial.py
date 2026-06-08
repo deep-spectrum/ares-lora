@@ -233,6 +233,8 @@ class LoraSerial:
         self._tx_stats: int = 0
         self._tx_stats_lock = Lock()
 
+        self._logger = logger
+
     def _should_event_be_dispatched(self, src: int, packet_id: int) -> bool:
         if src not in self._nodes:
             self._nodes[src] = packet_id
@@ -481,6 +483,18 @@ class LoraSerial:
         """
         return self._dev.version()
 
+    def register_logger(self, logger_redirect: logging.Logger | None = logger):
+        """Register a logger with the core module.
+
+        Args:
+            logger_redirect: The logger to register with the core. If `None`, then unregister and use the core module logger.
+        """
+        if logger_redirect is None:
+            self._dev.register_logger_callbacks(None, None, None, None, None, None, None)
+        self._logger = logger_redirect
+        self._dev.register_logger_callbacks(self._debug, self._info, self._warning, self._error, self._critical,
+                                            self._get_level, self._set_level)
+
     def set_logging_level(self, level: int):
         """Set the logging level of the LoRa driver core library.
 
@@ -501,6 +515,45 @@ class LoraSerial:
             - `60`: OFF
         """
         self._dev.set_logging_level(level)
+
+    def get_logging_level(self) -> int:
+        """Retrieve the current logging level of the core logger.
+
+        Returns:
+            The logging level.
+
+        Notes:
+            This is compatible with the logging levels found in the python logging module.
+
+            - `10`: DEBUG
+            - `20`: INFO
+            - `30`: WARNING
+            - `40`: ERROR
+            - `50`: CRITICAL
+            - `60`: OFF
+        """
+        return self._dev.get_log_level()
+
+    def _debug(self, msg: str):
+        self._logger.debug(msg)
+
+    def _info(self, msg: str):
+        self._logger.info(msg)
+
+    def _warning(self, msg: str):
+        self._logger.warning(msg)
+
+    def _error(self, msg: str):
+        self._logger.error(msg)
+
+    def _critical(self, msg: str):
+        self._logger.critical(msg)
+
+    def _get_level(self):
+        return self._logger.level
+
+    def _set_level(self, level: int):
+        self._logger.setLevel(level)
 
     def start_driver(self):
         """Starts execution of the LoRa driver."""
