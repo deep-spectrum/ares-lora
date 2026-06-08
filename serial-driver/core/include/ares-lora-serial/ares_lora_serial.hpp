@@ -235,13 +235,13 @@ class AresSerial {
     /**
      * Send a start message over the LoRa network.
      * @param sec The seconds part of the start time.
-     * @param nsec The nanoseconds part of the start time.
+     * @param usec The microseconds part of the start time.
      * @param id The ID to send the start message to. Ignored if broadcast is
      * set.
      * @param broadcast Broadcast the start time to all the listening nodes.
      * @return The ACK'ed error code from firmware.
      */
-    int send_start(int64_t sec, uint64_t nsec, uint16_t id, bool broadcast);
+    int send_start(int64_t sec, uint64_t usec, uint16_t id, bool broadcast);
 
     /**
      * Configure the LoRa modem.
@@ -307,10 +307,36 @@ class AresSerial {
     py::tuple version();
 
     /**
+     * Register logging redirects.
+     *
+     * @param[in] dbg Debug message callback.
+     * @param[in] info Info message callback.
+     * @param[in] warn Warning message callback.
+     * @param[in] error Error message callback.
+     * @param[in] crit Critical message callback.
+     * @param[in] get_level Get level callback.
+     * @param[in] set_level Set level callback.
+     */
+    void register_logger_callbacks(
+        const std::function<void(const std::string &)> &dbg,
+        const std::function<void(const std::string &)> &info,
+        const std::function<void(const std::string &)> &warn,
+        const std::function<void(const std::string &)> &error,
+        const std::function<void(const std::string &)> &crit,
+        const std::function<long()> &get_level,
+        const std::function<void(long)> &set_level);
+
+    /**
      * Set the logging level for the core module.
      * @param level The new logging level.
      */
     void set_logging_level(uint32_t level);
+
+    /**
+     * Retrieve the current logger level.
+     * @return The current log level.
+     */
+    long get_log_level();
 
     /**
      * Start driver execution.

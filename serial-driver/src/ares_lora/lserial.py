@@ -233,6 +233,8 @@ class LoraSerial:
         self._tx_stats: int = 0
         self._tx_stats_lock = Lock()
 
+        self._logger = logger
+
     def _should_event_be_dispatched(self, src: int, packet_id: int) -> bool:
         if src not in self._nodes:
             self._nodes[src] = packet_id
@@ -254,12 +256,12 @@ class LoraSerial:
         with self._tx_stats_lock:
             self._tx_stats += count
 
-    def _handle_start(self, sec: int, nsec: int, src: int, broadcast: bool, seq_cnt: int, packet_id: int):
+    def _handle_start(self, sec: int, usec: int, src: int, broadcast: bool, seq_cnt: int, packet_id: int):
         if self._should_event_be_dispatched(src, packet_id):
-            logger.info(f"Received start message (sec: {sec}, nsec: {nsec}, src: {src}, "
+            logger.info(f"Received start message (sec: {sec}, usec: {usec}, src: {src}, "
                         f"broadcast: {broadcast}, sequence count: {seq_cnt}, packet id: {packet_id})")
             if self._start_cb is not None:
-                self._start_cb(sec, nsec)
+                self._start_cb(sec, usec)
 
     def _handle_heartbeat(self, src_id: int, ready: bool, broadcast: bool):
         logger.info(f"Received heartbeat message: (source: {src_id}, ready: {ready}, broadcasted: {broadcast}")
@@ -321,13 +323,13 @@ class LoraSerial:
         return None
 
     @lora_serial_command
-    def start(self, sec: int, nsec: int, timeout: float = 20.0, broadcast: bool = True,
+    def start(self, sec: int, usec: int, timeout: float = 20.0, broadcast: bool = True,
               destination_id: int | None = None) -> None:
         """Send start time over LoRa
 
         Args:
             sec: The seconds part of the time to start.
-            nsec: The nanoseconds part of the time to start.
+            usec: The microseconds part of the time to start.
             timeout: The timeout of the transmission.
             broadcast: Broadcast the message to all the nodes.
             destination_id: The destination node if not broadcasting. This field is ignored if broadcasting.
@@ -340,14 +342,14 @@ class LoraSerial:
         """
         if not broadcast and (destination_id is None or destination_id <= 0):
             raise ValueError("Direct messages must have a valid destination specified")
-        if sec < 0 or nsec < 0:
+        if sec < 0 or usec < 0:
             raise ValueError("Time must be positive")
         if destination_id is None:
             destination_id = 0
         prev_timeout = self._dev.get_response_timeout()
         self._dev.set_response_timeout(timeout)
         try:
-            ret = self._dev.start(sec, nsec, destination_id, broadcast)
+            ret = self._dev.start(sec, usec, destination_id, broadcast)
         except Exception:
             self._dev.set_response_timeout(prev_timeout)
             raise
@@ -481,6 +483,18 @@ class LoraSerial:
         """
         return self._dev.version()
 
+    def register_logger(self, logger_redirect: logging.Logger | None = logger):
+        """Register a logger with the core module.
+
+        Args:
+            logger_redirect: The logger to register with the core. If `None`, then unregister and use the core module logger.
+        """
+        if logger_redirect is None:
+            self._dev.register_logger_callbacks(None, None, None, None, None, None, None)
+        self._logger = logger_redirect
+        self._dev.register_logger_callbacks(self._debug, self._info, self._warning, self._error, self._critical,
+                                            self._get_level, self._set_level)
+
     def set_logging_level(self, level: int):
         """Set the logging level of the LoRa driver core library.
 
@@ -501,6 +515,45 @@ class LoraSerial:
             - `60`: OFF
         """
         self._dev.set_logging_level(level)
+
+    def get_logging_level(self) -> int:
+        """Retrieve the current logging level of the core logger.
+
+        Returns:
+            The logging level.
+
+        Notes:
+            This is compatible with the logging levels found in the python logging module.
+
+            - `10`: DEBUG
+            - `20`: INFO
+            - `30`: WARNING
+            - `40`: ERROR
+            - `50`: CRITICAL
+            - `60`: OFF
+        """
+        return self._dev.get_log_level()
+
+    def _debug(self, msg: str):
+        self._logger.debug(msg)
+
+    def _info(self, msg: str):
+        self._logger.info(msg)
+
+    def _warning(self, msg: str):
+        self._logger.warning(msg)
+
+    def _error(self, msg: str):
+        self._logger.error(msg)
+
+    def _critical(self, msg: str):
+        self._logger.critical(msg)
+
+    def _get_level(self):
+        return self._logger.level
+
+    def _set_level(self, level: int):
+        self._logger.setLevel(level)
 
     def start_driver(self):
         """Starts execution of the LoRa driver."""

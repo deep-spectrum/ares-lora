@@ -36,10 +36,10 @@ There are a variety of payloads that these packets can send which are described 
 Start payloads are used to indicate the start time for data collection. They can either be directed at a certain
 node or broadcasted to all the nodes in the area. The payload is structured as follows:
 
-|           |           |             |
-|-----------|:---------:|:-----------:|
-| __Field__ |  seconds  | nanoseconds |
-| __Type__  | `int64_t` | `uint64_t`  |
+|           |           |              |
+|-----------|:---------:|:------------:|
+| __Field__ |  seconds  | microseconds |
+| __Type__  | `int64_t` |  `uint64_t`  |
 
 * __Payload size__: 16 bytes
 

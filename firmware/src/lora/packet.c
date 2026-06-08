@@ -124,11 +124,11 @@ static size_t calculate_packet_size(const struct ares_packet *packet) {
 
     switch (packet->payload.type) {
     case ARES_PKT_PAYLOAD_START: {
-        overhead += PSIZEOF_FIELD(START);
+        overhead += PSIZEOF_FIELD(START.sec) + PSIZEOF_FIELD(START.usec);
         break;
     }
     case ARES_PKT_PAYLOAD_HEARTBEAT: {
-        overhead += PSIZEOF_FIELD(HEARTBEAT);
+        overhead += PSIZEOF_FIELD(HEARTBEAT.ready);
         break;
     }
     case ARES_PKT_PAYLOAD_LOG: {
@@ -224,11 +224,12 @@ static void serialize(uint8_t *buf, size_t len,
 
     switch (packet->payload.type) {
     case ARES_PKT_PAYLOAD_START: {
-        (void)memcpy(payload, &packet->payload.payload.START, payload_len);
+        PSERIALIZE(START.sec);
+        PSERIALIZE(START.usec);
         break;
     }
     case ARES_PKT_PAYLOAD_HEARTBEAT: {
-        (void)memcpy(payload, &packet->payload.payload.HEARTBEAT, payload_len);
+        PSERIALIZE(HEARTBEAT.ready);
         break;
     }
     case ARES_PKT_PAYLOAD_LOG: {
@@ -322,17 +323,19 @@ static void deserialize(struct ares_packet *packet, const uint8_t *buf) {
     payload = &buf[ARES_PACKET_PAYLOAD_OFFSET(packet->type)];
     packet->payload.type = buf[ARES_PACKET_PAYLOAD_TYPE_OFFSET(packet->type)];
 
+    PDESERIALIZE_INIT();
     switch (packet->payload.type) {
     case ARES_PKT_PAYLOAD_START: {
-        (void)memcpy(&packet->payload.payload.START, payload, payload_len);
+
+        PDESERIALIZE(START.sec);
+        PDESERIALIZE(START.usec);
         break;
     }
     case ARES_PKT_PAYLOAD_HEARTBEAT: {
-        (void)memcpy(&packet->payload.payload.HEARTBEAT, payload, payload_len);
+        PDESERIALIZE(HEARTBEAT.ready);
         break;
     }
     case ARES_PKT_PAYLOAD_LOG: {
-        PDESERIALIZE_INIT();
         PDESERIALIZE(LOG.part);
         PDESERIALIZE(LOG.num_parts);
         PDESERIALIZE(LOG.log_id);
@@ -340,7 +343,6 @@ static void deserialize(struct ares_packet *packet, const uint8_t *buf) {
         break;
     }
     case ARES_PKT_PAYLOAD_LOG_ACK: {
-        PDESERIALIZE_INIT();
         PDESERIALIZE(LOG_ACK.part);
         PDESERIALIZE(LOG_ACK.num_parts);
         PDESERIALIZE(LOG_ACK.log_id);

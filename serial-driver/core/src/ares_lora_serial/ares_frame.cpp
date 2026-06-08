@@ -291,7 +291,7 @@ uint16_t AresFrame::_payload_size() const {
         break;
     }
     case START: {
-        ret = sizeof(Start::sec) + sizeof(Start::nsec) + sizeof(Start::id) +
+        ret = sizeof(Start::sec) + sizeof(Start::usec) + sizeof(Start::id) +
               sizeof(Start::broadcast) + sizeof(Start::seq_cnt) +
               sizeof(Start::packet_id);
         break;
@@ -404,7 +404,7 @@ void AresFrame::_serialize_setting(const Setting &payload,
 void AresFrame::_serialize_start(const Start &payload,
                                  std::vector<uint8_t> &buffer) {
     SERIALIZE(sec);
-    SERIALIZE(nsec);
+    SERIALIZE(usec);
     SERIALIZE(id);
     SERIALIZE(broadcast);
     SERIALIZE(seq_cnt);
@@ -517,7 +517,7 @@ void AresFrame::_deserialize_start(const uint8_t *buf, size_t len) {
     ARG_UNUSED(len);
     DESERIALIZE_INIT(Start);
     DESERIALIZE(sec);
-    DESERIALIZE(nsec);
+    DESERIALIZE(usec);
     DESERIALIZE(id);
     DESERIALIZE(broadcast);
     DESERIALIZE(seq_cnt);

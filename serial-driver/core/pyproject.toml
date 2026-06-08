@@ -4,7 +4,7 @@ build-backend = "scikit_build_core.build"
 
 [project]
 name = "ares-lora-core"
-version = "1.0.0"
+version = "1.0.1"
 description = "Ares LoRa serial driver core library"
 authors = [
     { name = "Tom Schmitz", email = "tschmitz@andrew.cmu.edu" },
@@ -17,4 +17,4 @@ classifiers = [
 ]
 
 [tool.scikit-build]
-cmake.args = ["-DDEFAULT_LOG_LEVEL=off", "-DUSE_PYTHON_LOGGERS=off"]
+cmake.args = ["-DDEFAULT_LOG_LEVEL=off"]

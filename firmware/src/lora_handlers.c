@@ -49,7 +49,7 @@ static void handle_start(const struct ares_lora *lora,
     frame.payload.START.id = packet->source_id;
     frame.payload.START.broadcast = packet->type == ARES_PKT_TYPE_BROADCAST;
     frame.payload.START.sec = packet->payload.payload.START.sec;
-    frame.payload.START.ns = packet->payload.payload.START.nsec;
+    frame.payload.START.usec = packet->payload.payload.START.usec;
     frame.payload.START.seq_cnt = packet->sequence_cnt;
     frame.payload.START.packet_id = packet->packet_id;
 
