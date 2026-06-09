@@ -818,6 +818,7 @@ void AresSerial::_heartbeat_event(const AresFrame::Heartbeat &heartbeat) {
 
     if (_heartbeat_callback != nullptr) {
         LOG_DBG("Calling Python event handler");
+        py::gil_scoped_acquire acquire;
         _heartbeat_callback(heartbeat.id, heartbeat.ready, heartbeat.broadcast);
     }
 }
