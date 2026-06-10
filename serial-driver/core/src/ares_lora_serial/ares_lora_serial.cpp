@@ -458,7 +458,7 @@ py::tuple AresSerial::send_log(const std::string &log_msg, bool broadcast,
             payload.broadcast = true;
             payload.tx_cnt = tx_cnt;
         } else {
-            LOG_INF("Directing message to node %d", _claimed_host);
+            LOG_DBG("Directing message to node %d", _claimed_host);
             payload.id = _claimed_host;
         }
     }
@@ -580,6 +580,8 @@ void AresSerial::start() {
         throw std::runtime_error("Please stop before restarting");
     }
 
+    LOG_INF("Starting driver");
+
     LOG_DBG("Clearing event queues");
     _start_event_q.clear();
     _heartbeat_event_q.clear();
@@ -588,7 +590,6 @@ void AresSerial::start() {
     _pkt_rx_event_q.clear();
     _pkt_tx_event_q.clear();
 
-    LOG_INF("Starting driver");
     _exception = nullptr;
     if (_serial.is_closed()) {
         LOG_DBG("Port was closed. Attempting to open it.");
@@ -708,7 +709,7 @@ void AresSerial::_process_frames_helper() {
     bool stopped = false;
     while (_tasks_running || !stopped) {
         AresFrame::Decoded frame = _frame_q.get();
-        LOG_INF("Received frame: %d", frame.type);
+        LOG_DBG("Received frame: %d", frame.type);
 
         switch (frame.type) {
         case AresFrame::ACK:
@@ -785,7 +786,7 @@ void AresSerial::_process_rx_buffer(std::vector<uint8_t> &buf) {
             return;
         }
 
-        LOG_INF_HEXDUMP(buf, frame_size, "Frame found");
+        LOG_DBG_HEXDUMP(buf, frame_size, "Frame found");
         AresFrame frame;
         frame.parse(buf, frame_start);
         _frame_q.put(frame.get_parsed_frame());
@@ -938,7 +939,7 @@ int AresSerial::_heartbeat_claim_host(uint16_t destination_id) {
 }
 
 void AresSerial::_claim_event(const AresFrame::Claim &claim) {
-    LOG_DBG("Claim event received: %d", claim.id);
+    LOG_INF("Claim event received: %d", claim.id);
     if (_master) {
         LOG_ERR("Someone sent a claim packet while this is the master node: "
                 "Undefined behavior");
@@ -958,7 +959,7 @@ void AresSerial::_claim_event(const AresFrame::Claim &claim) {
 }
 
 void AresSerial::_log_ack_event(const AresFrame::LogAck &ack) {
-    LOG_DBG("Log ACK event received (%d, %d, %d)", ack.part, ack.num_parts,
+    LOG_INF("Log ACK event received (%d, %d, %d)", ack.part, ack.num_parts,
             ack.id);
 
     try {
@@ -975,7 +976,6 @@ void AresSerial::_log_ack_event(const AresFrame::LogAck &ack) {
 bool AresSerial::_log_ack_event_wait(const std::chrono::milliseconds &timeout,
                                      size_t part, size_t num_parts,
                                      uint16_t id) {
-    py::gil_scoped_release release;
     AresFrame::LogAck expected{static_cast<uint8_t>(part),
                                static_cast<uint8_t>(num_parts), id};
     AresFrame::LogAck response{};
@@ -997,7 +997,7 @@ bool AresSerial::_log_ack_event_wait(const std::chrono::milliseconds &timeout,
 }
 
 void AresSerial::_log_event(const AresFrame::Log &log) {
-    LOG_DBG("Log event received from %d", log.id);
+    LOG_INF("Log event received from %d", log.id);
     LOG_DBG("Part %d of %d", log.part, log.num_parts);
     LOG_DBG("Log message: %s", log.msg.c_str());
     LOG_DBG("Log ID: %d", log.log_id);
