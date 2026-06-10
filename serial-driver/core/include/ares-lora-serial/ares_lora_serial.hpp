@@ -56,6 +56,15 @@ class AresTimeoutError : public std::exception {
     std::string _msg;
 };
 
+class AresThreadTerminate : public std::exception {
+  public:
+    explicit AresThreadTerminate() = default;
+
+    [[nodiscard]] const char *what() const noexcept override {
+        return "Thread terminate signal";
+    }
+};
+
 /**
  * @struct AresSerialConfigs
  *
@@ -348,6 +357,13 @@ class AresSerial {
      */
     void stop();
 
+    py::tuple wait_start_event();
+    py::tuple wait_heartbeat_event();
+    uint16_t wait_claim_event();
+    py::tuple wait_log_event();
+    py::tuple wait_packet_rx_event();
+    uint32_t wait_packet_tx_done_event();
+
   private:
     Serial::Serial _serial;
     ares::WorkQ _work_q;
@@ -456,6 +472,14 @@ class AresSerial {
 
     std::function<void(uint32_t)> _pkt_tx_cb = nullptr;
     void _packet_tx_event(const AresFrame::PktTx &msg) const;
+
+    ares::bounded_queue<std::unique_ptr<AresFrame::Start>, 5> _start_event_q;
+    ares::bounded_queue<std::unique_ptr<AresFrame::Heartbeat>, 10>
+        _heartbeat_event_q;
+    ares::bounded_queue<std::unique_ptr<AresFrame::Claim>, 5> _claim_event_q;
+    ares::bounded_queue<std::unique_ptr<AresFrame::Log>, 100> _log_event_q;
+    ares::bounded_queue<std::unique_ptr<AresFrame::PktRx>, 500> _pkt_rx_event_q;
+    ares::bounded_queue<std::unique_ptr<AresFrame::PktTx>, 3> _pkt_tx_event_q;
 };
 
 #endif // ARES_ARES_LORA_SERIAL_HPP

@@ -628,6 +628,57 @@ void AresSerial::stop() {
     _frame_q.clear();
 }
 
+template <typename Event, size_t size>
+void wait_event_queue_released(
+    Event &evt, ares::bounded_queue<std::unique_ptr<Event>, size> &evt_q) {
+    py::gil_scoped_release release;
+
+    auto event_ptr = evt_q.get();
+    if (event_ptr == nullptr) {
+        throw AresThreadTerminate();
+    }
+
+    evt = *event_ptr;
+}
+
+py::tuple AresSerial::wait_start_event() {
+    AresFrame::Start event;
+    wait_event_queue_released(event, _start_event_q);
+    return py::make_tuple(event.sec, event.usec, event.id, event.broadcast,
+                          event.seq_cnt, event.packet_id);
+}
+
+py::tuple AresSerial::wait_heartbeat_event() {
+    AresFrame::Heartbeat event;
+    wait_event_queue_released(event, _heartbeat_event_q);
+    return py::make_tuple(event.id, event.ready, event.broadcast);
+}
+
+uint16_t AresSerial::wait_claim_event() {
+    AresFrame::Claim event;
+    wait_event_queue_released(event, _claim_event_q);
+    return event.id;
+}
+
+py::tuple AresSerial::wait_log_event() {
+    AresFrame::Log event;
+    wait_event_queue_released(event, _log_event_q);
+    return py::make_tuple(event.id, event.log_id, event.part, event.num_parts,
+                          event.msg);
+}
+
+py::tuple AresSerial::wait_packet_rx_event() {
+    AresFrame::PktRx event;
+    wait_event_queue_released(event, _pkt_rx_event_q);
+    return py::make_tuple(event.seq_cnt, event.packet_id, event.src_id);
+}
+
+uint32_t AresSerial::wait_packet_tx_done_event() {
+    AresFrame::PktTx event;
+    wait_event_queue_released(event, _pkt_tx_event_q);
+    return event.count;
+}
+
 void AresSerial::_check_crash() {
     if (_exception) {
         stop();
