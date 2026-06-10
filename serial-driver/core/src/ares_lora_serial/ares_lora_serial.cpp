@@ -1018,7 +1018,9 @@ py::tuple AresSerial::_decode_version(uint32_t version_num) {
 }
 
 void AresSerial::_debug_event(const AresFrame::Dbg &msg) {
-    LOG_DBG("Received debug event: %d", msg.code);
+    if (msg.code != 0) {
+        LOG_ERR("Received debug event: %d", msg.code);
+    }
 }
 
 void AresSerial::_packet_rx_event(const AresFrame::PktRx &msg) {
