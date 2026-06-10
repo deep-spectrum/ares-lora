@@ -105,34 +105,6 @@ struct AresSerialConfigs {
     bool master = false;
 
     /**
-     * Callback function for start events.
-     * Parameters: (seconds, nanoseconds, source ID, broadcasted,
-     * sequence count, packet id).
-     */
-    std::function<void(int64_t, uint64_t, uint16_t, bool, uint8_t, uint16_t)>
-        start_callback = nullptr;
-
-    /**
-     * Callback for heartbeat events.
-     * Parameters: (source ID, ready, broadcasted).
-     */
-    std::function<void(uint16_t, bool, bool)> heartbeat_callback = nullptr;
-
-    /**
-     * Callback for claim events.
-     * Parameters: (Master node ID).
-     */
-    std::function<void(uint16_t)> claim_callback = nullptr;
-
-    /**
-     * Log event callback.
-     * Parameters: (source ID, Log ID, chunk ID, number of chunks, message).
-     */
-    std::function<void(uint16_t, uint16_t, uint8_t, uint8_t,
-                       const std::string &)>
-        log_callback = nullptr;
-
-    /**
      * Alpha parameter for the Gamma distribution.
      */
     double alpha = 1.0;
@@ -141,19 +113,6 @@ struct AresSerialConfigs {
      * Beta parameter for the Gamma distribution.
      */
     double beta = 2.0;
-
-    /**
-     * Packet Received callback.
-     * Parameters: (Sequence Count, Packet ID, Source ID).
-     */
-    std::function<void(uint8_t, uint16_t, uint16_t)> packet_rx_callback =
-        nullptr;
-
-    /**
-     * Packet Transmitted callback.
-     * Parameters: (Number of transmissions).
-     */
-    std::function<void(uint32_t)> packet_tx_callback = nullptr;
 };
 
 /**
@@ -416,9 +375,7 @@ class AresSerial {
 
     std::recursive_mutex _serial_lock;
 
-    std::function<void(int64_t, uint64_t, uint16_t, bool, uint8_t, uint16_t)>
-        _start_callback = nullptr;
-    void _start_event(const AresFrame::Start &start_frame) const;
+    void _start_event(const AresFrame::Start &start_frame);
 
     static void _handle_bad_frame(const AresResponse &response);
 
@@ -434,13 +391,11 @@ class AresSerial {
 
     bool _master;
     uint16_t _claimed_host = 0;
-    std::function<void(uint16_t, bool, bool)> _heartbeat_callback = nullptr;
     void _heartbeat_event(const AresFrame::Heartbeat &heartbeat);
     static void _heartbeat_handler(ares::Work *work);
     HeartbeatWork _heartbeat_work;
     int _heartbeat_claim_host(uint16_t destination_id);
 
-    std::function<void(uint16_t)> _claim_callback = nullptr;
     void _claim_event(const AresFrame::Claim &claim);
 
     ares::SpinLock _log_spinlock;
@@ -458,20 +413,15 @@ class AresSerial {
     std::random_device _rd;
     std::mt19937 _generator;
     void _handle_ack(uint16_t target, bool acked);
-    std::function<void(uint16_t, uint16_t, uint8_t, uint8_t,
-                       const std::string &msg)>
-        _log_callback = nullptr;
-    void _log_event(const AresFrame::Log &log) const;
+    void _log_event(const AresFrame::Log &log);
 
     static py::tuple _decode_version(uint32_t version_num);
 
     static void _debug_event(const AresFrame::Dbg &msg);
 
-    std::function<void(uint8_t, uint16_t, uint16_t)> _pkt_rx_cb = nullptr;
-    void _packet_rx_event(const AresFrame::PktRx &msg) const;
+    void _packet_rx_event(const AresFrame::PktRx &msg);
 
-    std::function<void(uint32_t)> _pkt_tx_cb = nullptr;
-    void _packet_tx_event(const AresFrame::PktTx &msg) const;
+    void _packet_tx_event(const AresFrame::PktTx &msg);
 
     ares::bounded_queue<std::unique_ptr<AresFrame::Start>, 5> _start_event_q;
     ares::bounded_queue<std::unique_ptr<AresFrame::Heartbeat>, 10>
