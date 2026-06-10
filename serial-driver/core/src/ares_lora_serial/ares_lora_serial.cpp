@@ -573,6 +573,14 @@ void AresSerial::start() {
         throw std::runtime_error("Please stop before restarting");
     }
 
+    LOG_DBG("Clearing event queues");
+    _start_event_q.clear();
+    _heartbeat_event_q.clear();
+    _claim_event_q.clear();
+    _log_event_q.clear();
+    _pkt_rx_event_q.clear();
+    _pkt_tx_event_q.clear();
+
     LOG_INF("Starting driver");
     _exception = nullptr;
     if (_serial.is_closed()) {
