@@ -17,4 +17,4 @@ classifiers = [
 ]
 
 [tool.scikit-build]
-cmake.args = ["-DDEFAULT_LOG_LEVEL=off"]
+cmake.args = ["-DDEFAULT_LOG_LEVEL=off", "-DCMAKE_BUILD_TYPE=Debug"]
