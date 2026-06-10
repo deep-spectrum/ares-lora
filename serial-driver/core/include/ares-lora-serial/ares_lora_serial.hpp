@@ -480,6 +480,7 @@ class AresSerial {
     ares::bounded_queue<std::unique_ptr<AresFrame::Log>, 100> _log_event_q;
     ares::bounded_queue<std::unique_ptr<AresFrame::PktRx>, 500> _pkt_rx_event_q;
     ares::bounded_queue<std::unique_ptr<AresFrame::PktTx>, 3> _pkt_tx_event_q;
+    bool _stop_event_queues();
 };
 
 #endif // ARES_ARES_LORA_SERIAL_HPP

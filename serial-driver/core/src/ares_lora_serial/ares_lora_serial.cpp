@@ -610,15 +610,17 @@ void AresSerial::stop() {
     _tasks_running = false;
     _rx_task.join();
 
+    AresFrame::Decoded terminate_request{AresFrame::DRIVER_STOP,
+                                         std::monostate()};
     size_t retries = 0;
-    for (; retries < max_attempts; retries++) {
-        if (_processing_task.join(100ms) == -ETIMEDOUT) {
-            AresFrame::Decoded dummy{AresFrame::UNKNOWN, std::monostate()};
-            _frame_q.put(dummy);
-            continue;
+
+    do {
+        _frame_q.put(terminate_request);
+        if (_processing_task.join(100ms) == 0) {
+            break;
         }
-        break;
-    }
+        retries++;
+    } while (retries < max_attempts);
 
     if (retries >= max_attempts) {
         throw std::runtime_error("Failed to shut down processing task");
@@ -687,7 +689,8 @@ void AresSerial::_check_crash() {
 }
 
 void AresSerial::_process_frames_helper() {
-    while (_tasks_running) {
+    bool stopped = false;
+    while (_tasks_running || !stopped) {
         AresFrame::Decoded frame = _frame_q.get();
         LOG_INF("Received frame: %d", frame.type);
 
@@ -730,6 +733,10 @@ void AresSerial::_process_frames_helper() {
         }
         case AresFrame::PKT_TX: {
             _packet_tx_event(std::get<AresFrame::PktTx>(frame.payload));
+            break;
+        }
+        case AresFrame::DRIVER_STOP: {
+            stopped = _stop_event_queues();
             break;
         }
         default: {
@@ -1022,4 +1029,27 @@ void AresSerial::_packet_tx_event(const AresFrame::PktTx &msg) const {
     if (_pkt_tx_cb) {
         _pkt_tx_cb(msg.count);
     }
+}
+
+template <typename T, size_t size>
+bool put_noexcept(ares::bounded_queue<std::unique_ptr<T>, size> &q) {
+    bool exit_requested = true;
+
+    try {
+        q.put_nonblocking(static_cast<std::unique_ptr<T>>(nullptr));
+    } catch (const ares::queue_exception &) {
+        exit_requested = false;
+    }
+
+    return exit_requested;
+}
+
+bool AresSerial::_stop_event_queues() {
+    bool success = put_noexcept(_start_event_q);
+    success = put_noexcept(_heartbeat_event_q) && success;
+    success = put_noexcept(_claim_event_q) && success;
+    success = put_noexcept(_log_event_q) && success;
+    success = put_noexcept(_pkt_rx_event_q) && success;
+    success = put_noexcept(_pkt_tx_event_q) && success;
+    return success;
 }

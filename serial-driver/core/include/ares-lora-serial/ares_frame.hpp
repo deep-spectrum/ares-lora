@@ -73,7 +73,9 @@ class AresFrame {
         DBG = 11,           ///< Debug message (RX)
         PKT_RX = 12,        ///< Packet Received (RX)
         PKT_TX = 13,        ///< Packet transmitted (RX)
-        UNKNOWN,            ///< Unknown frame
+
+        DRIVER_STOP, ///< Frame used to stop the core driver.
+        UNKNOWN,     ///< Unknown frame
     };
 
     /**
