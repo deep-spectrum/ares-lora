@@ -357,6 +357,8 @@ class AresSerial {
     void _send_frame(const std::vector<uint8_t> &tx);
     AresResponse _send_frame(AresFrame &frame,
                              const std::chrono::milliseconds &timeout);
+    AresResponse _send_frame_released(AresFrame &frame,
+                                      const std::chrono::milliseconds &timeout);
     void _send_multi_frame(AresFrame &frame,
                            const std::chrono::milliseconds &timeout,
                            std::vector<AresResponse> &responses);

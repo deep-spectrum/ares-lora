@@ -145,6 +145,13 @@ void AresSerial::_send_frame(const std::vector<uint8_t> &tx) {
 AresSerial::AresResponse
 AresSerial::_send_frame(AresFrame &frame,
                         const std::chrono::milliseconds &timeout) {
+    py::gil_scoped_release release;
+    return _send_frame_released(frame, timeout);
+}
+
+AresSerial::AresResponse
+AresSerial::_send_frame_released(AresFrame &frame,
+                                 const std::chrono::milliseconds &timeout) {
     std::unique_lock lock_(_command_lock);
     std::vector<uint8_t> tx;
     frame.serialize(tx);
@@ -155,6 +162,8 @@ AresSerial::_send_frame(AresFrame &frame,
 }
 
 static void check_python_errors() {
+    py::gil_scoped_acquire acquire;
+
     if (PyErr_CheckSignals() != 0) {
         throw py::error_already_set();
     }
@@ -174,6 +183,7 @@ void AresSerial::_send_log_frame_directed(
     AresFrame &frame, const std::chrono::milliseconds &ack_timeout,
     size_t max_attempts, std::vector<AresResponse> &responses,
     uint16_t target) {
+    py::gil_scoped_release release;
     std::vector<uint8_t> tx;
     size_t acked_frames = 0;
 
@@ -208,8 +218,6 @@ void AresSerial::_handle_ack(uint16_t target, bool acked) {
         return;
     }
 
-    py::gil_scoped_release release;
-
     py::tuple ret = setting_get(0);
     uint16_t id = static_cast<uint16_t>(ret[0].cast<uint32_t>());
     constexpr double min_delay = 100.0;
@@ -224,7 +232,6 @@ void AresSerial::_handle_ack(uint16_t target, bool acked) {
 
 AresSerial::AresResponse
 AresSerial::_wait_response(const std::chrono::milliseconds &timeout) {
-    py::gil_scoped_release release;
     AresResponse response;
     if (timeout == std::chrono::milliseconds::max()) {
         response = _wait_response_forever();
@@ -904,7 +911,8 @@ int AresSerial::_heartbeat_claim_host(uint16_t destination_id) {
     AresFrame frame(AresFrame::CLAIM, AresFrame::Claim{destination_id});
     AresResponse response;
     try {
-        response = _send_frame(frame, std::chrono::milliseconds::max());
+        response =
+            _send_frame_released(frame, std::chrono::milliseconds::max());
     } catch (const std::exception &exc) {
         LOG_ERR("_send_frame(): %s", exc.what());
         return -EADDRNOTAVAIL;
