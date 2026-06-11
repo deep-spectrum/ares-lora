@@ -1,4 +1,4 @@
-from ares_lora_serial_core import _SerialConfigs, _AresSerial, AresTimeout, _AresLoraConfig
+from ares_lora_serial_core import _SerialConfigs, _AresSerial, AresTimeout, _AresLoraConfig, AresThreadTerminate
 from typing import Callable
 from enum import IntEnum
 from dataclasses import dataclass, asdict
@@ -9,6 +9,7 @@ from .utils import check_serial_port
 from threading import Lock
 import copy
 import ctypes
+from concurrent.futures import ThreadPoolExecutor, Future
 
 logger = logging.getLogger("ares_lora")
 
@@ -211,12 +212,6 @@ class LoraSerial:
             rx_period=config.rx_period,
             serial_timeout=config.serial_timeout,
             master=config.master,
-            start_callback=self._handle_start,
-            heartbeat_callback=self._handle_heartbeat,
-            claim_callback=self._handle_claim,
-            log_callback=self._handle_log,
-            packet_rx_callback=self._handle_packet_rx,
-            packet_tx_callback=self._handle_tx_done_event,
         )
 
         self._start_cb = config.start_callback
@@ -235,6 +230,14 @@ class LoraSerial:
 
         self._logger = logger
 
+        self._event_worker_pool = ThreadPoolExecutor(max_workers=6)
+        self._start_future: Future[None] | None = None
+        self._heartbeat_future: Future[None] | None = None
+        self._claim_future: Future[None] | None = None
+        self._log_future: Future[None] | None = None
+        self._pkt_rx_future: Future[None] | None = None
+        self._pkt_tx_future: Future[None] | None = None
+
     def _should_event_be_dispatched(self, src: int, packet_id: int) -> bool:
         if src not in self._nodes:
             self._nodes[src] = packet_id
@@ -245,49 +248,83 @@ class LoraSerial:
             return True
         return False
 
-    def _handle_packet_rx(self, seq_cnt: int, packet_id: int, source_id: int):
-        with self._rx_stats_lock:
-            if source_id not in self._rx_stats:
-                self._rx_stats[source_id] = 1
-                return
-            self._rx_stats[source_id] += 1
+    def _start_event_handle(self):
+        while True:
+            try:
+                sec, usec, src, broadcast, seq_cnt, packet_id = self._dev.wait_start_event()
+            except AresThreadTerminate:
+                break
 
-    def _handle_tx_done_event(self, count: int):
-        with self._tx_stats_lock:
-            self._tx_stats += count
+            if self._should_event_be_dispatched(src, packet_id):
+                logger.info(f"Received start message (sec: {sec}, usec: {usec}, src: {src}, "
+                            f"broadcast: {broadcast}, sequence count: {seq_cnt}, packet id: {packet_id})")
+                if self._start_cb is not None:
+                    self._start_cb(sec, usec)
 
-    def _handle_start(self, sec: int, usec: int, src: int, broadcast: bool, seq_cnt: int, packet_id: int):
-        if self._should_event_be_dispatched(src, packet_id):
-            logger.info(f"Received start message (sec: {sec}, usec: {usec}, src: {src}, "
-                        f"broadcast: {broadcast}, sequence count: {seq_cnt}, packet id: {packet_id})")
-            if self._start_cb is not None:
-                self._start_cb(sec, usec)
+    def _heartbeat_event_handle(self):
+        while True:
+            try:
+                src_id, ready, broadcast = self._dev.wait_heartbeat_event()
+            except AresThreadTerminate:
+                break
 
-    def _handle_heartbeat(self, src_id: int, ready: bool, broadcast: bool):
-        logger.info(f"Received heartbeat message: (source: {src_id}, ready: {ready}, broadcasted: {broadcast}")
-        if self._heartbeat_cb is not None:
-            self._heartbeat_cb(src_id, ready)
+            logger.info(f"Received heartbeat message: (source: {src_id}, ready: {ready}, broadcasted: {broadcast}")
+            if self._heartbeat_cb is not None:
+                self._heartbeat_cb(src_id, ready)
 
-    def _handle_claim(self, src_id: int):
-        logger.info(f"Received host claim message from {src_id}")
-        if self._claim_cb is not None:
-            self._claim_cb(src_id)
+    def _claim_event_handle(self):
+        while True:
+            try:
+                src_id = self._dev.wait_claim_event()
+            except AresThreadTerminate:
+                break
+            if self._claim_cb is not None:
+                self._claim_cb(src_id)
 
-    def _handle_log(self, src_id: int, log_id: int, chunk: int, num_chunks: int, msg: str):
-        if src_id not in self._log_msg:
-            self._log_msg[src_id] = LogMessage(log_id, chunk, num_chunks, msg)
-        elif log_id != self._log_msg[src_id].msg_id:
-            self._log_msg[src_id] = LogMessage(log_id, chunk, num_chunks, msg)
-        elif self._log_msg[src_id].last_part != chunk and (self._log_msg[src_id].last_part + 1) == chunk:
-            self._log_msg[src_id].msg = f"{self._log_msg[src_id].msg}{msg}"
-            self._log_msg[src_id].last_part = chunk
+    def _log_event_handle(self):
+        while True:
+            try:
+                src_id, log_id, chunk, num_chunks, msg = self._dev.wait_log_event()
+            except AresThreadTerminate:
+                break
 
-        if (self._log_msg[src_id].last_part == self._log_msg[src_id].total_parts and
-                not self._log_msg[src_id].transmitted):
-            logger.info(f"Received log message: {self._log_msg[src_id].msg}")
-            self._log_msg[src_id].transmitted = True
-            if self._log_cb is not None:
-                self._log_cb(src_id, self._log_msg[src_id].msg)
+            if src_id not in self._log_msg:
+                self._log_msg[src_id] = LogMessage(log_id, chunk, num_chunks, msg)
+            elif log_id != self._log_msg[src_id].msg_id:
+                self._log_msg[src_id] = LogMessage(log_id, chunk, num_chunks, msg)
+            elif self._log_msg[src_id].last_part != chunk and (self._log_msg[src_id].last_part + 1) == chunk:
+                self._log_msg[src_id].msg = f"{self._log_msg[src_id].msg}{msg}"
+                self._log_msg[src_id].last_part = chunk
+
+            if (self._log_msg[src_id].last_part == self._log_msg[src_id].total_parts and
+                    not self._log_msg[src_id].transmitted):
+                logger.info(f"Received log message: {self._log_msg[src_id].msg}")
+                self._log_msg[src_id].transmitted = True
+                if self._log_cb is not None:
+                    self._log_cb(src_id, self._log_msg[src_id].msg)
+
+    def _pkt_rx_event_handle(self):
+        while True:
+            try:
+                seq_cnt, packet_id, source_id = self._dev.wait_packet_rx_event()
+            except AresThreadTerminate:
+                break
+
+            with self._rx_stats_lock:
+                if source_id not in self._rx_stats:
+                    self._rx_stats[source_id] = 1
+                else:
+                    self._rx_stats[source_id] += 1
+
+    def _pkt_tx_done_event_handle(self):
+        while True:
+            try:
+                count = self._dev.wait_packet_tx_done_event()
+            except AresThreadTerminate:
+                break
+
+            with self._tx_stats_lock:
+                self._tx_stats += count
 
     @staticmethod
     def _check_ret_code(code: int | tuple[int, ...]):
@@ -558,16 +595,36 @@ class LoraSerial:
     def start_driver(self):
         """Starts execution of the LoRa driver."""
         self._dev.start_driver()
+        self._start_future = self._event_worker_pool.submit(self._start_event_handle)
+        self._heartbeat_future = self._event_worker_pool.submit(self._heartbeat_event_handle)
+        self._claim_future = self._event_worker_pool.submit(self._claim_event_handle)
+        self._log_future = self._event_worker_pool.submit(self._log_event_handle)
+        self._pkt_rx_future = self._event_worker_pool.submit(self._pkt_rx_event_handle)
+        self._pkt_tx_future = self._event_worker_pool.submit(self._pkt_tx_done_event_handle)
+
+    @staticmethod
+    def _check_future(future: Future[None] | None, timeout: float):
+        if future is not None:
+            future.result(timeout)
 
     def stop_driver(self):
         """Stops execution of the LoRa driver."""
         self._dev.stop_driver()
+        self._check_future(self._start_future, 0.1)
+        self._check_future(self._heartbeat_future, 0.1)
+        self._check_future(self._claim_future, 0.1)
+        self._check_future(self._log_future, 0.1)
+        self._check_future(self._pkt_rx_future, 0.1)
+        self._check_future(self._pkt_tx_future, 0.1)
 
     def __enter__(self):
         self.start_driver()
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
+        self.stop_driver()
+
+    def __del__(self):
         self.stop_driver()
 
     @property

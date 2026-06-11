@@ -68,10 +68,20 @@ PYBIND11_MODULE(_ares_lora_serial, m, py::mod_gil_not_used()) {
         .def("stop_driver", &AresSerial::stop, "Stop the serial driver")
         .def("set_response_timeout", &AresSerial::set_response_timeout,
              py::arg("timeout"))
-        .def("get_response_timeout", &AresSerial::get_response_timeout);
+        .def("get_response_timeout", &AresSerial::get_response_timeout)
+        .def("wait_start_event", &AresSerial::wait_start_event)
+        .def("wait_heartbeat_event", &AresSerial::wait_heartbeat_event)
+        .def("wait_claim_event", &AresSerial::wait_claim_event)
+        .def("wait_log_event", &AresSerial::wait_log_event)
+        .def("wait_packet_rx_event", &AresSerial::wait_packet_rx_event)
+        .def("wait_packet_tx_done_event",
+             &AresSerial::wait_packet_tx_done_event);
 
     py::register_local_exception<AresTimeoutError>(m, "AresTimeout",
                                                    PyExc_TimeoutError);
+
+    py::register_local_exception<AresThreadTerminate>(m, "AresThreadTerminate",
+                                                      PyExc_Exception);
 
     py::class_<AresLoraConfig>(m, "_AresLoraConfig",
                                "LoRa configurations container")
@@ -91,10 +101,7 @@ PYBIND11_MODULE(_ares_lora_serial, m, py::mod_gil_not_used()) {
 
 AresSerialConfigs::AresSerialConfigs(const py::kwargs &kwargs) {
     from_kwargs(kwargs, SP(port), SP(response_timeout), SP(rx_period),
-                SP(start_callback), SP(serial_timeout), SP(master),
-                SP(heartbeat_callback), SP(claim_callback), SP(log_callback),
-                SP(alpha), SP(beta), SP(packet_rx_callback),
-                SP(packet_tx_callback));
+                SP(serial_timeout), SP(master), SP(alpha), SP(beta));
 }
 
 AresLoraConfig::AresLoraConfig(const py::kwargs &kwargs) {
@@ -122,13 +129,6 @@ AresSerial::AresSerial(const AresSerialConfigs &configs)
     _serial.exclusive(true);
     _serial.timeout(configs.serial_timeout);
     _serial.open();
-
-    _start_callback = configs.start_callback;
-    _heartbeat_callback = configs.heartbeat_callback;
-    _claim_callback = configs.claim_callback;
-    _log_callback = configs.log_callback;
-    _pkt_rx_cb = configs.packet_rx_callback;
-    _pkt_tx_cb = configs.packet_tx_callback;
 }
 
 AresSerial::~AresSerial() {
@@ -145,6 +145,13 @@ void AresSerial::_send_frame(const std::vector<uint8_t> &tx) {
 AresSerial::AresResponse
 AresSerial::_send_frame(AresFrame &frame,
                         const std::chrono::milliseconds &timeout) {
+    py::gil_scoped_release release;
+    return _send_frame_released(frame, timeout);
+}
+
+AresSerial::AresResponse
+AresSerial::_send_frame_released(AresFrame &frame,
+                                 const std::chrono::milliseconds &timeout) {
     std::unique_lock lock_(_command_lock);
     std::vector<uint8_t> tx;
     frame.serialize(tx);
@@ -155,6 +162,8 @@ AresSerial::_send_frame(AresFrame &frame,
 }
 
 static void check_python_errors() {
+    py::gil_scoped_acquire acquire;
+
     if (PyErr_CheckSignals() != 0) {
         throw py::error_already_set();
     }
@@ -174,6 +183,7 @@ void AresSerial::_send_log_frame_directed(
     AresFrame &frame, const std::chrono::milliseconds &ack_timeout,
     size_t max_attempts, std::vector<AresResponse> &responses,
     uint16_t target) {
+    py::gil_scoped_release release;
     std::vector<uint8_t> tx;
     size_t acked_frames = 0;
 
@@ -208,8 +218,6 @@ void AresSerial::_handle_ack(uint16_t target, bool acked) {
         return;
     }
 
-    py::gil_scoped_release release;
-
     py::tuple ret = setting_get(0);
     uint16_t id = static_cast<uint16_t>(ret[0].cast<uint32_t>());
     constexpr double min_delay = 100.0;
@@ -224,7 +232,6 @@ void AresSerial::_handle_ack(uint16_t target, bool acked) {
 
 AresSerial::AresResponse
 AresSerial::_wait_response(const std::chrono::milliseconds &timeout) {
-    py::gil_scoped_release release;
     AresResponse response;
     if (timeout == std::chrono::milliseconds::max()) {
         response = _wait_response_forever();
@@ -451,7 +458,7 @@ py::tuple AresSerial::send_log(const std::string &log_msg, bool broadcast,
             payload.broadcast = true;
             payload.tx_cnt = tx_cnt;
         } else {
-            LOG_INF("Directing message to node %d", _claimed_host);
+            LOG_DBG("Directing message to node %d", _claimed_host);
             payload.id = _claimed_host;
         }
     }
@@ -574,6 +581,15 @@ void AresSerial::start() {
     }
 
     LOG_INF("Starting driver");
+
+    LOG_DBG("Clearing event queues");
+    _start_event_q.clear();
+    _heartbeat_event_q.clear();
+    _claim_event_q.clear();
+    _log_event_q.clear();
+    _pkt_rx_event_q.clear();
+    _pkt_tx_event_q.clear();
+
     _exception = nullptr;
     if (_serial.is_closed()) {
         LOG_DBG("Port was closed. Attempting to open it.");
@@ -610,15 +626,17 @@ void AresSerial::stop() {
     _tasks_running = false;
     _rx_task.join();
 
+    AresFrame::Decoded terminate_request{AresFrame::DRIVER_STOP,
+                                         std::monostate()};
     size_t retries = 0;
-    for (; retries < max_attempts; retries++) {
-        if (_processing_task.join(100ms) == -ETIMEDOUT) {
-            AresFrame::Decoded dummy{AresFrame::UNKNOWN, std::monostate()};
-            _frame_q.put(dummy);
-            continue;
+
+    do {
+        _frame_q.put(terminate_request);
+        if (_processing_task.join(100ms) == 0) {
+            break;
         }
-        break;
-    }
+        retries++;
+    } while (retries < max_attempts);
 
     if (retries >= max_attempts) {
         throw std::runtime_error("Failed to shut down processing task");
@@ -626,6 +644,58 @@ void AresSerial::stop() {
 
     _response_queue.clear();
     _frame_q.clear();
+}
+
+template <typename Event, size_t size, bool overwrite>
+static void wait_event_queue_released(
+    Event &evt,
+    ares::bounded_queue<std::unique_ptr<Event>, size, overwrite> &evt_q) {
+    py::gil_scoped_release release;
+
+    auto event_ptr = evt_q.get();
+    if (event_ptr == nullptr) {
+        throw AresThreadTerminate();
+    }
+
+    evt = *event_ptr;
+}
+
+py::tuple AresSerial::wait_start_event() {
+    AresFrame::Start event;
+    wait_event_queue_released(event, _start_event_q);
+    return py::make_tuple(event.sec, event.usec, event.id, event.broadcast,
+                          event.seq_cnt, event.packet_id);
+}
+
+py::tuple AresSerial::wait_heartbeat_event() {
+    AresFrame::Heartbeat event;
+    wait_event_queue_released(event, _heartbeat_event_q);
+    return py::make_tuple(event.id, event.ready, event.broadcast);
+}
+
+uint16_t AresSerial::wait_claim_event() {
+    AresFrame::Claim event;
+    wait_event_queue_released(event, _claim_event_q);
+    return event.id;
+}
+
+py::tuple AresSerial::wait_log_event() {
+    AresFrame::Log event;
+    wait_event_queue_released(event, _log_event_q);
+    return py::make_tuple(event.id, event.log_id, event.part, event.num_parts,
+                          event.msg);
+}
+
+py::tuple AresSerial::wait_packet_rx_event() {
+    AresFrame::PktRx event;
+    wait_event_queue_released(event, _pkt_rx_event_q);
+    return py::make_tuple(event.seq_cnt, event.packet_id, event.src_id);
+}
+
+uint32_t AresSerial::wait_packet_tx_done_event() {
+    AresFrame::PktTx event;
+    wait_event_queue_released(event, _pkt_tx_event_q);
+    return event.count;
 }
 
 void AresSerial::_check_crash() {
@@ -636,9 +706,10 @@ void AresSerial::_check_crash() {
 }
 
 void AresSerial::_process_frames_helper() {
-    while (_tasks_running) {
+    bool stopped = false;
+    while (_tasks_running || !stopped) {
         AresFrame::Decoded frame = _frame_q.get();
-        LOG_INF("Received frame: %d", frame.type);
+        LOG_DBG("Received frame: %d", frame.type);
 
         switch (frame.type) {
         case AresFrame::ACK:
@@ -681,6 +752,10 @@ void AresSerial::_process_frames_helper() {
             _packet_tx_event(std::get<AresFrame::PktTx>(frame.payload));
             break;
         }
+        case AresFrame::DRIVER_STOP: {
+            stopped = _stop_event_queues();
+            break;
+        }
         default: {
             LOG_ERR("Invalid frame received: %d", static_cast<int>(frame.type));
             break;
@@ -711,7 +786,7 @@ void AresSerial::_process_rx_buffer(std::vector<uint8_t> &buf) {
             return;
         }
 
-        LOG_INF_HEXDUMP(buf, frame_size, "Frame found");
+        LOG_DBG_HEXDUMP(buf, frame_size, "Frame found");
         AresFrame frame;
         frame.parse(buf, frame_start);
         _frame_q.put(frame.get_parsed_frame());
@@ -788,22 +863,24 @@ void AresSerial::_publish_response(const AresFrame::Decoded &frame) {
     _response_queue.put(response);
 }
 
-void AresSerial::_start_event(const AresFrame::Start &start_frame) const {
+template <typename T, size_t size>
+static void put_no_except(const T &item,
+                          ares::bounded_queue<std::unique_ptr<T>, size> &q,
+                          const std::chrono::milliseconds &timeout) {
+    try {
+        q.put(std::make_unique<T>(item), timeout);
+    } catch (const ares::queue_exception &) {
+        // nop
+    }
+}
+
+void AresSerial::_start_event(const AresFrame::Start &start_frame) {
 
     LOG_INF("Start event received: (%ld, %lu, %u, %d, %d, %u)", start_frame.sec,
             start_frame.usec, start_frame.id, start_frame.broadcast,
             start_frame.seq_cnt, start_frame.packet_id);
 
-    if (_start_callback == nullptr) {
-        LOG_DBG("No callback registered");
-        return;
-    }
-
-    LOG_DBG("Calling registered callback for start event");
-
-    _start_callback(start_frame.sec, start_frame.usec, start_frame.id,
-                    start_frame.broadcast, start_frame.seq_cnt,
-                    start_frame.packet_id);
+    put_no_except(start_frame, _start_event_q, 100ms);
 }
 
 void AresSerial::_heartbeat_event(const AresFrame::Heartbeat &heartbeat) {
@@ -816,10 +893,7 @@ void AresSerial::_heartbeat_event(const AresFrame::Heartbeat &heartbeat) {
         _work_q.submit(&_heartbeat_work.work);
     }
 
-    if (_heartbeat_callback != nullptr) {
-        LOG_DBG("Calling Python event handler");
-        _heartbeat_callback(heartbeat.id, heartbeat.ready, heartbeat.broadcast);
-    }
+    put_no_except(heartbeat, _heartbeat_event_q, 100ms);
 }
 
 void AresSerial::_heartbeat_handler(ares::Work *work) {
@@ -838,7 +912,8 @@ int AresSerial::_heartbeat_claim_host(uint16_t destination_id) {
     AresFrame frame(AresFrame::CLAIM, AresFrame::Claim{destination_id});
     AresResponse response;
     try {
-        response = _send_frame(frame, std::chrono::milliseconds::max());
+        response =
+            _send_frame_released(frame, std::chrono::milliseconds::max());
     } catch (const std::exception &exc) {
         LOG_ERR("_send_frame(): %s", exc.what());
         return -EADDRNOTAVAIL;
@@ -864,7 +939,7 @@ int AresSerial::_heartbeat_claim_host(uint16_t destination_id) {
 }
 
 void AresSerial::_claim_event(const AresFrame::Claim &claim) {
-    LOG_DBG("Claim event received: %d", claim.id);
+    LOG_INF("Claim event received: %d", claim.id);
     if (_master) {
         LOG_ERR("Someone sent a claim packet while this is the master node: "
                 "Undefined behavior");
@@ -880,14 +955,11 @@ void AresSerial::_claim_event(const AresFrame::Claim &claim) {
     _claimed_host = claim.id;
     LOG_INF("Host claimed by %d", _claimed_host);
 
-    if (_claim_callback != nullptr) {
-        LOG_DBG("Notifying Python of claimed host");
-        _claim_callback(claim.id);
-    }
+    put_no_except(claim, _claim_event_q, 100ms);
 }
 
 void AresSerial::_log_ack_event(const AresFrame::LogAck &ack) {
-    LOG_DBG("Log ACK event received (%d, %d, %d)", ack.part, ack.num_parts,
+    LOG_INF("Log ACK event received (%d, %d, %d)", ack.part, ack.num_parts,
             ack.id);
 
     try {
@@ -904,7 +976,6 @@ void AresSerial::_log_ack_event(const AresFrame::LogAck &ack) {
 bool AresSerial::_log_ack_event_wait(const std::chrono::milliseconds &timeout,
                                      size_t part, size_t num_parts,
                                      uint16_t id) {
-    py::gil_scoped_release release;
     AresFrame::LogAck expected{static_cast<uint8_t>(part),
                                static_cast<uint8_t>(num_parts), id};
     AresFrame::LogAck response{};
@@ -925,16 +996,13 @@ bool AresSerial::_log_ack_event_wait(const std::chrono::milliseconds &timeout,
     return response == expected;
 }
 
-void AresSerial::_log_event(const AresFrame::Log &log) const {
-    LOG_DBG("Log event received from %d", log.id);
+void AresSerial::_log_event(const AresFrame::Log &log) {
+    LOG_INF("Log event received from %d", log.id);
     LOG_DBG("Part %d of %d", log.part, log.num_parts);
     LOG_DBG("Log message: %s", log.msg.c_str());
     LOG_DBG("Log ID: %d", log.log_id);
 
-    if (_log_callback) {
-        LOG_DBG("Forwarding log event to Python");
-        _log_callback(log.id, log.log_id, log.part, log.num_parts, log.msg);
-    }
+    put_no_except(log, _log_event_q, 100ms);
 }
 
 py::tuple AresSerial::_decode_version(uint32_t version_num) {
@@ -950,24 +1018,43 @@ py::tuple AresSerial::_decode_version(uint32_t version_num) {
 }
 
 void AresSerial::_debug_event(const AresFrame::Dbg &msg) {
-    LOG_DBG("Received debug event: %d", msg.code);
+    if (msg.code != 0) {
+        LOG_ERR("Received debug event: %d", msg.code);
+    }
 }
 
-void AresSerial::_packet_rx_event(const AresFrame::PktRx &msg) const {
+void AresSerial::_packet_rx_event(const AresFrame::PktRx &msg) {
     LOG_DBG("Received packet (%u, %u, %u)", msg.seq_cnt, msg.packet_id,
             msg.src_id);
 
-    if (!_pkt_rx_cb) {
-        LOG_DBG("Packet received handler not registered");
-        return;
-    }
-
-    _pkt_rx_cb(msg.seq_cnt, msg.packet_id, msg.src_id);
+    put_no_except(msg, _pkt_rx_event_q, 100ms);
 }
 
-void AresSerial::_packet_tx_event(const AresFrame::PktTx &msg) const {
+void AresSerial::_packet_tx_event(const AresFrame::PktTx &msg) {
     LOG_DBG("Transmitted %u times", msg.count);
-    if (_pkt_tx_cb) {
-        _pkt_tx_cb(msg.count);
+    put_no_except(msg, _pkt_tx_event_q, 100ms);
+}
+
+template <typename T, size_t size, bool overwrite>
+static bool
+put_noexcept(ares::bounded_queue<std::unique_ptr<T>, size, overwrite> &q) {
+    bool exit_requested = true;
+
+    try {
+        q.put_nonblocking(static_cast<std::unique_ptr<T>>(nullptr));
+    } catch (const ares::queue_exception &) {
+        exit_requested = false;
     }
+
+    return exit_requested;
+}
+
+bool AresSerial::_stop_event_queues() {
+    bool success = put_noexcept(_start_event_q);
+    success = put_noexcept(_heartbeat_event_q) && success;
+    success = put_noexcept(_claim_event_q) && success;
+    success = put_noexcept(_log_event_q) && success;
+    success = put_noexcept(_pkt_rx_event_q) && success;
+    success = put_noexcept(_pkt_tx_event_q) && success;
+    return success;
 }
