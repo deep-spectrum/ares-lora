@@ -19,6 +19,7 @@ nav:
       - C++ API:
           - Code Standards: serial-driver/standards.md
           - Code Documentation: serial-driver/cpp-api/html/index.html
+      - Debugging: serial-driver/debugging.md
   - Firmware:
       - Home: firmware/index.md
       - Build Configurations: firmware/build-configs.md
