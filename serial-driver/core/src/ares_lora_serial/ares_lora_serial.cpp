@@ -913,7 +913,7 @@ int AresSerial::_heartbeat_claim_host(uint16_t destination_id) {
     AresResponse response;
     try {
         response =
-            _send_frame_released(frame, std::chrono::milliseconds::max());
+            _send_frame(frame, std::chrono::milliseconds::max());
     } catch (const std::exception &exc) {
         LOG_ERR("_send_frame(): %s", exc.what());
         return -EADDRNOTAVAIL;
