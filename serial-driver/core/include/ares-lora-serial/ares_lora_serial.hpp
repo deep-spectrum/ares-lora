@@ -316,11 +316,40 @@ class AresSerial {
      */
     void stop();
 
+    /**
+     * Wait for a start message to be received.
+     * @return tuple[seconds, useconds, src_id, broadcast, seq_cnt, packet_id]
+     */
     py::tuple wait_start_event();
+
+    /**
+     * Wait for a heartbeat message to be received.
+     * @return tuple[src_id, ready, broadcast]
+     */
     py::tuple wait_heartbeat_event();
+
+    /**
+     * Wait for a claim message to be received.
+     * @return src_id
+     */
     uint16_t wait_claim_event();
+
+    /**
+     * Wait for a log message to be received.
+     * @return tuple[src_id, log_id, chunk, num_chunks, msg]
+     */
     py::tuple wait_log_event();
+
+    /**
+     * Wait for any LoRa packet reception.
+     * @return tuple[seq_cnt, packet_id, source_id]
+     */
     py::tuple wait_packet_rx_event();
+
+    /**
+     * Wait for LoRa transmission to finish.
+     * @return tx_count
+     */
     uint32_t wait_packet_tx_done_event();
 
   private:
