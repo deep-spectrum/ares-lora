@@ -352,8 +352,6 @@ class AresSerial {
      */
     uint32_t wait_packet_tx_done_event();
 
-    void cancel_events();
-
   private:
     Serial::Serial _serial;
     ares::WorkQ _work_q;
