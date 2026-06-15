@@ -642,7 +642,7 @@ class LoraSerial:
     def _stop_device_driver_noexcept(self):
         if not self._driver_started.is_set():
             return
-        self._dev.stop_driver()
+        self._dev.cancel_events()
 
     def start_driver(self):
         """Starts execution of the LoRa driver."""
@@ -653,7 +653,7 @@ class LoraSerial:
         self._start_driver()
 
     def _stop_driver(self):
-        self._stop_device_driver_noexcept()
+        self._dev.stop_driver()
 
         if self._start_thread is not None:
             self._start_thread.join()
