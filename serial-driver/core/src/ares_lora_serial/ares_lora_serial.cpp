@@ -75,7 +75,8 @@ PYBIND11_MODULE(_ares_lora_serial, m, py::mod_gil_not_used()) {
         .def("wait_log_event", &AresSerial::wait_log_event)
         .def("wait_packet_rx_event", &AresSerial::wait_packet_rx_event)
         .def("wait_packet_tx_done_event",
-             &AresSerial::wait_packet_tx_done_event);
+             &AresSerial::wait_packet_tx_done_event)
+        .def("cancel_events", &AresSerial::cancel_events);
 
     py::register_local_exception<AresTimeoutError>(m, "AresTimeout",
                                                    PyExc_TimeoutError);
@@ -696,6 +697,11 @@ uint32_t AresSerial::wait_packet_tx_done_event() {
     AresFrame::PktTx event;
     wait_event_queue_released(event, _pkt_tx_event_q);
     return event.count;
+}
+
+void AresSerial::cancel_events() {
+    LOG_DBG("Cancelling event queues");
+    _stop_event_queues();
 }
 
 void AresSerial::_check_crash() {
