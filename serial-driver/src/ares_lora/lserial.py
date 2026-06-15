@@ -652,12 +652,7 @@ class LoraSerial:
 
         self._start_driver()
 
-    def stop_driver(self):
-        """Stops execution of the LoRa driver."""
-
-        if not self._driver_started.is_set():
-            raise RuntimeError("Driver not started")
-
+    def _stop_driver(self):
         self._stop_device_driver_noexcept()
 
         if self._start_thread is not None:
@@ -686,6 +681,14 @@ class LoraSerial:
 
         self._driver_started.clear()
 
+    def stop_driver(self):
+        """Stops execution of the LoRa driver."""
+
+        if not self._driver_started.is_set():
+            raise RuntimeError("Driver not started")
+
+        self._stop_driver()
+
         global _instances
         if self in _instances:
             _instances.remove(self)
@@ -698,7 +701,7 @@ class LoraSerial:
         self.stop_driver()
 
     def __del__(self):
-        self.stop_driver()
+        self._stop_driver()
 
     @property
     def reception_count(self) -> dict[int, int]:
