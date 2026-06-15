@@ -352,6 +352,9 @@ class AresSerial {
      */
     uint32_t wait_packet_tx_done_event();
 
+    /**
+     * Throw AresThreadTerminate exceptions in threads waiting on event queues.
+     */
     void cancel_events();
 
   private:
