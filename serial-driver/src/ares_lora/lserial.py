@@ -6,10 +6,11 @@ import functools
 from .errno import strerror
 import logging
 from .utils import check_serial_port
-from threading import Lock
+from threading import Lock, Thread, Event
 import copy
 import ctypes
-from concurrent.futures import ThreadPoolExecutor, Future
+import threading
+from weakref import WeakSet
 
 logger = logging.getLogger("ares_lora")
 
@@ -189,6 +190,19 @@ def lora_serial_command(func):
     return wrapper
 
 
+_instances = WeakSet()
+
+
+def _shutdown_drivers():
+    global _instances
+    for x in _instances:
+        x._stop_device_driver_noexcept()
+
+
+# Need this since the threading module wants to run its shutdown sequence before object deletion...
+threading._register_atexit(_shutdown_drivers)
+
+
 class LoraSerial:
     """LoRa serial driver python implementation. Works only on Linux."""
 
@@ -230,13 +244,14 @@ class LoraSerial:
 
         self._logger = logger
 
-        self._event_worker_pool = ThreadPoolExecutor(max_workers=6)
-        self._start_future: Future[None] | None = None
-        self._heartbeat_future: Future[None] | None = None
-        self._claim_future: Future[None] | None = None
-        self._log_future: Future[None] | None = None
-        self._pkt_rx_future: Future[None] | None = None
-        self._pkt_tx_future: Future[None] | None = None
+        self._start_thread: Thread | None = None
+        self._heartbeat_thread: Thread | None = None
+        self._claim_thread: Thread | None = None
+        self._log_thread: Thread | None = None
+        self._pkt_rx_thread: Thread | None = None
+        self._pkt_tx_thread: Thread | None = None
+
+        self._driver_started = Event()
 
     def _should_event_be_dispatched(self, src: int, packet_id: int) -> bool:
         if src not in self._nodes:
@@ -592,30 +607,88 @@ class LoraSerial:
     def _set_level(self, level: int):
         self._logger.setLevel(level)
 
+    def _start_driver(self):
+        self._dev.start_driver()
+
+        self._start_thread = Thread(target=self._start_event_handle)
+        assert isinstance(self._start_thread, Thread)
+        self._start_thread.start()
+
+        self._heartbeat_thread = Thread(target=self._heartbeat_event_handle)
+        assert isinstance(self._heartbeat_thread, Thread)
+        self._heartbeat_thread.start()
+
+        self._claim_thread = Thread(target=self._claim_event_handle)
+        assert isinstance(self._claim_thread, Thread)
+        self._claim_thread.start()
+
+        self._log_thread = Thread(target=self._log_event_handle)
+        assert isinstance(self._log_thread, Thread)
+        self._log_thread.start()
+
+        self._pkt_rx_thread = Thread(target=self._pkt_rx_event_handle)
+        assert isinstance(self._pkt_rx_thread, Thread)
+        self._pkt_rx_thread.start()
+
+        self._pkt_tx_thread = Thread(target=self._pkt_tx_done_event_handle)
+        assert isinstance(self._pkt_tx_thread, Thread)
+        self._pkt_tx_thread.start()
+
+        self._driver_started.set()
+
+        global _instances
+        _instances.add(self)
+
+    def _stop_device_driver_noexcept(self):
+        if not self._driver_started.is_set():
+            return
+        self._dev.stop_driver()
+
     def start_driver(self):
         """Starts execution of the LoRa driver."""
-        self._dev.start_driver()
-        self._start_future = self._event_worker_pool.submit(self._start_event_handle)
-        self._heartbeat_future = self._event_worker_pool.submit(self._heartbeat_event_handle)
-        self._claim_future = self._event_worker_pool.submit(self._claim_event_handle)
-        self._log_future = self._event_worker_pool.submit(self._log_event_handle)
-        self._pkt_rx_future = self._event_worker_pool.submit(self._pkt_rx_event_handle)
-        self._pkt_tx_future = self._event_worker_pool.submit(self._pkt_tx_done_event_handle)
 
-    @staticmethod
-    def _check_future(future: Future[None] | None, timeout: float):
-        if future is not None:
-            future.result(timeout)
+        if self._driver_started.is_set():
+            raise RuntimeError("Driver already started")
+
+        self._start_driver()
 
     def stop_driver(self):
         """Stops execution of the LoRa driver."""
-        self._dev.stop_driver()
-        self._check_future(self._start_future, 0.1)
-        self._check_future(self._heartbeat_future, 0.1)
-        self._check_future(self._claim_future, 0.1)
-        self._check_future(self._log_future, 0.1)
-        self._check_future(self._pkt_rx_future, 0.1)
-        self._check_future(self._pkt_tx_future, 0.1)
+
+        if not self._driver_started.is_set():
+            raise RuntimeError("Driver not started")
+
+        self._stop_device_driver_noexcept()
+
+        if self._start_thread is not None:
+            self._start_thread.join()
+            self._start_thread = None
+
+        if self._heartbeat_thread is not None:
+            self._heartbeat_thread.join()
+            self._heartbeat_thread = None
+
+        if self._claim_thread is not None:
+            self._claim_thread.join()
+            self._claim_thread = None
+
+        if self._log_thread is not None:
+            self._log_thread.join()
+            self._log_thread = None
+
+        if self._pkt_rx_thread is not None:
+            self._pkt_rx_thread.join()
+            self._pkt_rx_thread = None
+
+        if self._pkt_tx_thread is not None:
+            self._pkt_tx_thread.join()
+            self._pkt_tx_thread = None
+
+        self._driver_started.clear()
+
+        global _instances
+        if self in _instances:
+            _instances.remove(self)
 
     def __enter__(self):
         self.start_driver()
