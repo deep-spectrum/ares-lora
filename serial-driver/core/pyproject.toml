@@ -4,7 +4,7 @@ build-backend = "scikit_build_core.build"
 
 [project]
 name = "ares-lora-core"
-version = "1.1.0"
+version = "1.1.1"
 description = "Ares LoRa serial driver core library"
 authors = [
     { name = "Tom Schmitz", email = "tschmitz@andrew.cmu.edu" },
