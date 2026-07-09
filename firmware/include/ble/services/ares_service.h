@@ -22,31 +22,26 @@
     BT_UUID_128_ENCODE(0xf2765f1d, 0xd570, 0x48cf, 0xa6b7, 0x985ff6af492c)
 
 /**
- * @brief Ares ready to transfer UUID.
- */
-#define BT_UUID_ARES_SRV_READY_VAL                                             \
-    BT_UUID_128_ENCODE(0xf2765f1e, 0xd570, 0x48cf, 0xa6b7, 0x985ff6af492c)
-
-/**
  * @brief Ares number of chunks UUID.
  */
 #define BT_UUID_ARES_SRV_CHUNKS_VAL                                            \
-    BT_UUID_128_ENCODE(0xf2765f1f, 0xd570, 0x48cf, 0xa6b7, 0x985ff6af492c)
+    BT_UUID_128_ENCODE(0xf2765f1e, 0xd570, 0x48cf, 0xa6b7, 0x985ff6af492c)
 
 /**
  * @brief Ares image UUID.
  */
 #define BT_UUID_ARES_SRV_IMAGE_VAL                                             \
-    BT_UUID_128_ENCODE(0xf2765f20, 0xd570, 0x48cf, 0xa6b7, 0x985ff6af492c)
+    BT_UUID_128_ENCODE(0xf2765f1f, 0xd570, 0x48cf, 0xa6b7, 0x985ff6af492c)
 
 #define BT_UUID_ARES_SRV        BT_UUID_DECLARE_128(BT_UUID_ARES_SRV_VAL)
-#define BT_UUID_ARES_SRV_READY  BT_UUID_DECLARE_128(BT_UUID_ARES_SRV_READY_VAL)
 #define BT_UUID_ARES_SRV_CHUNKS BT_UUID_DECLARE_128(BT_UUID_ARES_SRV_CHUNKS_VAL)
 #define BT_UUID_ARES_SRV_IMAGE  BT_UUID_DECLARE_128(BT_UUID_ARES_SRV_IMAGE_VAL)
 
 struct ares_ble_service_cb {
-    bool (*read_ready_cb)(void);
-    uint64_t (*read_num_chunks_cb)(void);
+    void (*num_chunks_ind_enabled)(bool enabled);
+    void (*image_ind_enabled)(bool enabled);
 };
+
+int bt_ares_srv_init(const struct ares_ble_service_cb *cb);
 
 #endif // ARES_ARES_SERVICE_H

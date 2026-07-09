@@ -18,45 +18,68 @@
 
 LOG_MODULE_REGISTER(ares_ble_service);
 
-static bool ready = false;
-static uint64_t num_chunks = 0;
+enum {
+    CHUNKS_ENABLED,
+    IMAGE_ENABLED,
+};
+
 static struct ares_ble_service_cb ares_service_cb;
+static atomic_t state;
 
-static ssize_t read_ready(struct bt_conn *conn, const struct bt_gatt_attr *attr,
-                          void *buf, uint16_t len, uint16_t offset) {
-    const bool *value = attr->user_data;
+static void ares_service_chunk_cfg_changed(const struct bt_gatt_attr *attr,
+                                           uint16_t value) {
+    ARG_UNUSED(attr);
+    bool enabled = value == BT_GATT_CCC_INDICATE;
 
-    LOG_DBG("Attribute read, handle: %u, conn: %p", attr->handle, (void *)conn);
+    LOG_DBG("Indication for chunks has been turned %s", enabled ? "on" : "off");
 
-    if (ares_service_cb.read_ready_cb != NULL) {
-        ready = ares_service_cb.read_ready_cb();
-        return bt_gatt_attr_read(conn, attr, buf, len, offset, value,
-                                 sizeof(*value));
+    if (ares_service_cb.num_chunks_ind_enabled != NULL) {
+        ares_service_cb.num_chunks_ind_enabled(enabled);
     }
 
-    return 0;
+    if (enabled) {
+        atomic_set_bit(&state, CHUNKS_ENABLED);
+    } else {
+        atomic_clear_bit(&state, CHUNKS_ENABLED);
+    }
 }
 
-static ssize_t read_num_chunks(struct bt_conn *conn,
-                               const struct bt_gatt_attr *attr, void *buf,
-                               uint16_t len, uint16_t offset) {
-    const uint64_t *value = attr->user_data;
+static void ares_service_image_cfg_changed(const struct bt_gatt_attr *attr,
+                                           uint16_t value) {
+    ARG_UNUSED(attr);
+    bool enabled = value == BT_GATT_CCC_INDICATE;
 
-    LOG_DBG("Attribute read, handle: %u, conn: %p", attr->handle, (void *)conn);
+    LOG_DBG("Indication for image has been turned %s", enabled ? "on" : "off");
 
-    if (ares_service_cb.read_num_chunks_cb != NULL) {
-        num_chunks = ares_service_cb.read_num_chunks_cb();
-        return bt_gatt_attr_read(conn, attr, buf, len, offset, value,
-                                 sizeof(*value));
+    if (ares_service_cb.image_ind_enabled != NULL) {
+        ares_service_cb.image_ind_enabled(enabled);
     }
 
-    return 0;
+    if (enabled) {
+        atomic_set_bit(&state, IMAGE_ENABLED);
+    } else {
+        atomic_clear_bit(&state, IMAGE_ENABLED);
+    }
 }
 
 BT_GATT_SERVICE_DEFINE(
     ares_srv_svc, BT_GATT_PRIMARY_SERVICE(BT_UUID_ARES_SRV),
-    BT_GATT_CHARACTERISTIC(BT_UUID_ARES_SRV_READY, BT_GATT_CHRC_READ,
-                           BT_GATT_PERM_READ, read_ready, NULL, &ready),
-    BT_GATT_CHARACTERISTIC(BT_UUID_ARES_SRV_CHUNKS, BT_GATT_CHRC_READ,
-                           BT_GATT_PERM_READ, read_num_chunks, NULL,
-                           &num_chunks));
+    BT_GATT_CHARACTERISTIC(BT_UUID_ARES_SRV_CHUNKS, BT_GATT_CHRC_INDICATE,
+                           BT_GATT_PERM_NONE, NULL, NULL, NULL),
+    BT_GATT_CCC(ares_service_chunk_cfg_changed,
+                BT_GATT_PERM_READ | BT_GATT_PERM_WRITE),
+    BT_GATT_CHARACTERISTIC(BT_UUID_ARES_SRV_IMAGE, BT_GATT_CHRC_INDICATE,
+                           BT_GATT_PERM_NONE, NULL, NULL, NULL),
+    BT_GATT_CCC(ares_service_image_cfg_changed,
+                BT_GATT_PERM_READ | BT_GATT_PERM_WRITE));
+
+int bt_ares_srv_init(const struct ares_ble_service_cb *cb) {
+    if (cb == NULL) {
+        return -EINVAL;
+    }
+
+    ares_service_cb.num_chunks_ind_enabled = cb->num_chunks_ind_enabled;
+    ares_service_cb.image_ind_enabled = cb->image_ind_enabled;
+
+    return 0;
+}
