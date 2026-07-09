@@ -8,8 +8,7 @@
  * @author Tom Schmitz \<tschmitz@andrew.cmu.edu\>
  */
 
-
 #ifndef ARES_BLE_H
 #define ARES_BLE_H
 
-#endif //ARES_BLE_H
+#endif // ARES_BLE_H
