@@ -49,20 +49,6 @@ struct ares_ble_callbacks {
      * @param[in] enabled `true` if subscribed to, `false` if unsubscribed from.
      */
     void (*image_enabled)(bool enabled);
-
-    /**
-     * Chunk indication sent callback.
-     *
-     * @param[in] err @p 0 if sent successfully
-     */
-    void (*chunk_indication_cb)(uint8_t err);
-
-    /**
-     * Image indication sent callback.
-     *
-     * @param[in] err @p 0 if sent successfully
-     */
-    void (*image_indication_cb)(uint8_t err);
 };
 
 /**
@@ -70,6 +56,11 @@ struct ares_ble_callbacks {
  * @brief BLE module initialization information.
  */
 struct ares_ble_init_data {
+    /**
+     * The node ID.
+     */
+    uint32_t node_id;
+
     /**
      * Callbacks for the BLE module.
      */
@@ -87,14 +78,14 @@ struct ares_ble_init_data {
 int ares_init_ble(const struct ares_ble_init_data *init_data);
 
 /**
- * Enable BLE and start advertising.
+ * Start BLE advertising.
  *
  * @return @p 0 on success.
  */
 int ares_enable_ble(void);
 
 /**
- * Disable BLE.
+ * Stop BLE advertising and terminates any connections.
  *
  * @return @p 0 on success.
  */

@@ -11,6 +11,7 @@
 #ifndef ARES_ARES_SERVICE_H
 #define ARES_ARES_SERVICE_H
 
+#include <zephyr/bluetooth/conn.h>
 #include <zephyr/bluetooth/uuid.h>
 
 /**
@@ -65,7 +66,7 @@ struct ares_service_cb {
      * carried out on.
      * @param[in] err The error code.
      */
-    void (*num_chunks_ind_cb)(const struct bt_conn *conn, uint8_t err);
+    void (*num_chunks_ind_cb)(struct bt_conn *conn, uint8_t err);
 
     /**
      * @brief Indication complete callback for image characteristic.
@@ -74,7 +75,7 @@ struct ares_service_cb {
      * carried out on.
      * @param[in] err The error code.
      */
-    void (*image_ind_cb)(const struct bt_conn *conn, uint8_t err);
+    void (*image_ind_cb)(struct bt_conn *conn, uint8_t err);
 };
 
 /**
