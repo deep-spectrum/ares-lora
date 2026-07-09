@@ -80,6 +80,61 @@ int bt_ares_srv_init(const struct ares_ble_service_cb *cb) {
 
     ares_service_cb.num_chunks_ind_enabled = cb->num_chunks_ind_enabled;
     ares_service_cb.image_ind_enabled = cb->image_ind_enabled;
+    ares_service_cb.num_chunks_ind_cb = cb->num_chunks_ind_cb;
+    ares_service_cb.image_ind_cb = cb->image_ind_cb;
 
     return 0;
+}
+
+static void num_chunks_ind_cb(struct bt_conn *conn,
+                              struct bt_gatt_indicate_params *params,
+                              uint8_t err) {
+    ARG_UNUSED(params);
+
+    LOG_DBG("Indication %s\n", err != 0U ? "fail" : "success");
+
+    if (ares_service_cb.num_chunks_ind_cb != NULL) {
+        ares_service_cb.num_chunks_ind_cb(conn, err);
+    }
+}
+
+static void image_ind_cb(struct bt_conn *conn,
+                         struct bt_gatt_indicate_params *params, uint8_t err) {
+    ARG_UNUSED(params);
+
+    LOG_DBG("Indication %s\n", err != 0U ? "fail" : "success");
+
+    if (ares_service_cb.image_ind_cb != NULL) {
+        ares_service_cb.image_ind_cb(conn, err);
+    }
+}
+
+int bt_ares_srv_ind_chunks(uint64_t chunks) {
+    static struct bt_gatt_indicate_params ind_params = {
+        .attr = &ares_srv_svc.attrs[2], // todo
+        .func = num_chunks_ind_cb,
+        .len = sizeof(chunks),
+    };
+
+    if (!atomic_test_bit(&state, CHUNKS_ENABLED)) {
+        return -EACCES;
+    }
+
+    ind_params.data = &chunks;
+    return bt_gatt_indicate(NULL, &ind_params);
+}
+
+int bt_ares_srv_ind_image_chunk(const uint8_t *bytes, size_t num_bytes) {
+    static struct bt_gatt_indicate_params ind_params = {
+        .attr = &ares_srv_svc.attrs[2], // todo
+        .func = image_ind_cb,
+    };
+
+    if (!atomic_test_bit(&state, IMAGE_ENABLED)) {
+        return -EACCES;
+    }
+
+    ind_params.data = bytes;
+    ind_params.len = num_bytes;
+    return bt_gatt_indicate(NULL, &ind_params);
 }

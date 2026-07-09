@@ -40,8 +40,15 @@
 struct ares_ble_service_cb {
     void (*num_chunks_ind_enabled)(bool enabled);
     void (*image_ind_enabled)(bool enabled);
+
+    void (*num_chunks_ind_cb)(const struct bt_conn *conn, uint8_t err);
+    void (*image_ind_cb)(const struct bt_conn *conn, uint8_t err);
 };
 
 int bt_ares_srv_init(const struct ares_ble_service_cb *cb);
+
+int bt_ares_srv_ind_chunks(uint64_t chunks);
+
+int bt_ares_srv_ind_image_chunk(const uint8_t *bytes, size_t num_bytes);
 
 #endif // ARES_ARES_SERVICE_H
