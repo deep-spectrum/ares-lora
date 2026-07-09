@@ -38,10 +38,10 @@
 #define BT_UUID_ARES_SRV_IMAGE  BT_UUID_DECLARE_128(BT_UUID_ARES_SRV_IMAGE_VAL)
 
 /**
- * @struct ares_ble_service_cb
+ * @struct ares_service_cb
  * @brief Service callback configurations.
  */
-struct ares_ble_service_cb {
+struct ares_service_cb {
     /**
      * @brief Callback for indicating that the chunks characteristic has been
      * subscribed to.
@@ -85,7 +85,7 @@ struct ares_ble_service_cb {
  * @return -EINVAL if cb is @p NULL.
  * @return 0 if no error.
  */
-int bt_ares_srv_init(const struct ares_ble_service_cb *cb);
+int bt_ares_srv_init(const struct ares_service_cb *cb);
 
 /**
  * Indicate how many chunks are going to be sent.

@@ -23,7 +23,7 @@ enum {
     IMAGE_ENABLED,
 };
 
-static struct ares_ble_service_cb ares_service_cb;
+static struct ares_service_cb ares_service_cb;
 static atomic_t state;
 
 static void ares_service_chunk_cfg_changed(const struct bt_gatt_attr *attr,
@@ -73,7 +73,7 @@ BT_GATT_SERVICE_DEFINE(
     BT_GATT_CCC(ares_service_image_cfg_changed,
                 BT_GATT_PERM_READ | BT_GATT_PERM_WRITE));
 
-int bt_ares_srv_init(const struct ares_ble_service_cb *cb) {
+int bt_ares_srv_init(const struct ares_service_cb *cb) {
     if (cb == NULL) {
         return -EINVAL;
     }
