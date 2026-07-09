@@ -37,18 +37,78 @@
 #define BT_UUID_ARES_SRV_CHUNKS BT_UUID_DECLARE_128(BT_UUID_ARES_SRV_CHUNKS_VAL)
 #define BT_UUID_ARES_SRV_IMAGE  BT_UUID_DECLARE_128(BT_UUID_ARES_SRV_IMAGE_VAL)
 
+/**
+ * @struct ares_ble_service_cb
+ * @brief Service callback configurations.
+ */
 struct ares_ble_service_cb {
+    /**
+     * @brief Callback for indicating that the chunks characteristic has been
+     * subscribed to.
+     *
+     * @param[in] enabled `true` if subscribed to to, `false` otherwise.
+     */
     void (*num_chunks_ind_enabled)(bool enabled);
+
+    /**
+     * @brief Callback for indicating that the image characteristic has been
+     * subscribed to.
+     *
+     * @param[in] enabled `true` if subscribed to to, `false` otherwise.
+     */
     void (*image_ind_enabled)(bool enabled);
 
+    /**
+     * @brief Indication complete callback for chunk characteristic.
+     *
+     * @param[in] conn Pointer to the bt_conn instance the indication was
+     * carried out on.
+     * @param[in] err The error code.
+     */
     void (*num_chunks_ind_cb)(const struct bt_conn *conn, uint8_t err);
+
+    /**
+     * @brief Indication complete callback for image characteristic.
+     *
+     * @param[in] conn Pointer to the bt_conn instance the indication was
+     * carried out on.
+     * @param[in] err The error code.
+     */
     void (*image_ind_cb)(const struct bt_conn *conn, uint8_t err);
 };
 
+/**
+ * Initialize the ares service.
+ *
+ * @param[in] cb Pointer to the callback configuration.
+ *
+ * @return -EINVAL if cb is @p NULL.
+ * @return 0 if no error.
+ */
 int bt_ares_srv_init(const struct ares_ble_service_cb *cb);
 
+/**
+ * Indicate how many chunks are going to be sent.
+ *
+ * @param[in] chunks The value to indicate.
+ *
+ * @return @p -EACCESS if the indication has not been subscribed to
+ * @return @p 0 on success
+ * @return negative error code otherwise.
+ */
 int bt_ares_srv_ind_chunks(uint64_t chunks);
 
+/**
+ * Indicate an image chunk over BLE.
+ *
+ * @param[in] bytes The data to send over BLE.
+ * @param[in] num_bytes The number of bytes that is in the data.
+ *
+ * @return @p -EACCESS if the indication has not been subscribed to
+ * @return @p -EINVAL if @p bytes is @p NULL
+ * @return @p 0 on success
+ * @return negative error code otherwise.
+ */
 int bt_ares_srv_ind_image_chunk(const uint8_t *bytes, size_t num_bytes);
 
 #endif // ARES_ARES_SERVICE_H

@@ -134,6 +134,10 @@ int bt_ares_srv_ind_image_chunk(const uint8_t *bytes, size_t num_bytes) {
         return -EACCES;
     }
 
+    if (bytes == NULL) {
+        return -EINVAL;
+    }
+
     ind_params.data = bytes;
     ind_params.len = num_bytes;
     return bt_gatt_indicate(NULL, &ind_params);
