@@ -8,6 +8,7 @@
  * @author Tom Schmitz \<tschmitz@andrew.cmu.edu\>
  */
 
+#include <ble/ble.h>
 #include <led.h>
 #include <lora/lora.h>
 #include <lora/lora_backend.h>
@@ -222,6 +223,33 @@ static void handle_version(const struct ares_serial *serial,
     ares_serial_write_frame(serial, frame);
 }
 
+static void handle_ble_state(const struct ares_serial *serial,
+                             struct ares_frame *frame) {
+    switch (frame->payload.BLE_STATE) {
+    case 0: {
+        frame->type = ARES_FRAME_ACK;
+        frame->payload.ACK = ares_disable_ble();
+        break;
+    }
+    case 1: {
+        frame->type = ARES_FRAME_ACK;
+        frame->payload.ACK = ares_enable_ble();
+        break;
+    }
+    case 2: {
+        frame->payload.BLE_STATE = ares_ble_enabled() != false;
+        break;
+    }
+    default: {
+        frame->type = ARES_FRAME_ACK;
+        frame->payload.ACK = EINVAL;
+        break;
+    }
+    }
+
+    ares_serial_write_frame(serial, frame);
+}
+
 static struct ares_serial_command commands[] = {
     {ARES_FRAME_SETTING, handle_setting},
     {ARES_FRAME_START, handle_start},
@@ -231,6 +259,7 @@ static struct ares_serial_command commands[] = {
     {ARES_FRAME_CLAIM, handle_claim},
     {ARES_FRAME_LOG, handle_log},
     {ARES_FRAME_VERSION, handle_version},
+    {ARES_FRAME_BLE_STATE, handle_ble_state},
 };
 
 static int init_serial_handlers(void) {

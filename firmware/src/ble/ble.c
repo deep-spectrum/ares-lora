@@ -244,6 +244,10 @@ int ares_disable_ble(void) {
     return ret;
 }
 
+bool ares_ble_enabled(void) {
+    return atomic_test_bit(&connection_info.state, BLE_ACTIVE);
+}
+
 int ares_disconnect_ble(void) {
     if (!atomic_test_bit(&connection_info.state, BLE_CONNECTED)) {
         return -EALREADY;

@@ -198,7 +198,10 @@ struct ares_frame {
 
         uint8_t BLE_STATE; ///< ARES_FRAME_BLE_STATE
 
-        uint16_t BLE_CONNECTED; ///< ARES_FRAME_BLE_CONNECTED
+        struct {
+            bool connected;
+            uint16_t mtu_size;
+        } BLE_CONNECTED; ///< ARES_FRAME_BLE_CONNECTED
 
         struct {
             uint8_t chunks_subscribed : 1;

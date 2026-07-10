@@ -104,7 +104,8 @@ static size_t calculate_frame_length(const struct ares_frame *frame) {
         break;
     }
     case ARES_FRAME_BLE_CONNECTED: {
-        payload_len = FSIZEOF_FIELD(BLE_CONNECTED);
+        payload_len = FSIZEOF_FIELD(BLE_CONNECTED.connected) +
+                      FSIZEOF_FIELD(BLE_CONNECTED.mtu_size);
         break;
     }
     case ARES_FRAME_BLE_SUBSCRIBED: {
@@ -232,7 +233,8 @@ static void serialize(uint8_t *buf, const struct ares_frame *frame,
         break;
     }
     case ARES_FRAME_BLE_CONNECTED: {
-        FSERIALIZE(BLE_CONNECTED);
+        FSERIALIZE(BLE_CONNECTED.connected);
+        FSERIALIZE(BLE_CONNECTED.mtu_size);
         break;
     }
     case ARES_FRAME_BLE_SUBSCRIBED: {

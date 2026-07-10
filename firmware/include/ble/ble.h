@@ -92,6 +92,12 @@ int ares_enable_ble(void);
 int ares_disable_ble(void);
 
 /**
+ * Check if BLE is enabled.
+ * @return `true` if BLE is active, `false` otherwise.
+ */
+bool ares_ble_enabled(void);
+
+/**
  * Disconnect BLE and start advertising.
  *
  * @return @p 0 on success.
