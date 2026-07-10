@@ -84,6 +84,17 @@ enum ares_frame_type {
     ARES_FRAME_PKT_RX,        ///< Packet received, TX only.
     ARES_FRAME_PKT_TX,        ///< Packet transmitted, TX only.
 
+    // BLE
+    ARES_FRAME_BLE_STATE,       ///< Enable/disable BLE.
+    ARES_FRAME_BLE_CONNECTED,   ///< Indicate that BLE has been connected or
+                                ///< disconnected from. Tx only.
+    ARES_FRAME_BLE_DISCONNECT,  ///< Terminate the current BLE connection.
+    ARES_FRAME_BLE_SUBSCRIBED,  ///< Indicate that an attribute got
+                                ///< subscribed/unsubscribed from. Tx only.
+    ARES_FRAME_BLE_CHUNKS,      ///< Tell the central device how many chunks are
+                                ///< going to be sent.
+    ARES_FRAME_BLE_IMAGE_CHUNK, ///< Send a chunk to the central device.
+
     ARES_FRAME_TYPE_INVALID, ///< Invalid frame.
 };
 
@@ -184,6 +195,24 @@ struct ares_frame {
         } PKT_RX; ///< ARES_FRAME_PKT_RX
 
         uint32_t PKT_TX; ///< ARES_FRAME_PKT_TX
+
+        bool BLE_STATE; ///< ARES_FRAME_BLE_STATE
+
+        uint16_t BLE_CONNECTED; ///< ARES_FRAME_BLE_CONNECTED
+
+        struct {
+            uint8_t chunks_subscribed : 1;
+            uint8_t image_subscribed : 1;
+            uint8_t padding : 6;
+        } BLE_SUBSCRIBED; ///< ARES_FRAME_BLE_SUBSCRIBED
+
+        uint64_t BLE_CHUNKS; ///< ARES_FRAME_BLE_CHUNKS
+
+        struct {
+            size_t len;
+            const uint8_t *buf;
+        } BLE_IMAGE_CHUNK; ///< ARES_FRAME_BLE_IMAGE_CHUNK
+
     } payload;
 };
 
