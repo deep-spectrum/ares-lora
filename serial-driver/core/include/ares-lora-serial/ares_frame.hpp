@@ -477,7 +477,7 @@ class AresFrame {
          *
          * BLE States.
          */
-        enum State : unsigned {
+        enum State : uint8_t {
             OFF = 0,     ///< BLE off.
             ON = 1,      ///< BLE On.
             REQUEST = 2, ///< Request BLE state.
@@ -498,12 +498,12 @@ class AresFrame {
         /**
          * Flag indicating if the BLE is connected or not.
          */
-        bool connected;
+        bool connected = false;
 
         /**
          * The maximum transfer size.
          */
-        uint16_t chunk_size;
+        uint16_t chunk_size = 0;
     };
 
     /**
@@ -515,12 +515,12 @@ class AresFrame {
         /**
          * Flag indicating if the chunks attribute has been subscribed to.
          */
-        bool chunk;
+        bool chunk = false;
 
         /**
          * Flag indicating if the image attribute has been subscribed to.
          */
-        bool image;
+        bool image = false;
     };
 
     /**
@@ -532,7 +532,7 @@ class AresFrame {
         /**
          * The number of chunks to transfer.
          */
-        uint64_t num_chunks;
+        uint64_t num_chunks = 0;
     };
 
     /**
