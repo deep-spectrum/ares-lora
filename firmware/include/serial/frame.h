@@ -196,7 +196,7 @@ struct ares_frame {
 
         uint32_t PKT_TX; ///< ARES_FRAME_PKT_TX
 
-        bool BLE_STATE; ///< ARES_FRAME_BLE_STATE
+        uint8_t BLE_STATE; ///< ARES_FRAME_BLE_STATE
 
         uint16_t BLE_CONNECTED; ///< ARES_FRAME_BLE_CONNECTED
 
