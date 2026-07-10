@@ -23,6 +23,50 @@
 #include <zephyr/kernel.h>
 #include <zephyr/version.h>
 
+enum connected_state {
+    DISCONNECTED,
+    CONNECTED,
+};
+
+struct connect_work {
+    enum connected_state state;
+    uint16_t mtu_size;
+    const struct ares_serial *serial;
+    struct k_work work;
+};
+
+struct connect_work connect_work = {};
+
+static void connected_work_handler(struct k_work *work) {
+    struct connect_work *cwork = CONTAINER_OF(work, struct connect_work, work);
+    struct ares_frame frame = {
+        .type = ARES_FRAME_BLE_CONNECTED,
+        .payload.BLE_CONNECTED.connected = cwork->state == CONNECTED,
+    };
+
+    if (cwork->state == DISCONNECTED) {
+        cwork->mtu_size = 0;
+    }
+
+    frame.payload.BLE_CONNECTED.mtu_size = cwork->mtu_size;
+    ares_serial_write_frame(cwork->serial, &frame);
+}
+
+static void ble_connected(void) {
+    // This is guaranteed to run before the mtu exchange.
+    connect_work.state = CONNECTED;
+}
+
+static void mtu_size_change(size_t new_mtu) {
+    connect_work.mtu_size = (uint16_t)new_mtu;
+    k_work_submit(&connect_work.work);
+}
+
+static void ble_disconnected(void) {
+    connect_work.state = DISCONNECTED;
+    k_work_submit(&connect_work.work);
+}
+
 static void send_ack_frame(const struct ares_serial *serial,
                            struct ares_frame *frame, int code) {
     frame->type = ARES_FRAME_ACK;
@@ -250,6 +294,23 @@ static void handle_ble_state(const struct ares_serial *serial,
     ares_serial_write_frame(serial, frame);
 }
 
+static int initialize_ble(const struct ares_serial *serial) {
+    struct ares_ble_init_data init_data = {
+        .cb = {
+            .connected = ble_connected,
+            .disconnected = ble_disconnected,
+            .mtu_size_changed = mtu_size_change,
+        }};
+
+    connect_work.serial = serial;
+
+    k_work_init(&connect_work.work, connected_work_handler);
+
+    (void)retrieve_setting(ARES_SETTING_ID, &init_data.node_id);
+
+    return ares_init_ble(&init_data);
+}
+
 static struct ares_serial_command commands[] = {
     {ARES_FRAME_SETTING, handle_setting},
     {ARES_FRAME_START, handle_start},
@@ -264,6 +325,12 @@ static struct ares_serial_command commands[] = {
 
 static int init_serial_handlers(void) {
     const struct ares_serial *serial = ares_serial_backend_uart_get_ptr();
+
+    int ret = initialize_ble(serial);
+    if (ret != 0) {
+        return ret;
+    }
+
     return ares_serial_register_command_callbacks(serial, commands,
                                                   ARRAY_SIZE(commands));
 }

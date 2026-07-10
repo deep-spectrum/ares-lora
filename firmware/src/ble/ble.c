@@ -146,11 +146,11 @@ static void on_connected(struct bt_conn *conn, uint8_t bt_err) {
         return;
     }
 
-    update_mtu(conn);
-
     if (callbacks.connected != NULL) {
         callbacks.connected();
     }
+
+    update_mtu(conn);
 }
 
 static void on_disconnected(struct bt_conn *conn, uint8_t reason) {
