@@ -294,6 +294,11 @@ static void handle_ble_state(const struct ares_serial *serial,
     ares_serial_write_frame(serial, frame);
 }
 
+static void handle_ble_disconnect(const struct ares_serial *serial,
+                                  struct ares_frame *frame) {
+    send_ack_frame(serial, frame, ares_disconnect_ble());
+}
+
 static int initialize_ble(const struct ares_serial *serial) {
     struct ares_ble_init_data init_data = {
         .cb = {
@@ -321,6 +326,7 @@ static struct ares_serial_command commands[] = {
     {ARES_FRAME_LOG, handle_log},
     {ARES_FRAME_VERSION, handle_version},
     {ARES_FRAME_BLE_STATE, handle_ble_state},
+    {ARES_FRAME_BLE_DISCONNECT, handle_ble_disconnect},
 };
 
 static int init_serial_handlers(void) {
