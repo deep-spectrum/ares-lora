@@ -484,6 +484,17 @@ class AresFrame {
         };
 
         /**
+         * Default constructor.
+         */
+        BleState() = default;
+
+        /**
+         * Constructor.
+         * @param[in] value The state value.
+         */
+        explicit BleState(uint8_t value) { state = static_cast<State>(value); }
+
+        /**
          * The BLE state frame data.
          */
         State state = REQUEST;

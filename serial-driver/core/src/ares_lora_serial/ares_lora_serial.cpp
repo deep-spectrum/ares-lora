@@ -57,6 +57,9 @@ PYBIND11_MODULE(_ares_lora_serial, m, py::mod_gil_not_used()) {
         .def("send_log", &AresSerial::send_log,
              "Send a logging message over LoRa")
         .def("version", &AresSerial::version, "Retrieve the firmware version")
+        .def("ble_state", &AresSerial::ble_state, py::arg("value"))
+        .def("ble_disconnect", &AresSerial::ble_disconnect)
+        .def("ble_send_image", &AresSerial::ble_send_image, py::arg("image"))
         .def("register_logger_callbacks",
              &AresSerial::register_logger_callbacks, py::arg("dbg"),
              py::arg("info"), py::arg("warning"), py::arg("error"),
@@ -76,6 +79,9 @@ PYBIND11_MODULE(_ares_lora_serial, m, py::mod_gil_not_used()) {
         .def("wait_packet_rx_event", &AresSerial::wait_packet_rx_event)
         .def("wait_packet_tx_done_event",
              &AresSerial::wait_packet_tx_done_event)
+        .def("wait_ble_connect_event", &AresSerial::wait_ble_connection_event)
+        .def("wait_ble_subscribe_event",
+             &AresSerial::wait_ble_subscription_event)
         .def("cancel_events", &AresSerial::cancel_events);
 
     py::register_local_exception<AresTimeoutError>(m, "AresTimeout",
@@ -522,6 +528,63 @@ py::tuple AresSerial::version() {
                           _decode_version(version.kernel));
 }
 
+py::tuple AresSerial::ble_state(uint8_t value) {
+    _check_crash();
+    LOG_DBG("BLE state command received");
+    AresFrame frame(AresFrame::BLE_STATE, AresFrame::BleState(value));
+    AresResponse response = _send_frame(frame, _response_timeout);
+
+    int ret = 0;
+    AresFrame::BleState val;
+
+    switch (response.type) {
+    case AresResponse::ACK: {
+        ret = std::get<AresFrame::AckErrorCode>(response.payload);
+        break;
+    }
+    case AresResponse::BAD_FRAME: {
+        _handle_bad_frame(response);
+        break;
+    }
+    case AresResponse::COMMAND_SPECIFIC: {
+        val = std::get<AresFrame::BleState>(response.payload);
+        break;
+    }
+    default: {
+        throw std::runtime_error("Received invalid response");
+    }
+    }
+
+    return py::make_tuple(static_cast<uint8_t>(val.state), ret);
+}
+
+int AresSerial::ble_disconnect() {
+    _check_crash();
+    LOG_DBG("BLE state command received");
+    AresFrame frame(AresFrame::BLE_DISCONNECT, std::monostate());
+    AresResponse response = _send_frame(frame, _response_timeout);
+
+    int ret = -1;
+
+    switch (response.type) {
+    case AresResponse::ACK: {
+        ret = std::get<AresFrame::AckErrorCode>(response.payload);
+        break;
+    }
+    case AresResponse::BAD_FRAME: {
+        _handle_bad_frame(response);
+        break;
+    }
+    default: {
+        throw std::runtime_error("Received invalid response");
+    }
+    }
+
+    return ret;
+}
+
+int AresSerial::ble_send_image(py::bytes &image) { return -ENOTSUP; }
+
 void AresSerial::register_logger_callbacks(
     const std::function<void(const std::string &)> &dbg,
     const std::function<void(const std::string &)> &info,
@@ -699,6 +762,18 @@ uint32_t AresSerial::wait_packet_tx_done_event() {
     return event.count;
 }
 
+bool AresSerial::wait_ble_connection_event() {
+    AresFrame::BleConnect event;
+    wait_event_queue_released(event, _ble_connect_event_q);
+    return event.connected;
+}
+
+py::tuple AresSerial::wait_ble_subscription_event() {
+    AresFrame::BleSubscribed event;
+    wait_event_queue_released(event, _ble_subscribe_event_q);
+    return py::make_tuple(event.chunk, event.image);
+}
+
 void AresSerial::cancel_events() {
     LOG_DBG("Cancelling event queues");
     _stop_event_queues();
@@ -722,7 +797,8 @@ void AresSerial::_process_frames_helper() {
         case AresFrame::FRAMING_ERROR:
         case AresFrame::SETTING:
         case AresFrame::LED:
-        case AresFrame::VERSION: {
+        case AresFrame::VERSION:
+        case AresFrame::BLE_STATE: {
             _publish_response(frame);
             break;
         }
@@ -756,6 +832,15 @@ void AresSerial::_process_frames_helper() {
         }
         case AresFrame::PKT_TX: {
             _packet_tx_event(std::get<AresFrame::PktTx>(frame.payload));
+            break;
+        }
+        case AresFrame::BLE_CONNECTED: {
+            _ble_connect_event(std::get<AresFrame::BleConnect>(frame.payload));
+            break;
+        }
+        case AresFrame::BLE_SUBSCRIBED: {
+            _ble_subscribe_event(
+                std::get<AresFrame::BleSubscribed>(frame.payload));
             break;
         }
         case AresFrame::DRIVER_STOP: {
@@ -1062,5 +1147,25 @@ bool AresSerial::_stop_event_queues() {
     success = put_noexcept(_log_event_q) && success;
     success = put_noexcept(_pkt_rx_event_q) && success;
     success = put_noexcept(_pkt_tx_event_q) && success;
+    success = put_noexcept(_ble_connect_event_q) && success;
+    success = put_noexcept(_ble_subscribe_event_q) && success;
     return success;
+}
+
+void AresSerial::_ble_connect_event(const AresFrame::BleConnect &event) {
+    LOG_DBG("Received BLE connect event (Connected: %d, MTU: %d)",
+            event.connected, event.chunk_size);
+    ble_info.connected = event.connected;
+    ble_info.mtu = event.chunk_size;
+
+    put_no_except(event, _ble_connect_event_q, 100ms);
+}
+
+void AresSerial::_ble_subscribe_event(const AresFrame::BleSubscribed &event) {
+    LOG_DBG("Received BLE subscription event (chunk: %d, image: %d)",
+            event.chunk, event.image);
+    ble_info.subscriptions.chunk = event.chunk;
+    ble_info.subscriptions.image = event.image;
+
+    put_no_except(event, _ble_subscribe_event_q, 100ms);
 }
