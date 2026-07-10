@@ -111,7 +111,7 @@ static void image_ind_cb(struct bt_conn *conn,
 
 int bt_ares_srv_ind_chunks(uint64_t chunks) {
     static struct bt_gatt_indicate_params ind_params = {
-        .attr = &ares_srv_svc.attrs[2], // todo
+        .attr = &ares_srv_svc.attrs[2],
         .func = num_chunks_ind_cb,
         .len = sizeof(chunks),
     };
@@ -126,7 +126,7 @@ int bt_ares_srv_ind_chunks(uint64_t chunks) {
 
 int bt_ares_srv_ind_image_chunk(const uint8_t *bytes, size_t num_bytes) {
     static struct bt_gatt_indicate_params ind_params = {
-        .attr = &ares_srv_svc.attrs[2], // todo
+        .attr = &ares_srv_svc.attrs[5],
         .func = image_ind_cb,
     };
 
