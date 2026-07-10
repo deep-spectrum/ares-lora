@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from .lserial import LoraException, SettingId, LoraBandwidth, LoraSpreadingFactor, LoraCodingRate, LoraConfig, \
-    LoraSerial, LoraLedState, LoraSerialConfig
+    LoraSerial, LoraLedState, LoraSerialConfig, BleState
 from .version import __version__
 from .dfu import AresDfu, AresUploadStatusBase, AresImageStates, ImageManagerException
 from .utils import find_ports
@@ -19,6 +19,7 @@ __all__ = [
     "LoraSpreadingFactor",
     "LoraCodingRate",
     "LoraLedState",
+    "BleState",
 
     # .dfu
     "AresDfu",
