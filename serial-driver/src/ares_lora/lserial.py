@@ -11,6 +11,7 @@ import copy
 import ctypes
 import threading
 from weakref import WeakSet
+from queue import Queue
 
 logger = logging.getLogger("ares_lora")
 
@@ -179,6 +180,19 @@ class LogMessage:
     transmitted: bool = False
 
 
+class BleState(IntEnum):
+    """Different states the BLE can be in (except for request).
+
+    Attributes:
+        OFF: BLE is turned off.
+        ON: BLE is solid on.
+        REQUEST: Request the current BLE state.
+    """
+    OFF = 0
+    ON = 1
+    REQUEST = 2
+
+
 def lora_serial_command(func):
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
@@ -250,6 +264,12 @@ class LoraSerial:
         self._log_thread: Thread | None = None
         self._pkt_rx_thread: Thread | None = None
         self._pkt_tx_thread: Thread | None = None
+
+        self._wait_ble_connect_event: Thread | None = None
+        self._wait_ble_subscribe_event: Thread | None = None
+
+        self._ble_connect_events = Queue()
+        self._ble_subscribe_events = Queue()
 
         self._driver_started = Event()
 
@@ -340,6 +360,24 @@ class LoraSerial:
 
             with self._tx_stats_lock:
                 self._tx_stats += count
+
+    def _ble_connect_event_handle(self):
+        while True:
+            try:
+                connected = self._dev.wait_ble_connection_event()
+            except AresThreadTerminate:
+                break
+
+            self._ble_connect_events.put(connected)
+
+    def _ble_subscribe_event_handle(self):
+        while True:
+            try:
+                subscriptions: tuple[bool, ...] = self._dev.wait_ble_subscribe_event()
+            except AresThreadTerminate:
+                break
+
+            self._ble_subscribe_events.put(subscriptions)
 
     @staticmethod
     def _check_ret_code(code: int | tuple[int, ...]):
@@ -535,6 +573,24 @@ class LoraSerial:
         """
         return self._dev.version()
 
+    @lora_serial_command
+    def ble_state(self, state: BleState = BleState.REQUEST) -> BleState | None:
+        ret, err_code = self._dev.ble_state(state.value)
+        self._check_ret_code(err_code)
+        if state == BleState.REQUEST:
+            return BleState(ret)
+        return None
+
+    @lora_serial_command
+    def ble_disconnect(self):
+        ret = self._dev.ble_disconnect()
+        self._check_ret_code(ret)
+
+    @lora_serial_command
+    def ble_send_file(self, f: bytes):
+        ret = self._dev.ble_send_image(f)
+        self._check_ret_code(ret)
+
     def register_logger(self, logger_redirect: logging.Logger | None = logger):
         """Register a logger with the core module.
 
@@ -634,6 +690,14 @@ class LoraSerial:
         assert isinstance(self._pkt_tx_thread, Thread)
         self._pkt_tx_thread.start()
 
+        self._wait_ble_connect_event = Thread(target=self._ble_connect_event_handle)
+        assert isinstance(self._wait_ble_connect_event, Thread)
+        self._wait_ble_connect_event.start()
+
+        self._wait_ble_subscribe_event = Thread(target=self._ble_subscribe_event_handle)
+        assert isinstance(self._wait_ble_subscribe_event, Thread)
+        self._wait_ble_subscribe_event.start()
+
         self._driver_started.set()
 
         global _instances
@@ -678,6 +742,14 @@ class LoraSerial:
         if self._pkt_tx_thread is not None:
             self._pkt_tx_thread.join()
             self._pkt_tx_thread = None
+
+        if self._wait_ble_subscribe_event is not None:
+            self._wait_ble_subscribe_event.join()
+            self._wait_ble_subscribe_event = None
+
+        if self._wait_ble_connect_event is not None:
+            self._wait_ble_connect_event.join()
+            self._wait_ble_connect_event = None
 
         self._driver_started.clear()
 
