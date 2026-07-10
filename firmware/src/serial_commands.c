@@ -333,6 +333,19 @@ static void handle_ble_disconnect(const struct ares_serial *serial,
     send_ack_frame(serial, frame, ares_disconnect_ble());
 }
 
+static void handle_ble_chunks(const struct ares_serial *serial,
+                              struct ares_frame *frame) {
+    int ret = ares_ble_indicate_chunks(frame->payload.BLE_CHUNKS);
+    send_ack_frame(serial, frame, ret);
+}
+
+static void handle_ble_image_chunk(const struct ares_serial *serial,
+                                   struct ares_frame *frame) {
+    int ret = ares_ble_send_chunk(frame->payload.BLE_IMAGE_CHUNK.buf,
+                                  frame->payload.BLE_IMAGE_CHUNK.len);
+    send_ack_frame(serial, frame, ret);
+}
+
 static int initialize_ble(const struct ares_serial *serial) {
     struct ares_ble_init_data init_data = {
         .cb = {
@@ -365,6 +378,8 @@ static struct ares_serial_command commands[] = {
     {ARES_FRAME_VERSION, handle_version},
     {ARES_FRAME_BLE_STATE, handle_ble_state},
     {ARES_FRAME_BLE_DISCONNECT, handle_ble_disconnect},
+    {ARES_FRAME_BLE_CHUNKS, handle_ble_chunks},
+    {ARES_FRAME_BLE_IMAGE_CHUNK, handle_ble_image_chunk},
 };
 
 static int init_serial_handlers(void) {
