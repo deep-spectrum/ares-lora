@@ -156,7 +156,7 @@ static void on_connected(struct bt_conn *conn, uint8_t bt_err) {
 static void on_disconnected(struct bt_conn *conn, uint8_t reason) {
     ARG_UNUSED(conn);
     ARG_UNUSED(reason);
-    LOG_INF("Diconnected (%d: %s)", reason, bt_hci_err_to_str(reason));
+    LOG_INF("Diconnected (%d: %s)", reason, bt_att_err_to_str(reason));
     bt_conn_unref(connection_info.conn);
     connection_info.conn = NULL;
     atomic_clear_bit(&connection_info.state, BLE_CONNECTED);
