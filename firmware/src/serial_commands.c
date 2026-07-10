@@ -35,7 +35,16 @@ struct connect_work {
     struct k_work work;
 };
 
+struct subscribe_work {
+    bool chunk_enabled;
+    bool image_enabled;
+    const struct ares_serial *serial;
+    struct k_work work;
+    struct k_spinlock lock;
+};
+
 struct connect_work connect_work = {};
+struct subscribe_work subscribe_work = {};
 
 static void connected_work_handler(struct k_work *work) {
     struct connect_work *cwork = CONTAINER_OF(work, struct connect_work, work);
@@ -52,6 +61,21 @@ static void connected_work_handler(struct k_work *work) {
     ares_serial_write_frame(cwork->serial, &frame);
 }
 
+static void subscribe_work_handler(struct k_work *work) {
+    struct subscribe_work *swork =
+        CONTAINER_OF(work, struct subscribe_work, work);
+    struct ares_frame frame = {
+        .type = ARES_FRAME_BLE_SUBSCRIBED,
+    };
+
+    K_SPINLOCK(&swork->lock) {
+        frame.payload.BLE_SUBSCRIBED.chunks_subscribed = swork->chunk_enabled;
+        frame.payload.BLE_SUBSCRIBED.image_subscribed = swork->image_enabled;
+    }
+
+    ares_serial_write_frame(swork->serial, &frame);
+}
+
 static void ble_connected(void) {
     // This is guaranteed to run before the mtu exchange.
     connect_work.state = CONNECTED;
@@ -65,6 +89,16 @@ static void mtu_size_change(size_t new_mtu) {
 static void ble_disconnected(void) {
     connect_work.state = DISCONNECTED;
     k_work_submit(&connect_work.work);
+}
+
+static void chunks_enabled(bool enable) {
+    K_SPINLOCK(&subscribe_work.lock) { subscribe_work.chunk_enabled = enable; }
+    k_work_submit(&subscribe_work.work);
+}
+
+static void image_enabled(bool enable) {
+    K_SPINLOCK(&subscribe_work.lock) { subscribe_work.image_enabled = enable; }
+    k_work_submit(&subscribe_work.work);
 }
 
 static void send_ack_frame(const struct ares_serial *serial,
@@ -305,11 +339,15 @@ static int initialize_ble(const struct ares_serial *serial) {
             .connected = ble_connected,
             .disconnected = ble_disconnected,
             .mtu_size_changed = mtu_size_change,
+            .chunks_enabled = chunks_enabled,
+            .image_enabled = image_enabled,
         }};
 
     connect_work.serial = serial;
+    subscribe_work.serial = serial;
 
     k_work_init(&connect_work.work, connected_work_handler);
+    k_work_init(&subscribe_work.work, subscribe_work_handler);
 
     (void)retrieve_setting(ARES_SETTING_ID, &init_data.node_id);
 
