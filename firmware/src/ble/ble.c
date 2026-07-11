@@ -233,7 +233,7 @@ int ares_disable_ble(void) {
     atomic_clear_bit(&connection_info.state, BLE_ACTIVE);
 
     if (atomic_test_bit(&connection_info.state, BLE_CONNECTED)) {
-        ret = ares_disable_ble();
+        ret = ares_disconnect_ble();
     } else if (atomic_test_bit(&connection_info.state, BLE_ADVERTISING)) {
         ret = bt_le_adv_stop();
         if (ret != 0) {
