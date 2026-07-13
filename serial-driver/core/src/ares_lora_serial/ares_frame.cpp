@@ -462,16 +462,16 @@ void AresFrame::_preprocess_ble_image(BleImage &payload) {
 
     payload._img_split.reserve(num_chunks);
 
-    for (ssize_t i = 0; i < num_chunks; i++) {
-        ssize_t start_index = i * payload._max_chunk_size;
-        ssize_t end_index =
-            ((i + 1) * payload._max_chunk_size) >= payload.image.size()
-                ? payload.image.end() - (payload.image.begin() + start_index)
-                : start_index + payload._max_chunk_size;
-
-        payload._img_split.emplace_back(payload.image.begin() + start_index,
-                                        payload.image.begin() + end_index);
+    ssize_t start = 0;
+    for (ssize_t i = 0; i < (num_chunks - 1);
+         i++, start += payload._max_chunk_size) {
+        payload._img_split.emplace_back(payload.image.begin() + start,
+                                        payload.image.begin() + start +
+                                            payload._max_chunk_size);
     }
+
+    payload._img_split.emplace_back(payload.image.begin() + start,
+                                    payload.image.end());
 
     payload._preprocessed = true;
 }
