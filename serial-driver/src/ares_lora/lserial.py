@@ -850,12 +850,16 @@ class BleTransfer:
     def __enter__(self):
         self._dev.clear_ble_events()
         self._dev.ble_state(BleState.ON)
-        self._wait_connect_event()
-        self._wait_subscriptions()
+        try:
+            self._wait_connect_event()
+            self._wait_subscriptions()
+        except:
+            self._dev.ble_state(BleState.OFF)
+            raise
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         self._dev.ble_state(BleState.OFF)
 
     def write(self, data: bytes):
-        pass
+        self._dev.ble_send_file(data)

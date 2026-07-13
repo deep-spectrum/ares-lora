@@ -278,7 +278,7 @@ class AresSerial {
 
     int ble_disconnect();
 
-    int ble_send_image(py::bytes &image);
+    int ble_send_image(const py::bytes &image);
 
     /**
      * Register logging redirects.
@@ -499,6 +499,8 @@ class AresSerial {
 
     void _ble_connect_event(const AresFrame::BleConnect &event);
     void _ble_subscribe_event(const AresFrame::BleSubscribed &event);
+
+    int _ble_send_chunk(uint64_t num_chunks);
 };
 
 #endif // ARES_ARES_LORA_SERIAL_HPP

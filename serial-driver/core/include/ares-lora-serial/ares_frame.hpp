@@ -92,8 +92,6 @@ class AresFrame {
      * Data for AresFrame::SETTING frames.
      */
     struct Setting {
-        Setting() = default;
-
         bool set = false;        ///< Set flag for settings.
         uint16_t setting_id = 0; ///< The setting ID.
         uint32_t value = 0;      ///< The value of the setting.
@@ -105,8 +103,6 @@ class AresFrame {
      * Data for AresFrame::START frames.
      */
     struct Start {
-        Start() = default;
-
         int64_t sec = -1;       ///< Seconds part for start time.
         uint64_t usec = 0;      ///< Microseconds part for start time.
         uint16_t id = 0;        ///< The destination ID on transmissions. The
@@ -126,8 +122,6 @@ class AresFrame {
      * Data for AresFrame::LORA_CONFIG frames.
      */
     struct LoraConfig {
-        LoraConfig() = default;
-
         /**
          * Frequency in Hz to use for transceiving.
          */
@@ -230,8 +224,6 @@ class AresFrame {
      * Data for AresFrame::HEARTBEAT frames.
      */
     struct Heartbeat {
-        Heartbeat() = default;
-
         /**
          * System ready for data collection.
          */

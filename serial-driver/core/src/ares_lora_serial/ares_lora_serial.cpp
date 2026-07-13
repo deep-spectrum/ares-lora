@@ -20,6 +20,7 @@
 #include <pybind11/functional.h>
 // ReSharper restore CppUnusedIncludeDirective
 #include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
 #include <sstream>
 #include <stdexcept>
 #include <type_traits>
@@ -583,7 +584,22 @@ int AresSerial::ble_disconnect() {
     return ret;
 }
 
-int AresSerial::ble_send_image(py::bytes &image) { return -ENOTSUP; }
+int AresSerial::ble_send_image(const py::bytes &image) {
+    LOG_DBG("Attempting to transfer image");
+    py::buffer_info info(py::buffer(image).request());
+    auto *data = static_cast<const uint8_t *>(info.ptr);
+    auto size = static_cast<size_t>(info.size);
+    std::vector image_(data, data + size);
+
+    int ret =
+        _ble_send_chunk(AresFrame::BleImage::num_chunks(image_, ble_info.mtu));
+
+    if (ret != 0) {
+        return ret;
+    }
+
+    return 0;
+}
 
 void AresSerial::register_logger_callbacks(
     const std::function<void(const std::string &)> &dbg,
@@ -1168,4 +1184,30 @@ void AresSerial::_ble_subscribe_event(const AresFrame::BleSubscribed &event) {
     ble_info.subscriptions.image = event.image;
 
     put_no_except(event, _ble_subscribe_event_q, 100ms);
+}
+
+int AresSerial::_ble_send_chunk(uint64_t num_chunks) {
+    _check_crash();
+    LOG_DBG("BLE chunk command received");
+    AresFrame frame(AresFrame::BLE_CHUNK, AresFrame::BleChunk{num_chunks});
+    LOG_DBG("Image fits into %lu chunks", num_chunks);
+    AresResponse response = _send_frame(frame, _response_timeout);
+
+    int ret = -1;
+
+    switch (response.type) {
+    case AresResponse::ACK: {
+        ret = std::get<AresFrame::AckErrorCode>(response.payload);
+        break;
+    }
+    case AresResponse::BAD_FRAME: {
+        _handle_bad_frame(response);
+        break;
+    }
+    default: {
+        throw std::runtime_error("Received invalid response");
+    }
+    }
+
+    return ret;
 }
