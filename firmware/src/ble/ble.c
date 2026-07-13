@@ -308,6 +308,10 @@ int ares_ble_send_chunk(const uint8_t *chunk, size_t num_bytes) {
         return -ECANCELED;
     }
 
+    if (num_bytes > connection_info.payload_mtu_size) {
+        return -ENOBUFS;
+    }
+
     ret = bt_ares_srv_ind_image_chunk(chunk, num_bytes);
     if (ret != 0) {
         return ret;
