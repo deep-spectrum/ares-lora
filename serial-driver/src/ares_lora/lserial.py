@@ -11,7 +11,8 @@ import copy
 import ctypes
 import threading
 from weakref import WeakSet
-from queue import Queue
+from queue import Queue, Empty
+from datetime import datetime, timedelta
 
 logger = logging.getLogger("ares_lora")
 
@@ -597,6 +598,19 @@ class LoraSerial:
     def wait_subscription_change_event(self, block: bool, timeout: float) -> tuple[bool, ...]:
         return self._ble_subscribe_events.get(block, timeout)
 
+    def clear_ble_events(self):
+        try:
+            while True:
+                self._ble_connect_events.get_nowait()
+        except Empty:
+            pass
+
+        try:
+            while True:
+                self._ble_subscribe_events.get_nowait()
+        except Empty:
+            pass
+
     def register_logger(self, logger_redirect: logging.Logger | None = logger):
         """Register a logger with the core module.
 
@@ -802,3 +816,46 @@ class LoraSerial:
         with self._tx_stats_lock:
             ret = self._tx_stats
         return ret
+
+
+class BleTransfer:
+    def __init__(self, serial: LoraSerial, timeout: float = 60.0, max_attempts: int = 3):
+        self._dev = serial
+
+        if timeout < 0:
+            raise ValueError("Timeout must be positive")
+        if max_attempts <= 0:
+            raise ValueError("Max attempts must be a positive non-zero integer")
+
+        self._timeout = timeout
+        self._max_attempts = max_attempts
+
+    def _wait_connect_event(self):
+        try:
+            self._dev.wait_connection_changed_event(True, self._timeout)
+        except Empty:
+            raise TimeoutError("Could not establish BLE connection")
+
+    def _wait_subscriptions(self):
+        try:
+            subs = (False,)
+            timeout_time = datetime.now() + timedelta(seconds=self._timeout)
+            while not all(subs) and datetime.now() < timeout_time:
+                subs = self._dev.wait_subscription_change_event(True, self._timeout)
+            if not all(subs):
+                raise TimeoutError("Central device did not subscribe to all required attributes")
+        except Empty:
+            raise TimeoutError("Central device did not subscribe to all required attributes")
+
+    def __enter__(self):
+        self._dev.clear_ble_events()
+        self._dev.ble_state(BleState.ON)
+        self._wait_connect_event()
+        self._wait_subscriptions()
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self._dev.ble_state(BleState.OFF)
+
+    def write(self, data: bytes):
+        pass
