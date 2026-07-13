@@ -74,6 +74,13 @@ class AresFrame {
         PKT_RX = 12,        ///< Packet Received (RX)
         PKT_TX = 13,        ///< Packet transmitted (RX)
 
+        BLE_STATE = 14,       ///< Set or retrieve the BLE state (TX/RX)
+        BLE_CONNECTED = 15,   ///< BLE connect state change (RX)
+        BLE_DISCONNECT = 16,  ///< Disconnect BLE (TX)
+        BLE_SUBSCRIBED = 17,  ///< BLE service subscription change (RX)
+        BLE_CHUNK = 18,       ///< BLE tell central how many chunks (TX)
+        BLE_IMAGE_CHUNK = 19, ///< BLE transfer image chunk (TX)
+
         DRIVER_STOP, ///< Frame used to stop the core driver.
         UNKNOWN,     ///< Unknown frame
     };
@@ -84,8 +91,6 @@ class AresFrame {
      * Data for AresFrame::SETTING frames.
      */
     struct Setting {
-        Setting() = default;
-
         bool set = false;        ///< Set flag for settings.
         uint16_t setting_id = 0; ///< The setting ID.
         uint32_t value = 0;      ///< The value of the setting.
@@ -97,8 +102,6 @@ class AresFrame {
      * Data for AresFrame::START frames.
      */
     struct Start {
-        Start() = default;
-
         int64_t sec = -1;       ///< Seconds part for start time.
         uint64_t usec = 0;      ///< Microseconds part for start time.
         uint16_t id = 0;        ///< The destination ID on transmissions. The
@@ -118,8 +121,6 @@ class AresFrame {
      * Data for AresFrame::LORA_CONFIG frames.
      */
     struct LoraConfig {
-        LoraConfig() = default;
-
         /**
          * Frequency in Hz to use for transceiving.
          */
@@ -222,8 +223,6 @@ class AresFrame {
      * Data for AresFrame::HEARTBEAT frames.
      */
     struct Heartbeat {
-        Heartbeat() = default;
-
         /**
          * System ready for data collection.
          */
@@ -460,21 +459,149 @@ class AresFrame {
     };
 
     /**
+     * @struct BleState
+     *
+     * Payload data for AresFrame::BLE_STATE frames.
+     */
+    struct BleState {
+        /**
+         * @enum State
+         *
+         * BLE States.
+         */
+        enum State : uint8_t {
+            OFF = 0,     ///< BLE off.
+            ON = 1,      ///< BLE On.
+            REQUEST = 2, ///< Request BLE state.
+        };
+
+        /**
+         * Default constructor.
+         */
+        BleState() = default;
+
+        /**
+         * Constructor.
+         * @param[in] value The state value.
+         */
+        explicit BleState(uint8_t value) { state = static_cast<State>(value); }
+
+        /**
+         * The BLE state frame data.
+         */
+        State state = REQUEST;
+    };
+
+    /**
+     * @struct BleConnect
+     *
+     * Payload data for AresFrame::BLE_CONNECTED frames.
+     */
+    struct BleConnect {
+        /**
+         * Flag indicating if the BLE is connected or not.
+         */
+        bool connected = false;
+
+        /**
+         * The maximum transfer size.
+         */
+        uint16_t chunk_size = 0;
+    };
+
+    /**
+     * @struct BleSubscribed
+     *
+     * Payload data for AresFrame::BLE_SUBSCRIBED frames.
+     */
+    struct BleSubscribed {
+        /**
+         * Flag indicating if the chunks attribute has been subscribed to.
+         */
+        bool chunk = false;
+
+        /**
+         * Flag indicating if the image attribute has been subscribed to.
+         */
+        bool image = false;
+    };
+
+    /**
+     * @struct BleChunk
+     *
+     * Payload data for AresFrame::BLE_CHUNK frames.
+     */
+    struct BleChunk {
+        /**
+         * The number of chunks to transfer.
+         */
+        uint64_t num_chunks = 0;
+    };
+
+    /**
+     * @struct BleImage
+     *
+     * Payload data for AresFrame::BLE_IMAGE_CHUNK frames.
+     */
+    struct BleImage {
+        /**
+         * Constructor.
+         * @param[in] bytes The bytes in the image.
+         * @param[in] max_chunk_size The maximum chunk size for a single
+         * transfer. This is usually the MTU or less.
+         */
+        BleImage(const std::vector<uint8_t> &bytes, uint16_t max_chunk_size)
+            : image(bytes), _max_chunk_size(max_chunk_size) {}
+
+        /**
+         * Constructor.
+         */
+        BleImage() = default;
+
+        /**
+         * The image bytes.
+         */
+        std::vector<uint8_t> image;
+
+        /**
+         * Helper for calculating the number of chunks needed to transfer an
+         * image.
+         * @param[in] image The image representation in memory.
+         * @param[in] max_chunk_size The maximum chunk size.
+         * @return The number of chunks needed to transfer the entire image.
+         */
+        static size_t num_chunks(const std::vector<uint8_t> &image,
+                                 uint16_t max_chunk_size);
+
+        friend class AresFrame;
+
+      private:
+        std::vector<std::vector<uint8_t>> _img_split;
+        size_t _idx = 0;
+        // used for serialization
+        uint64_t _num_chunks = 1;
+        bool _preprocessed = false;
+        uint16_t _max_chunk_size = 29;
+    };
+
+    /**
      * @typedef TxTypes
      *
      * A variant representing all the transmission frame types.
      */
-    using TxTypes = std::variant<std::monostate, Setting, Start, LoraConfig,
-                                 Led, Heartbeat, Claim, Log, Version>;
+    using TxTypes =
+        std::variant<std::monostate, Setting, Start, LoraConfig, Led, Heartbeat,
+                     Claim, Log, Version, BleState, BleChunk, BleImage>;
 
     /**
      * @typedef RxTypes
      *
      * A variant representing all the reception frame types.
      */
-    using RxTypes = std::variant<std::monostate, Setting, Start, AckErrorCode,
-                                 FramingError, Led, Heartbeat, Claim, Log,
-                                 Version, LogAck, Dbg, PktRx, PktTx>;
+    using RxTypes =
+        std::variant<std::monostate, Setting, Start, AckErrorCode, FramingError,
+                     Led, Heartbeat, Claim, Log, Version, LogAck, Dbg, PktRx,
+                     PktTx, BleState, BleConnect, BleSubscribed>;
 
     /**
      * @typedef ResponseTypes
@@ -482,7 +609,7 @@ class AresFrame {
      * A variant representing all the response frame types.
      */
     using ResponseTypes = std::variant<std::monostate, Setting, AckErrorCode,
-                                       FramingError, Led, Version>;
+                                       FramingError, Led, Version, BleState>;
 
     /**
      * @struct Decoded
@@ -626,6 +753,7 @@ class AresFrame {
 
     void _preprocess_serialize();
     static void _preprocess_log(Log &payload);
+    static void _preprocess_ble_image(BleImage &payload);
 
     static void _serialize_setting(const Setting &payload,
                                    std::vector<uint8_t> &buffer);
@@ -643,6 +771,12 @@ class AresFrame {
                                std::vector<uint8_t> &buffer);
     static void _serialize_version(const Version &payload,
                                    std::vector<uint8_t> &buffer);
+    static void _serialize_ble_state(const BleState &payload,
+                                     std::vector<uint8_t> &buffer);
+    static void _serialize_ble_chunks(const BleChunk &payload,
+                                      std::vector<uint8_t> &buffer);
+    static void _serialize_ble_image(const BleImage &payload,
+                                     std::vector<uint8_t> &buffer);
 
     void _deserialize_setting(const uint8_t *buf, size_t len);
     void _deserialize_led(const uint8_t *buf, size_t len);
@@ -657,6 +791,9 @@ class AresFrame {
     void _deserialize_dbg(const uint8_t *buf, size_t len);
     void _deserialize_pkt_rx(const uint8_t *buf, size_t len);
     void _deserialize_pkt_tx(const uint8_t *buf, size_t len);
+    void _deserialize_ble_state(const uint8_t *buf, size_t len);
+    void _deserialize_ble_connected(const uint8_t *buf, size_t len);
+    void _deserialize_ble_subscribed(const uint8_t *buf, size_t len);
 };
 
 #endif // ARES_ARES_FRAME_HPP

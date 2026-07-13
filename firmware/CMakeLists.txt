@@ -26,4 +26,9 @@ set(LORA_SRC
         src/lora/packet.c
 )
 
-target_sources(app PRIVATE ${SRC} ${SERIAL_SRC} ${LORA_SRC})
+set(BLE_SRC
+        src/ble/ble.c
+        src/ble/services/ares_service.c
+)
+
+target_sources(app PRIVATE ${SRC} ${SERIAL_SRC} ${LORA_SRC} ${BLE_SRC})

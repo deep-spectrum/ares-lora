@@ -1,0 +1,115 @@
+/**
+ * @file ares_service.h
+ *
+ * @brief
+ *
+ * @date 7/9/26
+ *
+ * @author Tom Schmitz \<tschmitz@andrew.cmu.edu\>
+ */
+
+#ifndef ARES_ARES_SERVICE_H
+#define ARES_ARES_SERVICE_H
+
+#include <zephyr/bluetooth/conn.h>
+#include <zephyr/bluetooth/uuid.h>
+
+/**
+ * @brief Ares service UUID.
+ *
+ * f2765f1d-d570-48cf-a6b7-985ff6af492c
+ */
+#define BT_UUID_ARES_SRV_VAL                                                   \
+    BT_UUID_128_ENCODE(0xf2765f1d, 0xd570, 0x48cf, 0xa6b7, 0x985ff6af492c)
+
+/**
+ * @brief Ares number of chunks UUID.
+ */
+#define BT_UUID_ARES_SRV_CHUNKS_VAL                                            \
+    BT_UUID_128_ENCODE(0xf2765f1e, 0xd570, 0x48cf, 0xa6b7, 0x985ff6af492c)
+
+/**
+ * @brief Ares image UUID.
+ */
+#define BT_UUID_ARES_SRV_IMAGE_VAL                                             \
+    BT_UUID_128_ENCODE(0xf2765f1f, 0xd570, 0x48cf, 0xa6b7, 0x985ff6af492c)
+
+#define BT_UUID_ARES_SRV        BT_UUID_DECLARE_128(BT_UUID_ARES_SRV_VAL)
+#define BT_UUID_ARES_SRV_CHUNKS BT_UUID_DECLARE_128(BT_UUID_ARES_SRV_CHUNKS_VAL)
+#define BT_UUID_ARES_SRV_IMAGE  BT_UUID_DECLARE_128(BT_UUID_ARES_SRV_IMAGE_VAL)
+
+/**
+ * @struct ares_service_cb
+ * @brief Service callback configurations.
+ */
+struct ares_service_cb {
+    /**
+     * @brief Callback for indicating that the chunks characteristic has been
+     * subscribed to.
+     *
+     * @param[in] enabled `true` if subscribed to to, `false` otherwise.
+     */
+    void (*num_chunks_ind_enabled)(bool enabled);
+
+    /**
+     * @brief Callback for indicating that the image characteristic has been
+     * subscribed to.
+     *
+     * @param[in] enabled `true` if subscribed to to, `false` otherwise.
+     */
+    void (*image_ind_enabled)(bool enabled);
+
+    /**
+     * @brief Indication complete callback for chunk characteristic.
+     *
+     * @param[in] conn Pointer to the bt_conn instance the indication was
+     * carried out on.
+     * @param[in] err The error code.
+     */
+    void (*num_chunks_ind_cb)(struct bt_conn *conn, uint8_t err);
+
+    /**
+     * @brief Indication complete callback for image characteristic.
+     *
+     * @param[in] conn Pointer to the bt_conn instance the indication was
+     * carried out on.
+     * @param[in] err The error code.
+     */
+    void (*image_ind_cb)(struct bt_conn *conn, uint8_t err);
+};
+
+/**
+ * Initialize the ares service.
+ *
+ * @param[in] cb Pointer to the callback configuration.
+ *
+ * @return -EINVAL if cb is @p NULL.
+ * @return 0 if no error.
+ */
+int bt_ares_srv_init(const struct ares_service_cb *cb);
+
+/**
+ * Indicate how many chunks are going to be sent.
+ *
+ * @param[in] chunks The value to indicate.
+ *
+ * @return @p -EACCESS if the indication has not been subscribed to
+ * @return @p 0 on success
+ * @return negative error code otherwise.
+ */
+int bt_ares_srv_ind_chunks(uint64_t chunks);
+
+/**
+ * Indicate an image chunk over BLE.
+ *
+ * @param[in] bytes The data to send over BLE.
+ * @param[in] num_bytes The number of bytes that is in the data.
+ *
+ * @return @p -EACCESS if the indication has not been subscribed to
+ * @return @p -EINVAL if @p bytes is @p NULL
+ * @return @p 0 on success
+ * @return negative error code otherwise.
+ */
+int bt_ares_srv_ind_image_chunk(const uint8_t *bytes, size_t num_bytes);
+
+#endif // ARES_ARES_SERVICE_H

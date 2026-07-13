@@ -2,6 +2,7 @@ import serial.tools.list_ports as list_ports
 
 TARGETS = (
     'CMU LoRa',
+    "Zephyr Project USBD sample",
 )
 
 

@@ -275,6 +275,32 @@ class AresSerial {
     py::tuple version();
 
     /**
+     * Retrieve or fetch the BLE radio state.
+     *
+     * @param[in] value The new BLE state. If @p 2, then fetches the current BLE
+     * state.
+     *
+     * @return py::tuple<BleState, ACK'ed error code>
+     */
+    py::tuple ble_state(uint8_t value);
+
+    /**
+     * Force the BLE to terminate the current connection and return to the
+     * advertising state.
+     * @return The ACK'ed error code from the firmware.
+     */
+    int ble_disconnect();
+
+    /**
+     * Send data over BLE.
+     *
+     * @param[in] image The image to send over BLE loaded into RAM.
+     *
+     * @return py::tuple<ACK'ed error code, ...>.
+     */
+    py::tuple ble_send_image(const py::bytes &image);
+
+    /**
      * Register logging redirects.
      *
      * @param[in] dbg Debug message callback.
@@ -351,6 +377,18 @@ class AresSerial {
      * @return tx_count
      */
     uint32_t wait_packet_tx_done_event();
+
+    /**
+     * Wait for a BLE connection event to be received.
+     * @return `true` if a BLE connection was established, `false` otherwise.
+     */
+    bool wait_ble_connection_event();
+
+    /**
+     * Wait for BLE service subscription status changes.
+     * @return tuple[subscription statuses, ...]
+     */
+    py::tuple wait_ble_subscription_event();
 
     /**
      * Throw AresThreadTerminate exceptions in threads waiting on event queues.
@@ -466,7 +504,32 @@ class AresSerial {
     ares::bounded_queue<std::unique_ptr<AresFrame::Log>, 100> _log_event_q;
     ares::bounded_queue<std::unique_ptr<AresFrame::PktRx>, 500> _pkt_rx_event_q;
     ares::bounded_queue<std::unique_ptr<AresFrame::PktTx>, 3> _pkt_tx_event_q;
+    ares::bounded_queue<std::unique_ptr<AresFrame::BleConnect>, 2>
+        _ble_connect_event_q;
+    ares::bounded_queue<std::unique_ptr<AresFrame::BleSubscribed>, 10>
+        _ble_subscribe_event_q;
     bool _stop_event_queues();
+
+    struct BleInfo {
+        struct Subscriptions {
+            bool chunk = false;
+            bool image = false;
+        };
+
+        bool connected = false;
+
+        Subscriptions subscriptions;
+
+        size_t mtu = 0;
+    };
+
+    BleInfo ble_info;
+
+    void _ble_connect_event(const AresFrame::BleConnect &event);
+    void _ble_subscribe_event(const AresFrame::BleSubscribed &event);
+
+    int _ble_send_chunk(uint64_t num_chunks);
+    py::tuple _ble_send_image(const std::vector<uint8_t> &image);
 };
 
 #endif // ARES_ARES_LORA_SERIAL_HPP

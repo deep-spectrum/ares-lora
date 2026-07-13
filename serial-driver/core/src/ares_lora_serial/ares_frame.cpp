@@ -42,6 +42,12 @@ static size_t retrieve_payload_len(const uint8_t *data) {
     return len;
 }
 
+size_t AresFrame::BleImage::num_chunks(const std::vector<uint8_t> &image,
+                                       uint16_t max_chunk_size) {
+    return (image.size() + (static_cast<size_t>(max_chunk_size) - 1)) /
+           static_cast<size_t>(max_chunk_size);
+}
+
 AresFrame::AresFrame(AresFrameType type, TxTypes payload)
     : _direction(TX), _type(type) {
     _tx_payload = std::move(payload);
@@ -151,6 +157,22 @@ void AresFrame::serialize(std::vector<uint8_t> &bytearray) {
         _serialize_version(std::get<Version>(_tx_payload), bytearray);
         break;
     }
+    case BLE_STATE: {
+        _serialize_ble_state(std::get<BleState>(_tx_payload), bytearray);
+        break;
+    }
+    case BLE_CHUNK: {
+        _serialize_ble_chunks(std::get<BleChunk>(_tx_payload), bytearray);
+        break;
+    }
+    case BLE_IMAGE_CHUNK: {
+        _serialize_ble_image(std::get<BleImage>(_tx_payload), bytearray);
+        break;
+    }
+    case BLE_DISCONNECT: {
+        // nop
+        break;
+    }
     default: {
         throw AresFrameError("Invalid type for TX");
     }
@@ -236,6 +258,21 @@ void AresFrame::parse(const std::vector<uint8_t> &bytearray,
     case PKT_TX: {
         _deserialize_pkt_tx(&bytearray[start_index + payload_offset],
                             payload_len);
+        break;
+    }
+    case BLE_STATE: {
+        _deserialize_ble_state(&bytearray[start_index + payload_offset],
+                               payload_len);
+        break;
+    }
+    case BLE_CONNECTED: {
+        _deserialize_ble_connected(&bytearray[start_index + payload_offset],
+                                   payload_len);
+        break;
+    }
+    case BLE_SUBSCRIBED: {
+        _deserialize_ble_subscribed(&bytearray[start_index + payload_offset],
+                                    payload_len);
         break;
     }
     default: {
@@ -326,6 +363,23 @@ uint16_t AresFrame::_payload_size() const {
               sizeof(Version::kernel);
         break;
     }
+    case BLE_STATE: {
+        ret = sizeof(BleState::state);
+        break;
+    }
+    case BLE_CHUNK: {
+        ret = sizeof(BleChunk::num_chunks);
+        break;
+    }
+    case BLE_IMAGE_CHUNK: {
+        BleImage payload = std::get<BleImage>(_tx_payload);
+        ret = payload._img_split[payload._idx].size();
+        break;
+    }
+    case BLE_DISCONNECT: {
+        // nop
+        break;
+    }
     default: {
         throw AresFrameError("Invalid TX type");
     }
@@ -341,6 +395,13 @@ void AresFrame::_preprocess_serialize() {
         _preprocess_log(payload);
         _tx_payload = payload;
         _new_frame = payload._msg_split.size() > (payload._idx + 1);
+        break;
+    }
+    case BLE_IMAGE_CHUNK: {
+        BleImage payload = std::get<BleImage>(_tx_payload);
+        _preprocess_ble_image(payload);
+        _tx_payload = payload;
+        _new_frame = payload._img_split.size() > (payload._idx + 1);
         break;
     }
     default: {
@@ -382,6 +443,35 @@ void AresFrame::_preprocess_log(Log &payload) {
     payload._part = 1;
     payload._idx = 0;
     payload._num_parts = payload._msg_split.size();
+
+    payload._preprocessed = true;
+}
+
+void AresFrame::_preprocess_ble_image(BleImage &payload) {
+    if (payload._preprocessed) {
+        payload._idx++;
+        return;
+    }
+
+    if (payload.image.empty()) {
+        throw AresFrameError("BLE Image message empty");
+    }
+
+    size_t num_chunks =
+        BleImage::num_chunks(payload.image, payload._max_chunk_size);
+
+    payload._img_split.reserve(num_chunks);
+
+    ssize_t start = 0;
+    for (ssize_t i = 0; i < (num_chunks - 1);
+         i++, start += payload._max_chunk_size) {
+        payload._img_split.emplace_back(payload.image.begin() + start,
+                                        payload.image.begin() + start +
+                                            payload._max_chunk_size);
+    }
+
+    payload._img_split.emplace_back(payload.image.begin() + start,
+                                    payload.image.end());
 
     payload._preprocessed = true;
 }
@@ -468,6 +558,22 @@ void AresFrame::_serialize_version(const Version &payload,
     SERIALIZE(app);
     SERIALIZE(ncs);
     SERIALIZE(kernel);
+}
+
+void AresFrame::_serialize_ble_state(const BleState &payload,
+                                     std::vector<uint8_t> &buffer) {
+    SERIALIZE(state);
+}
+
+void AresFrame::_serialize_ble_chunks(const BleChunk &payload,
+                                      std::vector<uint8_t> &buffer) {
+    SERIALIZE(num_chunks);
+}
+
+void AresFrame::_serialize_ble_image(const BleImage &payload,
+                                     std::vector<uint8_t> &buffer) {
+    buffer.insert(buffer.end(), payload._img_split[payload._idx].begin(),
+                  payload._img_split[payload._idx].end());
 }
 
 #define Z_DESERIALIZE_INIT_DEFAULT(class_)                                     \
@@ -608,5 +714,29 @@ void AresFrame::_deserialize_pkt_tx(const uint8_t *buf, size_t len) {
     ARG_UNUSED(len);
     DESERIALIZE_INIT(PktTx);
     DESERIALIZE(count);
+    DESERIALIZE_FINALIZE();
+}
+
+void AresFrame::_deserialize_ble_state(const uint8_t *buf, size_t len) {
+    ARG_UNUSED(len);
+    DESERIALIZE_INIT(BleState);
+    DESERIALIZE(state);
+    DESERIALIZE_FINALIZE();
+}
+
+void AresFrame::_deserialize_ble_connected(const uint8_t *buf, size_t len) {
+    ARG_UNUSED(len);
+    DESERIALIZE_INIT(BleConnect);
+    DESERIALIZE(connected);
+    DESERIALIZE(chunk_size);
+    DESERIALIZE_FINALIZE();
+}
+
+void AresFrame::_deserialize_ble_subscribed(const uint8_t *buf, size_t len) {
+    ARG_UNUSED(len);
+    DESERIALIZE_INIT(BleSubscribed);
+    DESERIALIZE_SET(chunk, (buf[0] & 1) != 0);
+    DESERIALIZE_SET(image, (buf[0] & 2) != 0);
+    DESERIALIZE_SET_ADVANCE(1);
     DESERIALIZE_FINALIZE();
 }

@@ -99,6 +99,19 @@ static size_t calculate_frame_length(const struct ares_frame *frame) {
         payload_len = FSIZEOF_FIELD(PKT_TX);
         break;
     }
+    case ARES_FRAME_BLE_STATE: {
+        payload_len = FSIZEOF_FIELD(BLE_STATE);
+        break;
+    }
+    case ARES_FRAME_BLE_CONNECTED: {
+        payload_len = FSIZEOF_FIELD(BLE_CONNECTED.connected) +
+                      FSIZEOF_FIELD(BLE_CONNECTED.mtu_size);
+        break;
+    }
+    case ARES_FRAME_BLE_SUBSCRIBED: {
+        payload_len = FSIZEOF_FIELD(BLE_SUBSCRIBED);
+        break;
+    }
     default: {
         __ASSERT(false, "Invalid frame type received");
         break;
@@ -213,6 +226,19 @@ static void serialize(uint8_t *buf, const struct ares_frame *frame,
     }
     case ARES_FRAME_PKT_TX: {
         FSERIALIZE(PKT_TX);
+        break;
+    }
+    case ARES_FRAME_BLE_STATE: {
+        FSERIALIZE(BLE_STATE);
+        break;
+    }
+    case ARES_FRAME_BLE_CONNECTED: {
+        FSERIALIZE(BLE_CONNECTED.connected);
+        FSERIALIZE(BLE_CONNECTED.mtu_size);
+        break;
+    }
+    case ARES_FRAME_BLE_SUBSCRIBED: {
+        FSERIALIZE(BLE_SUBSCRIBED);
         break;
     }
     default:
@@ -334,6 +360,23 @@ static void deserialize(struct ares_frame *frame, const uint8_t *buf) {
     case ARES_FRAME_VERSION: {
         // nop: This is a request so it doesn't make sense to look at the
         // payload
+        break;
+    }
+    case ARES_FRAME_BLE_STATE: {
+        FDESERIALIZE(BLE_STATE);
+        break;
+    }
+    case ARES_FRAME_BLE_DISCONNECT: {
+        // nop: Nothing to deserialize.
+        break;
+    }
+    case ARES_FRAME_BLE_CHUNKS: {
+        FDESERIALIZE(BLE_CHUNKS);
+        break;
+    }
+    case ARES_FRAME_BLE_IMAGE_CHUNK: {
+        FDESERIALIZE_BUF(BLE_IMAGE_CHUNK.buf, const uint8_t *,
+                         BLE_IMAGE_CHUNK.len);
         break;
     }
     default: {
