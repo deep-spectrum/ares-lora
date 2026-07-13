@@ -274,10 +274,30 @@ class AresSerial {
      */
     py::tuple version();
 
+    /**
+     * Retrieve or fetch the BLE radio state.
+     *
+     * @param[in] value The new BLE state. If @p 2, then fetches the current BLE
+     * state.
+     *
+     * @return py::tuple<BleState, ACK'ed error code>
+     */
     py::tuple ble_state(uint8_t value);
 
+    /**
+     * Force the BLE to terminate the current connection and return to the
+     * advertising state.
+     * @return The ACK'ed error code from the firmware.
+     */
     int ble_disconnect();
 
+    /**
+     * Send data over BLE.
+     *
+     * @param[in] image The image to send over BLE loaded into RAM.
+     *
+     * @return py::tuple<ACK'ed error code, ...>.
+     */
     py::tuple ble_send_image(const py::bytes &image);
 
     /**
@@ -358,8 +378,16 @@ class AresSerial {
      */
     uint32_t wait_packet_tx_done_event();
 
+    /**
+     * Wait for a BLE connection event to be received.
+     * @return `true` if a BLE connection was established, `false` otherwise.
+     */
     bool wait_ble_connection_event();
 
+    /**
+     * Wait for BLE service subscription status changes.
+     * @return tuple[subscription statuses, ...]
+     */
     py::tuple wait_ble_subscription_event();
 
     /**
