@@ -10,22 +10,28 @@ described as follows:
 | Value        |   ^    |       n        | ...  |   ...   |   @    |
 
 
-| Type          | Value | Direction | Description                                                                      |
-|:--------------|:-----:|:---------:|:---------------------------------------------------------------------------------|
-| SETTING       |   0   |   TX/RX   | Configure or read persistent firmware settings                                   |
-| START         |   1   |   TX/RX   | Time to start I/Q data collection                                                |
-| LORA_CONFIG   |   2   |    RX     | Set new LoRa modem configurations                                                |
-| LED           |   3   |   TX/RX   | Set or read the LED state/action                                                 |
-| HEARTBEAT     |   4   |   TX/RX   | Heartbeat indicating that the node is working and if it is ready to collect data |
-| CLAIM         |   5   |   TX/RX   | Claim master node request                                                        |
-| LOG           |   6   |   TX/RX   | Logging message                                                                  |
-| LOG_ACK       |   7   |    TX     | Logging message received acknowledgement                                         |
-| VERSION       |   8   |   TX/RX   | Firmware versions                                                                |
-| ACK           |   9   |    TX     | Frame acknowledgement                                                            |
-| FRAMING_ERROR |  10   |    TX     | Framing error (internal error)                                                   |
-| DBG           |  11   |    TX     | Firmware debugging message                                                       |
-| PKT_RX        |  12   |    TX     | Notification from firmware that indicates a LoRa packet was received             |
-| PKT_TX        |  13   |    TX     | Notification from firmware that indicates how many packets were sent over LoRa   |
+| Type             | Value | Direction | Description                                                                      |
+|:-----------------|:-----:|:---------:|:---------------------------------------------------------------------------------|
+| SETTING          |   0   |   TX/RX   | Configure or read persistent firmware settings                                   |
+| START            |   1   |   TX/RX   | Time to start I/Q data collection                                                |
+| LORA_CONFIG      |   2   |    RX     | Set new LoRa modem configurations                                                |
+| LED              |   3   |   TX/RX   | Set or read the LED state/action                                                 |
+| HEARTBEAT        |   4   |   TX/RX   | Heartbeat indicating that the node is working and if it is ready to collect data |
+| CLAIM            |   5   |   TX/RX   | Claim master node request                                                        |
+| LOG              |   6   |   TX/RX   | Logging message                                                                  |
+| LOG_ACK          |   7   |    TX     | Logging message received acknowledgement                                         |
+| VERSION          |   8   |   TX/RX   | Firmware versions                                                                |
+| ACK              |   9   |    TX     | Frame acknowledgement                                                            |
+| FRAMING_ERROR    |  10   |    TX     | Framing error (internal error)                                                   |
+| DBG              |  11   |    TX     | Firmware debugging message                                                       |
+| PKT_RX           |  12   |    TX     | Notification from firmware that indicates a LoRa packet was received             |
+| PKT_TX           |  13   |    TX     | Notification from firmware that indicates how many packets were sent over LoRa   |
+| BLE_STATE        |  14   |   TX/RX   | Set or read the BLE state                                                        |
+| BLE_CONNECTED    |  15   |    TX     | BLE connection state has changed                                                 |
+| BLE_DISCONNECT   |  16   |    RX     | Terminate BLE connection from the peripheral side                                |
+| BLE_SUBSCRIPTION |  17   |    TX     | BLE attribute subscription status has changed                                    |
+| BLE_CHUNKS       |  18   |    RX     | Write to the BLE chunks attribute                                                |
+| BLE_IMAGE        |  19   |    RX     | Write to the BLE image chunk attribute                                           |
 
 !!! note
 
@@ -328,3 +334,80 @@ The payload is structured as follows:
 | __Type__  | `uint32_t` |
 
 * __Payload size__: 4 bytes
+
+## BLE_STATE Frame
+
+The BLE state frame is used to either get the current state of the BLE radio or to set a new state of the BLE radio. The
+payload is structured as follows:
+
+|           |           |
+|-----------|:---------:|
+| __Field__ |   State   |
+| __Type__  | `uint8_t` |
+
+| State/Action | Value | Description                              |
+|:-------------|:-----:|:-----------------------------------------|
+| OFF          |   0   | Turn BLE off.                            |
+| ON           |   1   | Turn BLE on.                             |
+| REQUEST      |   2   | Request the current BLE state. (RX only) |
+
+* __Payload size__: 1 byte
+
+## BLE_CONNECTED
+
+The BLE connected frame is a notification from the firmware that the BLE connection status has changed. The payload is 
+structured as follows:
+
+|           |           |            |
+|-----------|:---------:|:----------:|
+| __Field__ | Connected |  MTU Size  |
+| __Type__  |  `bool`   | `uint16_t` |
+
+* __Payload size__: 3 bytes
+
+## BLE_DISCONNECT
+
+The BLE disconnect frame is used to tell the firmware to disconnect the current BLE connection and return back to 
+advertising. There is no payload associated with this frame.
+
+* __Payload size__: 0 bytes
+
+## BLE_SUBSCRIBED
+
+The BLE subscribed frame is a notification from the firmware that the BLE attribute subscription statuses have changed.
+The payload is structured as follows:
+
+|           |               |
+|-----------|:-------------:|
+| __Field__ | Subscriptions |
+| __Type__  |   `uint8_t`   |
+
+| Field         | Description                                                                                            |
+|:--------------|:-------------------------------------------------------------------------------------------------------|
+| Subscriptions | `bit 0`: chunks subscribed status <br> `bit 1`: image chunk subscribed status <br> `bit 7:2`: Reserved |
+
+## BLE_CHUNKS
+
+The BLE chunks frame is used to write to the chunks attribute in the BLE service. The payload is structured as follows:
+
+|           |            |
+|-----------|:----------:|
+| __Field__ |   Chunks   |
+| __Type__  | `uint64_t` |
+
+* __Payload size__: 8 bytes
+
+## BLE_IMAGE
+
+The BLE image frame is used to write to the image chunk attribute in the BLE service. The payload is structured as follows:
+
+|           |             |
+|-----------|:-----------:|
+| __Field__ |    Data     |
+| __Type__  | `uint8_t[]` |
+
+* __Payload size__: n bytes
+
+!!! note
+
+    The payload length must not exceed the MTU Size field in [BLE_CONNECTED frame](#ble_connected).
