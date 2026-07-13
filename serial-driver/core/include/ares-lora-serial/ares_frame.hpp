@@ -13,7 +13,6 @@
 
 #include <cstdint>
 #include <exception>
-#include <span>
 #include <string>
 #include <sys/types.h>
 #include <tuple>
@@ -577,12 +576,12 @@ class AresFrame {
         friend class AresFrame;
 
       private:
-        std::vector<std::span<uint8_t>> _img_split;
+        std::vector<std::vector<uint8_t>> _img_split;
         size_t _idx = 0;
         // used for serialization
         uint64_t _num_chunks = 1;
         bool _preprocessed = false;
-        size_t _max_chunk_size = 29;
+        uint16_t _max_chunk_size = 29;
     };
 
     /**

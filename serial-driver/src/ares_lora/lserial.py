@@ -589,8 +589,8 @@ class LoraSerial:
 
     @lora_serial_command
     def ble_send_file(self, f: bytes):
-        ret = self._dev.ble_send_image(f)
-        self._check_ret_code(ret)
+        codes = self._dev.ble_send_image(f)
+        self._check_ret_code(codes)
 
     def wait_connection_changed_event(self, block: bool, timeout: float) -> bool:
         return self._ble_connect_events.get(block, timeout)

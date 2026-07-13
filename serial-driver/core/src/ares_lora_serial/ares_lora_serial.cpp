@@ -584,7 +584,7 @@ int AresSerial::ble_disconnect() {
     return ret;
 }
 
-int AresSerial::ble_send_image(const py::bytes &image) {
+py::tuple AresSerial::ble_send_image(const py::bytes &image) {
     LOG_DBG("Attempting to transfer image");
     py::buffer_info info(py::buffer(image).request());
     auto *data = static_cast<const uint8_t *>(info.ptr);
@@ -595,10 +595,10 @@ int AresSerial::ble_send_image(const py::bytes &image) {
         _ble_send_chunk(AresFrame::BleImage::num_chunks(image_, ble_info.mtu));
 
     if (ret != 0) {
-        return ret;
+        return py::make_tuple(ret);
     }
 
-    return 0;
+    return _ble_send_image(image_);
 }
 
 void AresSerial::register_logger_callbacks(
@@ -1210,4 +1210,36 @@ int AresSerial::_ble_send_chunk(uint64_t num_chunks) {
     }
 
     return ret;
+}
+
+py::tuple AresSerial::_ble_send_image(const std::vector<uint8_t> &image) {
+    _check_crash();
+    LOG_DBG("BLE image command received");
+    LOG_DBG_HEXDUMP(image, image.size(), "Bytes to send");
+    AresFrame frame(AresFrame::BLE_IMAGE_CHUNK,
+                    AresFrame::BleImage(image, ble_info.mtu));
+    std::vector<AresResponse> responses;
+
+    _send_multi_frame(frame, _response_timeout, responses);
+
+    std::vector<int> ret;
+
+    for (auto &response : responses) {
+        switch (response.type) {
+        case AresResponse::ACK: {
+            ret.emplace_back(
+                std::get<AresFrame::AckErrorCode>(response.payload));
+            break;
+        }
+        case AresResponse::BAD_FRAME: {
+            _handle_bad_frame(response);
+            break;
+        }
+        default: {
+            throw std::runtime_error("Received invalid response");
+        }
+        }
+    }
+
+    return ares::array_to_tuple(ret.data(), ret.size());
 }
