@@ -13,6 +13,7 @@
 
 #include <cstdint>
 #include <exception>
+#include <span>
 #include <string>
 #include <sys/types.h>
 #include <tuple>
@@ -552,7 +553,44 @@ class AresFrame {
      * Payload data for AresFrame::BLE_IMAGE_CHUNK frames.
      */
     struct BleImage {
-        // todo
+        /**
+         * Constructor.
+         * @param[in] bytes The bytes in the image.
+         * @param[in] max_chunk_size The maximum chunk size for a single
+         * transfer. This is usually the MTU or less.
+         */
+        BleImage(const std::vector<uint8_t> &bytes, uint16_t max_chunk_size)
+            : image(bytes), _max_chunk_size(max_chunk_size) {}
+
+        /**
+         * Constructor.
+         */
+        BleImage() = default;
+
+        /**
+         * The image bytes.
+         */
+        std::vector<uint8_t> image;
+
+        /**
+         * Helper for calculating the number of chunks needed to transfer an
+         * image.
+         * @param[in] image The image representation in memory.
+         * @param[in] max_chunk_size The maximum chunk size.
+         * @return The number of chunks needed to transfer the entire image.
+         */
+        static size_t num_chunks(const std::vector<uint8_t> &image,
+                                 uint16_t max_chunk_size);
+
+        friend class AresFrame;
+
+      private:
+        std::vector<std::span<uint8_t>> _img_split;
+        size_t _idx = 0;
+        // used for serialization
+        uint64_t _num_chunks = 1;
+        bool _preprocessed = false;
+        size_t _max_chunk_size = 29;
     };
 
     /**
@@ -724,6 +762,7 @@ class AresFrame {
 
     void _preprocess_serialize();
     static void _preprocess_log(Log &payload);
+    static void _preprocess_ble_image(BleImage &payload);
 
     static void _serialize_setting(const Setting &payload,
                                    std::vector<uint8_t> &buffer);

@@ -42,6 +42,12 @@ static size_t retrieve_payload_len(const uint8_t *data) {
     return len;
 }
 
+size_t AresFrame::BleImage::num_chunks(const std::vector<uint8_t> &image,
+                                       uint16_t max_chunk_size) {
+    return (image.size() + (static_cast<size_t>(max_chunk_size) - 1)) /
+           static_cast<size_t>(max_chunk_size);
+}
+
 AresFrame::AresFrame(AresFrameType type, TxTypes payload)
     : _direction(TX), _type(type) {
     _tx_payload = std::move(payload);
@@ -160,7 +166,7 @@ void AresFrame::serialize(std::vector<uint8_t> &bytearray) {
         break;
     }
     case BLE_IMAGE_CHUNK: {
-        throw AresFrameError("Not implemented");
+        _serialize_ble_image(std::get<BleImage>(_tx_payload), bytearray);
         break;
     }
     case BLE_DISCONNECT: {
@@ -366,7 +372,8 @@ uint16_t AresFrame::_payload_size() const {
         break;
     }
     case BLE_IMAGE_CHUNK: {
-        // TODO:
+        BleImage payload = std::get<BleImage>(_tx_payload);
+        ret = payload._img_split[payload._idx].size();
         break;
     }
     case BLE_DISCONNECT: {
@@ -388,6 +395,13 @@ void AresFrame::_preprocess_serialize() {
         _preprocess_log(payload);
         _tx_payload = payload;
         _new_frame = payload._msg_split.size() > (payload._idx + 1);
+        break;
+    }
+    case BLE_IMAGE_CHUNK: {
+        BleImage payload = std::get<BleImage>(_tx_payload);
+        _preprocess_ble_image(payload);
+        _tx_payload = payload;
+        _new_frame = payload._img_split.size() > (payload._idx + 1);
         break;
     }
     default: {
@@ -429,6 +443,32 @@ void AresFrame::_preprocess_log(Log &payload) {
     payload._part = 1;
     payload._idx = 0;
     payload._num_parts = payload._msg_split.size();
+
+    payload._preprocessed = true;
+}
+
+void AresFrame::_preprocess_ble_image(BleImage &payload) {
+    if (payload._preprocessed) {
+        payload._idx++;
+        return;
+    }
+
+    if (payload.image.empty()) {
+        throw AresFrameError("BLE Image message empty");
+    }
+
+    size_t num_chunks =
+        BleImage::num_chunks(payload.image, payload._max_chunk_size);
+
+    payload._img_split.reserve(num_chunks);
+    std::span full_span(payload.image);
+
+    for (size_t i = 0; i < num_chunks; i++) {
+        std::span<uint8_t> chunk;
+        chunk = full_span.subspan(i * payload._max_chunk_size,
+                                  payload._max_chunk_size);
+        payload._img_split.emplace_back(chunk);
+    }
 
     payload._preprocessed = true;
 }
@@ -529,7 +569,8 @@ void AresFrame::_serialize_ble_chunks(const BleChunk &payload,
 
 void AresFrame::_serialize_ble_image(const BleImage &payload,
                                      std::vector<uint8_t> &buffer) {
-    // todo
+    buffer.insert(buffer.end(), payload._img_split[payload._idx].begin(),
+                  payload._img_split[payload._idx].end());
 }
 
 #define Z_DESERIALIZE_INIT_DEFAULT(class_)                                     \
