@@ -269,7 +269,7 @@ int ares_set_ble_node(uint32_t node_id) {
         return -EBUSY;
     }
 
-    len = snprintk(adv_name, sizeof(adv_name), "Ares %u", node_id);
+    len = snprintk(adv_name, sizeof(adv_name), "Ares %u", node_id - 1);
     name_data.data_len = len;
     sd[NAME_SD_IDX] = name_data;
 
