@@ -62,8 +62,8 @@ static void handle_poll(const struct ares_lora *lora,
 
     const struct ares_serial *serial = ares_serial_backend_uart_get_ptr();
     struct ares_frame frame = {
-        // todo:
-        .type = ARES_FRAME_HEARTBEAT,
+        .type = ARES_FRAME_POLL,
+        .payload.POLL = packet->source_id,
     };
 
     if (packet->type != ARES_PKT_TYPE_DIRECT) {
