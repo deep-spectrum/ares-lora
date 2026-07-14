@@ -229,11 +229,6 @@ class AresFrame {
         bool ready = false;
 
         /**
-         * The number of times to send the heartbeat.
-         */
-        uint8_t tx_cnt = 0;
-
-        /**
          * The destination for the heartbeat.
          */
         uint16_t id = 0;

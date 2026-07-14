@@ -1021,7 +1021,7 @@ void AresSerial::_heartbeat_handler(ares::Work *work) {
 void AresSerial::_send_heartbeat(uint16_t id, bool ready) {
     AresFrame frame{
         AresFrame::HEARTBEAT,
-        AresFrame::Heartbeat{ready, 1, id},
+        AresFrame::Heartbeat{ready, id},
     };
     AresResponse response;
 

@@ -349,8 +349,7 @@ uint16_t AresFrame::_payload_size() const {
         break;
     }
     case HEARTBEAT: {
-        ret = sizeof(Heartbeat::tx_cnt) + sizeof(Heartbeat::id) +
-              sizeof(uint8_t); // flags are bit-packed
+        ret = sizeof(Heartbeat::id) + sizeof(uint8_t); // flags are bit-packed
         break;
     }
     case LOG: {
@@ -529,7 +528,6 @@ void AresFrame::_serialize_heartbeat(const Heartbeat &payload,
     }
 
     buffer.emplace_back(flags);
-    SERIALIZE(tx_cnt);
     SERIALIZE(id);
 }
 
@@ -633,7 +631,6 @@ void AresFrame::_deserialize_heartbeat(const uint8_t *buf, size_t len) {
     DESERIALIZE_INIT(Heartbeat, 1);
     DESERIALIZE_SET(ready, (buf[0] & 1) != 0);
     // No need to advance here. Offset is already set to 1 byte...
-    DESERIALIZE(tx_cnt);
     DESERIALIZE(id);
     DESERIALIZE_FINALIZE();
 }
