@@ -418,10 +418,15 @@ py::tuple AresSerial::send_poll(uint16_t id,
     _check_crash();
     AresFrame frame{AresFrame::POLL, AresFrame::Poll{id}};
 
+    {
+        std::unique_lock lock(_heartbeat_sem);
+        _expected_heartbeat_id = id;
+    }
+
     AresResponse response = _send_frame(frame, _response_timeout);
 
     int ret = -1;
-    AresFrame::Heartbeat heartbeat;
+    bool ready;
 
     switch (response.type) {
     case AresResponse::ACK: {
@@ -437,9 +442,9 @@ py::tuple AresSerial::send_poll(uint16_t id,
     }
     }
 
-    // todo: wait for heartbeat
+    ready = _wait_heartbeat(id, timeout);
 
-    return py::make_tuple(heartbeat.ready, ret);
+    return py::make_tuple(ready, ret);
 }
 
 py::tuple AresSerial::send_log(const std::string &log_msg, bool broadcast,
@@ -964,20 +969,56 @@ void AresSerial::_start_event(const AresFrame::Start &start_frame) {
     put_no_except(start_frame, _start_event_q, 100ms);
 }
 
+bool AresSerial::_wait_heartbeat(uint16_t id,
+                                 const std::chrono::seconds &timeout) {
+    py::gil_scoped_release release;
+    AresFrame::Heartbeat heartbeat;
+    bool timed_out = false;
+    auto now = std::chrono::steady_clock::now;
+
+    auto to_time = now() + timeout;
+    while (id != heartbeat.id && !timed_out) {
+        try {
+            heartbeat = *_heartbeat_event_q.get(
+                std::chrono::duration_cast<std::chrono::milliseconds>(timeout));
+        } catch (const ares::queue_exception &e) {
+            timed_out = e.reason() == ares::queue_exception::QUEUE_TIMEOUT;
+            continue;
+        }
+
+        timed_out = now() > to_time;
+    }
+
+    if (timed_out) {
+        throw AresTimeoutError("Timed out waiting for a heartbeat response");
+    }
+
+    return heartbeat.id;
+}
+
 void AresSerial::_heartbeat_event(const AresFrame::Heartbeat &heartbeat) {
     LOG_INF("Heartbeat received from %d", heartbeat.id);
+    {
+        std::unique_lock lock(_heartbeat_sem);
+        if (heartbeat.id != _expected_heartbeat_id) {
+            LOG_WRN("Late heartbeat received or spurious heartbeat received");
+            return;
+        }
+    }
+
     put_no_except(heartbeat, _heartbeat_event_q, 100ms);
 }
 
 void AresSerial::_heartbeat_handler(ares::Work *work) {
     HeartbeatWork *hwork = ares::container_of(work, &HeartbeatWork::work);
     uint16_t id = hwork->id;
+    bool ready = hwork->ready;
     hwork->sem.unlock();
-    hwork->obj->_send_heartbeat(id);
+    hwork->obj->_send_heartbeat(id, ready);
 }
 
 // ReSharper disable once CppDFAUnreachableFunctionCall
-void AresSerial::_send_heartbeat(uint16_t id) {
+void AresSerial::_send_heartbeat(uint16_t id, bool ready) {
     AresFrame frame{
         AresFrame::HEARTBEAT,
         AresFrame::Heartbeat{ready, 1, id},

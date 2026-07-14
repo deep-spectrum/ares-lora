@@ -437,16 +437,19 @@ class AresSerial {
         ares::Work work;
         AresSerial *obj;
         uint16_t id = 0;
+        bool ready = false; // todo: make setter for this in parent class
         ares::semaphore<> sem{};
     };
 
+    ares::semaphore<> _heartbeat_sem;
+    uint16_t _expected_heartbeat_id = 0;
+    bool _wait_heartbeat(uint16_t id, const std::chrono::seconds &timeout);
     void _heartbeat_event(const AresFrame::Heartbeat &heartbeat);
 
     void _poll_event(const AresFrame::Poll &poll);
     static void _heartbeat_handler(ares::Work *work);
     HeartbeatWork _heartbeat_work;
-    bool ready = false; // todo: make setter for this
-    void _send_heartbeat(uint16_t id);
+    void _send_heartbeat(uint16_t id, bool ready);
 
     ares::SpinLock _log_spinlock;
     uint16_t _log_id = 0;
@@ -474,7 +477,7 @@ class AresSerial {
     void _packet_tx_event(const AresFrame::PktTx &msg);
 
     ares::bounded_queue<std::unique_ptr<AresFrame::Start>, 5> _start_event_q;
-    ares::bounded_queue<std::unique_ptr<AresFrame::Heartbeat>, 10>
+    ares::bounded_queue<std::unique_ptr<AresFrame::Heartbeat>, 5>
         _heartbeat_event_q;
     ares::bounded_queue<std::unique_ptr<AresFrame::Poll>, 5> _poll_event_q;
     ares::bounded_queue<std::unique_ptr<AresFrame::Log>, 100> _log_event_q;
