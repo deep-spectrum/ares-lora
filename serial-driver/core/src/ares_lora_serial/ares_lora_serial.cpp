@@ -973,7 +973,40 @@ void AresSerial::_heartbeat_handler(ares::Work *work) {
     HeartbeatWork *hwork = ares::container_of(work, &HeartbeatWork::work);
     uint16_t id = hwork->id;
     hwork->sem.unlock();
-    // TODO: send heartbeat frame
+    hwork->obj->_send_heartbeat(id);
+}
+
+// ReSharper disable once CppDFAUnreachableFunctionCall
+void AresSerial::_send_heartbeat(uint16_t id) {
+    AresFrame frame{
+        AresFrame::HEARTBEAT,
+        AresFrame::Heartbeat{ready, 1, id},
+    };
+    AresResponse response;
+
+    try {
+        response =
+            _send_frame_released(frame, std::chrono::milliseconds::max());
+    } catch (const std::exception &e) {
+        LOG_ERR("_send_frame_released(): %s", e.what());
+        return;
+    }
+
+    switch (response.type) {
+    case AresResponse::ACK: {
+        LOG_DBG("Send heartbeat ACK'ed: %d",
+                std::get<AresFrame::AckErrorCode>(response.payload));
+        break;
+    }
+    case AresResponse::BAD_FRAME: {
+        LOG_ERR("Bad frame response received in heartbeat handler");
+        break;
+    }
+    default: {
+        LOG_ERR("Received invalid response");
+        break;
+    }
+    }
 }
 
 void AresSerial::_poll_event(const AresFrame::Poll &poll) {

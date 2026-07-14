@@ -441,10 +441,12 @@ class AresSerial {
     };
 
     void _heartbeat_event(const AresFrame::Heartbeat &heartbeat);
-    static void _heartbeat_handler(ares::Work *work);
-    HeartbeatWork _heartbeat_work;
 
     void _poll_event(const AresFrame::Poll &poll);
+    static void _heartbeat_handler(ares::Work *work);
+    HeartbeatWork _heartbeat_work;
+    bool ready = false; // todo: make setter for this
+    void _send_heartbeat(uint16_t id);
 
     ares::SpinLock _log_spinlock;
     uint16_t _log_id = 0;
