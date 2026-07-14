@@ -64,7 +64,7 @@ class AresFrame {
         LORA_CONFIG = 2,    ///< LoRa modem configuration (TX)
         LED = 3,            ///< LED state get/set (TX/RX)
         HEARTBEAT = 4,      ///< Send heartbeat (TX/RX)
-        CLAIM = 5,          ///< Master claim (TX/RX)
+        POLL = 5,           ///< Poll a node for a heartbeat (TX/RX)
         LOG = 6,            ///< Log message (TX/RX)
         LOG_ACK = 7,        ///< Log acknowledge (RX)
         VERSION = 8,        ///< Firmware version (TX/RX)
@@ -229,11 +229,6 @@ class AresFrame {
         bool ready = false;
 
         /**
-         * Broadcast the heartbeat frame.
-         */
-        bool broadcast = false;
-
-        /**
          * The number of times to send the heartbeat.
          */
         uint8_t tx_cnt = 0;
@@ -245,14 +240,14 @@ class AresFrame {
     };
 
     /**
-     * @struct Claim
+     * @struct Poll
      *
-     * Data for AresFrame::CLAIM frames.
+     * Data for AresFrame::POLL frames.
      */
-    struct Claim {
+    struct Poll {
         /**
-         * When transmitting, the ID of the node to send the claim notification
-         * to. When receiving, the claimed master node ID.
+         * When transmitting, the ID of the node to poll for a heartbeat. When
+         * receiving, the source of the poll message.
          */
         uint16_t id = 0;
     };
@@ -591,7 +586,7 @@ class AresFrame {
      */
     using TxTypes =
         std::variant<std::monostate, Setting, Start, LoraConfig, Led, Heartbeat,
-                     Claim, Log, Version, BleState, BleChunk, BleImage>;
+                     Poll, Log, Version, BleState, BleChunk, BleImage>;
 
     /**
      * @typedef RxTypes
@@ -600,7 +595,7 @@ class AresFrame {
      */
     using RxTypes =
         std::variant<std::monostate, Setting, Start, AckErrorCode, FramingError,
-                     Led, Heartbeat, Claim, Log, Version, LogAck, Dbg, PktRx,
+                     Led, Heartbeat, Poll, Log, Version, LogAck, Dbg, PktRx,
                      PktTx, BleState, BleConnect, BleSubscribed>;
 
     /**
@@ -765,8 +760,8 @@ class AresFrame {
                                std::vector<uint8_t> &buffer);
     static void _serialize_heartbeat(const Heartbeat &payload,
                                      std::vector<uint8_t> &buffer);
-    static void _serialize_claim(const Claim &payload,
-                                 std::vector<uint8_t> &buffer);
+    static void _serialize_poll(const Poll &payload,
+                                std::vector<uint8_t> &buffer);
     static void _serialize_log(const Log &payload,
                                std::vector<uint8_t> &buffer);
     static void _serialize_version(const Version &payload,
@@ -782,7 +777,7 @@ class AresFrame {
     void _deserialize_led(const uint8_t *buf, size_t len);
     void _deserialize_start(const uint8_t *buf, size_t len);
     void _deserialize_heartbeat(const uint8_t *buf, size_t len);
-    void _deserialize_claim(const uint8_t *buf, size_t len);
+    void _deserialize_poll(const uint8_t *buf, size_t len);
     void _deserialize_log(const uint8_t *buf, size_t len);
     void _deserialize_log_ack(const uint8_t *buf, size_t len);
     void _deserialize_version(const uint8_t *buf, size_t len);
