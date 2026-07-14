@@ -255,8 +255,7 @@ static void handle_heartbeat(const struct ares_serial *serial,
                         .ready = frame->payload.HEARTBEAT.flags.ready,
                     }}};
 
-    send_lora_transmission(serial, frame, &packet,
-                           frame->payload.HEARTBEAT.tx_count);
+    send_lora_transmission(serial, frame, &packet, 1);
 }
 
 static void handle_poll(const struct ares_serial *serial,

@@ -145,7 +145,6 @@ struct ares_frame {
                 uint8_t ready : 1;
                 uint8_t padding : 7;
             } flags;
-            uint8_t tx_count;
             uint16_t id;
         } HEARTBEAT; ///< ARES_FRAME_HEARTBEAT
 
