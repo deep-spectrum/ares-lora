@@ -447,6 +447,12 @@ py::tuple AresSerial::send_poll(uint16_t id,
     return py::make_tuple(ready, ret);
 }
 
+void AresSerial::ready(bool new_state) {
+    py::gil_scoped_release release;
+    std::unique_lock lock(_heartbeat_work.sem);
+    _heartbeat_work.ready = new_state;
+}
+
 py::tuple AresSerial::send_log(const std::string &log_msg, bool broadcast,
                                uint8_t tx_cnt, uint16_t id) {
     std::unique_lock lock_(_log_spinlock);
@@ -736,6 +742,12 @@ py::tuple AresSerial::wait_start_event() {
     wait_event_queue_released(event, _start_event_q);
     return py::make_tuple(event.sec, event.usec, event.id, event.broadcast,
                           event.seq_cnt, event.packet_id);
+}
+
+uint16_t AresSerial::wait_poll_event() {
+    AresFrame::Poll event;
+    wait_event_queue_released(event, _poll_event_q);
+    return event.id;
 }
 
 py::tuple AresSerial::wait_log_event() {

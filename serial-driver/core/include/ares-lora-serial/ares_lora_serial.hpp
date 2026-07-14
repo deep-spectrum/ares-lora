@@ -235,6 +235,8 @@ class AresSerial {
 
     py::tuple send_poll(uint16_t id, const std::chrono::seconds &timeout);
 
+    void ready(bool new_state);
+
     /**
      * Send a logging message over the LoRa network.
      * @param log_msg The log message to send.
@@ -336,6 +338,8 @@ class AresSerial {
      * @return tuple[seconds, useconds, src_id, broadcast, seq_cnt, packet_id]
      */
     py::tuple wait_start_event();
+
+    uint16_t wait_poll_event();
 
     /**
      * Wait for a log message to be received.
