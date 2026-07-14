@@ -56,7 +56,8 @@ static void handle_start(const struct ares_lora *lora,
     ares_serial_write_frame(serial, &frame);
 }
 
-static void handle_poll(const struct ares_lora *lora, const struct ares_packet *packet) {
+static void handle_poll(const struct ares_lora *lora,
+                        const struct ares_packet *packet) {
     ARG_UNUSED(lora);
 
     const struct ares_serial *serial = ares_serial_backend_uart_get_ptr();

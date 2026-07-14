@@ -63,8 +63,8 @@ static size_t calculate_frame_length(const struct ares_frame *frame) {
                       FSIZEOF_FIELD(HEARTBEAT.id);
         break;
     }
-    case ARES_FRAME_CLAIM: {
-        payload_len = FSIZEOF_FIELD(CLAIM);
+    case ARES_FRAME_POLL: {
+        payload_len = FSIZEOF_FIELD(POLL);
         break;
     }
     case ARES_FRAME_LOG: {
@@ -199,8 +199,8 @@ static void serialize(uint8_t *buf, const struct ares_frame *frame,
         FSERIALIZE(HEARTBEAT.id);
         break;
     }
-    case ARES_FRAME_CLAIM: {
-        FSERIALIZE(CLAIM);
+    case ARES_FRAME_POLL: {
+        FSERIALIZE(POLL);
         break;
     }
     case ARES_FRAME_FRAMING_ERROR: {
@@ -343,8 +343,8 @@ static void deserialize(struct ares_frame *frame, const uint8_t *buf) {
         FDESERIALIZE(HEARTBEAT.id);
         break;
     }
-    case ARES_FRAME_CLAIM: {
-        FDESERIALIZE(CLAIM);
+    case ARES_FRAME_POLL: {
+        FDESERIALIZE(POLL);
         break;
     }
     case ARES_FRAME_LOG: {
