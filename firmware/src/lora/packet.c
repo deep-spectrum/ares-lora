@@ -143,7 +143,7 @@ static size_t calculate_packet_size(const struct ares_packet *packet) {
                     PSIZEOF_FIELD(LOG_ACK.log_id);
         break;
     }
-    case ARES_PKT_PAYLOAD_CLAIM: {
+    case ARES_PKT_PAYLOAD_POLL: {
         // nop
         break;
     }
@@ -245,7 +245,7 @@ static void serialize(uint8_t *buf, size_t len,
         PSERIALIZE(LOG_ACK.log_id);
         break;
     }
-    case ARES_PKT_PAYLOAD_CLAIM: {
+    case ARES_PKT_PAYLOAD_POLL: {
         // nop
         break;
     }
@@ -348,7 +348,7 @@ static void deserialize(struct ares_packet *packet, const uint8_t *buf) {
         PDESERIALIZE(LOG_ACK.log_id);
         break;
     }
-    case ARES_PKT_PAYLOAD_CLAIM: {
+    case ARES_PKT_PAYLOAD_POLL: {
         // nop
         break;
     }

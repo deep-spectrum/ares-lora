@@ -110,8 +110,8 @@
  */
 enum ares_packet_payload_type {
     ARES_PKT_PAYLOAD_START = 0,     ///< Start data collection packet.
-    ARES_PKT_PAYLOAD_HEARTBEAT = 1, ///< Heartbeat packet.
-    ARES_PKT_PAYLOAD_CLAIM = 2,     ///< Claim master packet.
+    ARES_PKT_PAYLOAD_POLL = 1,      ///< Poll packet
+    ARES_PKT_PAYLOAD_HEARTBEAT = 2, ///< Heartbeat packet.
     ARES_PKT_PAYLOAD_LOG = 3,       ///< Log packet.
     ARES_PKT_PAYLOAD_LOG_ACK = 4,   ///< Log acknowledge packet.
 
