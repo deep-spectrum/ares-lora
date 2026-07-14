@@ -248,9 +248,7 @@ static void handle_led(const struct ares_serial *serial,
 static void handle_heartbeat(const struct ares_serial *serial,
                              struct ares_frame *frame) {
     struct ares_packet packet = {
-        .type = (frame->payload.HEARTBEAT.flags.broadcast)
-                    ? ARES_PKT_TYPE_BROADCAST
-                    : ARES_PKT_TYPE_DIRECT,
+        .type = ARES_PKT_TYPE_DIRECT,
         .destination_id = frame->payload.HEARTBEAT.id,
         .payload = {.type = ARES_PKT_PAYLOAD_HEARTBEAT,
                     .payload.HEARTBEAT = {
@@ -261,15 +259,15 @@ static void handle_heartbeat(const struct ares_serial *serial,
                            frame->payload.HEARTBEAT.tx_count);
 }
 
-static void handle_claim(const struct ares_serial *serial,
-                         struct ares_frame *frame) {
+static void handle_poll(const struct ares_serial *serial,
+                        struct ares_frame *frame) {
     struct ares_packet packet = {.type = ARES_PKT_TYPE_DIRECT,
-                                 .destination_id = frame->payload.CLAIM,
+                                 .destination_id = frame->payload.POLL,
                                  .payload = {
-                                     .type = ARES_PKT_PAYLOAD_CLAIM,
+                                     .type = ARES_PKT_PAYLOAD_POLL,
                                  }};
 
-    send_lora_transmission(serial, frame, &packet, -1);
+    send_lora_transmission(serial, frame, &packet, 1);
 }
 
 static void handle_log(const struct ares_serial *serial,
@@ -373,7 +371,7 @@ static struct ares_serial_command commands[] = {
     {ARES_FRAME_LORA_CONFIG, handle_lora_config},
     {ARES_FRAME_LED, handle_led},
     {ARES_FRAME_HEARTBEAT, handle_heartbeat},
-    {ARES_FRAME_CLAIM, handle_claim},
+    {ARES_FRAME_POLL, handle_poll},
     {ARES_FRAME_LOG, handle_log},
     {ARES_FRAME_VERSION, handle_version},
     {ARES_FRAME_BLE_STATE, handle_ble_state},
