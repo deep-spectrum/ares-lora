@@ -53,8 +53,6 @@ PYBIND11_MODULE(_ares_lora_serial, m, py::mod_gil_not_used()) {
         .def("lora_config", &AresSerial::lora_config, py::arg("config"))
         .def("led", &AresSerial::led, py::arg("led_id"), py::arg("state"),
              "Retrieve or set the LED state")
-        .def("send_heartbeat", &AresSerial::send_heartbeat, py::arg("ready"),
-             py::arg("tx_cnt"), "Send heartbeat packet")
         .def("send_log", &AresSerial::send_log,
              "Send a logging message over LoRa")
         .def("version", &AresSerial::version, "Retrieve the firmware version")
@@ -74,8 +72,6 @@ PYBIND11_MODULE(_ares_lora_serial, m, py::mod_gil_not_used()) {
              py::arg("timeout"))
         .def("get_response_timeout", &AresSerial::get_response_timeout)
         .def("wait_start_event", &AresSerial::wait_start_event)
-        .def("wait_heartbeat_event", &AresSerial::wait_heartbeat_event)
-        .def("wait_claim_event", &AresSerial::wait_claim_event)
         .def("wait_log_event", &AresSerial::wait_log_event)
         .def("wait_packet_rx_event", &AresSerial::wait_packet_rx_event)
         .def("wait_packet_tx_done_event",
@@ -109,7 +105,7 @@ PYBIND11_MODULE(_ares_lora_serial, m, py::mod_gil_not_used()) {
 
 AresSerialConfigs::AresSerialConfigs(const py::kwargs &kwargs) {
     from_kwargs(kwargs, SP(port), SP(response_timeout), SP(rx_period),
-                SP(serial_timeout), SP(master), SP(alpha), SP(beta));
+                SP(serial_timeout), SP(alpha), SP(beta));
 }
 
 AresLoraConfig::AresLoraConfig(const py::kwargs &kwargs) {
@@ -127,7 +123,7 @@ AresFrame AresLoraConfig::generate_frame() const {
 AresSerial::AresSerial(const AresSerialConfigs &configs)
     : _response_timeout(configs.response_timeout),
       _rx_period(configs.rx_period), _rx_task([this] { _read_serial(); }),
-      _processing_task([this] { _process_frames(); }), _master(configs.master),
+      _processing_task([this] { _process_frames(); }),
       _heartbeat_work(_heartbeat_handler, this),
       _mac_backoff(configs.alpha, configs.beta), _generator(_rd()) {
     SerialInternal::SerialAttributes attr;
@@ -417,18 +413,15 @@ py::tuple AresSerial::led(uint8_t id, uint8_t state) {
     return py::make_tuple(static_cast<uint8_t>(val.state), ret);
 }
 
-int AresSerial::send_heartbeat(bool ready, uint8_t tx_cnt) {
+py::tuple AresSerial::send_poll(uint16_t id,
+                                const std::chrono::seconds &timeout) {
     _check_crash();
-    if (_master) {
-        return -EINVAL;
-    }
-    LOG_DBG("Heartbeat command received");
-    AresFrame frame(AresFrame::HEARTBEAT,
-                    AresFrame::Heartbeat{ready, _claimed_host == UINT16_C(0),
-                                         tx_cnt, _claimed_host});
+    AresFrame frame{AresFrame::POLL, AresFrame::Poll{id}};
+
     AresResponse response = _send_frame(frame, _response_timeout);
 
-    int ret = 0;
+    int ret = -1;
+    AresFrame::Heartbeat heartbeat;
 
     switch (response.type) {
     case AresResponse::ACK: {
@@ -444,7 +437,9 @@ int AresSerial::send_heartbeat(bool ready, uint8_t tx_cnt) {
     }
     }
 
-    return ret;
+    // todo: wait for heartbeat
+
+    return py::make_tuple(heartbeat.ready, ret);
 }
 
 py::tuple AresSerial::send_log(const std::string &log_msg, bool broadcast,
@@ -458,17 +453,8 @@ py::tuple AresSerial::send_log(const std::string &log_msg, bool broadcast,
     _log_id++;
 
     if (!broadcast && id == UINT16_C(0)) {
-        if (_claimed_host == UINT16_C(0)) {
-            LOG_WRN("Log message broadcast parameter is `false` and the `id` "
-                    "is `0`. That means the message gets directed to the "
-                    "master node, but the master node has not been claimed. "
-                    "Switching to broadcast mode.");
-            payload.broadcast = true;
-            payload.tx_cnt = tx_cnt;
-        } else {
-            LOG_DBG("Directing message to node %d", _claimed_host);
-            payload.id = _claimed_host;
-        }
+        LOG_ERR("Tried sending to invalid ID.");
+        throw std::invalid_argument("Bad ID");
     }
 
     AresFrame frame{AresFrame::LOG, payload};
@@ -665,7 +651,7 @@ void AresSerial::start() {
     LOG_DBG("Clearing event queues");
     _start_event_q.clear();
     _heartbeat_event_q.clear();
-    _claim_event_q.clear();
+    _poll_event_q.clear();
     _log_event_q.clear();
     _pkt_rx_event_q.clear();
     _pkt_tx_event_q.clear();
@@ -747,18 +733,6 @@ py::tuple AresSerial::wait_start_event() {
                           event.seq_cnt, event.packet_id);
 }
 
-py::tuple AresSerial::wait_heartbeat_event() {
-    AresFrame::Heartbeat event;
-    wait_event_queue_released(event, _heartbeat_event_q);
-    return py::make_tuple(event.id, event.ready, event.broadcast);
-}
-
-uint16_t AresSerial::wait_claim_event() {
-    AresFrame::Claim event;
-    wait_event_queue_released(event, _claim_event_q);
-    return event.id;
-}
-
 py::tuple AresSerial::wait_log_event() {
     AresFrame::Log event;
     wait_event_queue_released(event, _log_event_q);
@@ -826,8 +800,8 @@ void AresSerial::_process_frames_helper() {
             _heartbeat_event(std::get<AresFrame::Heartbeat>(frame.payload));
             break;
         }
-        case AresFrame::CLAIM: {
-            _claim_event(std::get<AresFrame::Claim>(frame.payload));
+        case AresFrame::POLL: {
+            _poll_event(std::get<AresFrame::Poll>(frame.payload));
             break;
         }
         case AresFrame::LOG: {
@@ -992,14 +966,6 @@ void AresSerial::_start_event(const AresFrame::Start &start_frame) {
 
 void AresSerial::_heartbeat_event(const AresFrame::Heartbeat &heartbeat) {
     LOG_INF("Heartbeat received from %d", heartbeat.id);
-
-    if (_master && heartbeat.broadcast) {
-        LOG_DBG("Heartbeat received from hanging node");
-        _heartbeat_work.sem.lock();
-        _heartbeat_work.id = heartbeat.id;
-        _work_q.submit(&_heartbeat_work.work);
-    }
-
     put_no_except(heartbeat, _heartbeat_event_q, 100ms);
 }
 
@@ -1007,62 +973,14 @@ void AresSerial::_heartbeat_handler(ares::Work *work) {
     HeartbeatWork *hwork = ares::container_of(work, &HeartbeatWork::work);
     uint16_t id = hwork->id;
     hwork->sem.unlock();
-    LOG_DBG("Sending claim response to %d", id);
-
-    int ret = hwork->obj->_heartbeat_claim_host(id);
-    LOG_DBG("Claim host response: %d", ret);
+    // TODO: send heartbeat frame
 }
 
-// ReSharper disable CppDFAUnreachableFunctionCall
-int AresSerial::_heartbeat_claim_host(uint16_t destination_id) {
-    // ReSharper restore CppDFAUnreachableFunctionCall
-    AresFrame frame(AresFrame::CLAIM, AresFrame::Claim{destination_id});
-    AresResponse response;
-    try {
-        response =
-            _send_frame_released(frame, std::chrono::milliseconds::max());
-    } catch (const std::exception &exc) {
-        LOG_ERR("_send_frame(): %s", exc.what());
-        return -EADDRNOTAVAIL;
-    }
-    int ret = -EINVAL;
-
-    switch (response.type) {
-    case AresResponse::ACK: {
-        ret = std::get<AresFrame::AckErrorCode>(response.payload);
-        break;
-    }
-    case AresResponse::BAD_FRAME: {
-        LOG_ERR("Bad frame response received in heartbeat claim host handler");
-        break;
-    }
-    default: {
-        LOG_ERR("Received invalid response");
-        break;
-    }
-    }
-
-    return ret;
-}
-
-void AresSerial::_claim_event(const AresFrame::Claim &claim) {
-    LOG_INF("Claim event received: %d", claim.id);
-    if (_master) {
-        LOG_ERR("Someone sent a claim packet while this is the master node: "
-                "Undefined behavior");
-        return;
-    }
-
-    if (_claimed_host != UINT16_C(0) && claim.id != _claimed_host) {
-        LOG_ERR("Someone sent claim packet even though the host has already "
-                "been claimed");
-        return;
-    }
-
-    _claimed_host = claim.id;
-    LOG_INF("Host claimed by %d", _claimed_host);
-
-    put_no_except(claim, _claim_event_q, 100ms);
+void AresSerial::_poll_event(const AresFrame::Poll &poll) {
+    _heartbeat_work.sem.lock();
+    _heartbeat_work.id = poll.id;
+    _work_q.submit(&_heartbeat_work.work);
+    put_no_except(poll, _poll_event_q, 100ms);
 }
 
 void AresSerial::_log_ack_event(const AresFrame::LogAck &ack) {
@@ -1158,8 +1076,7 @@ put_noexcept(ares::bounded_queue<std::unique_ptr<T>, size, overwrite> &q) {
 
 bool AresSerial::_stop_event_queues() {
     bool success = put_noexcept(_start_event_q);
-    success = put_noexcept(_heartbeat_event_q) && success;
-    success = put_noexcept(_claim_event_q) && success;
+    success = put_noexcept(_poll_event_q) && success;
     success = put_noexcept(_log_event_q) && success;
     success = put_noexcept(_pkt_rx_event_q) && success;
     success = put_noexcept(_pkt_tx_event_q) && success;

@@ -100,11 +100,6 @@ struct AresSerialConfigs {
     std::chrono::milliseconds rx_period = 100ms;
 
     /**
-     * Designates the driver as the master node.
-     */
-    bool master = false;
-
-    /**
      * Alpha parameter for the Gamma distribution.
      */
     double alpha = 1.0;
@@ -238,13 +233,7 @@ class AresSerial {
      */
     py::tuple led(uint8_t id, uint8_t state);
 
-    /**
-     * Send a heartbeat message over the LoRa network.
-     * @param ready Flag indicating the system is ready to collect data.
-     * @param tx_cnt The amount of times to transmit the heartbeat.
-     * @return The ACK'ed error code from the firmware.
-     */
-    int send_heartbeat(bool ready, uint8_t tx_cnt);
+    py::tuple send_poll(uint16_t id, const std::chrono::seconds &timeout);
 
     /**
      * Send a logging message over the LoRa network.
@@ -349,18 +338,6 @@ class AresSerial {
     py::tuple wait_start_event();
 
     /**
-     * Wait for a heartbeat message to be received.
-     * @return tuple[src_id, ready, broadcast]
-     */
-    py::tuple wait_heartbeat_event();
-
-    /**
-     * Wait for a claim message to be received.
-     * @return src_id
-     */
-    uint16_t wait_claim_event();
-
-    /**
      * Wait for a log message to be received.
      * @return tuple[src_id, log_id, chunk, num_chunks, msg]
      */
@@ -463,14 +440,11 @@ class AresSerial {
         ares::semaphore<> sem{};
     };
 
-    bool _master;
-    uint16_t _claimed_host = 0;
     void _heartbeat_event(const AresFrame::Heartbeat &heartbeat);
     static void _heartbeat_handler(ares::Work *work);
     HeartbeatWork _heartbeat_work;
-    int _heartbeat_claim_host(uint16_t destination_id);
 
-    void _claim_event(const AresFrame::Claim &claim);
+    void _poll_event(const AresFrame::Poll &poll);
 
     ares::SpinLock _log_spinlock;
     uint16_t _log_id = 0;
@@ -500,7 +474,7 @@ class AresSerial {
     ares::bounded_queue<std::unique_ptr<AresFrame::Start>, 5> _start_event_q;
     ares::bounded_queue<std::unique_ptr<AresFrame::Heartbeat>, 10>
         _heartbeat_event_q;
-    ares::bounded_queue<std::unique_ptr<AresFrame::Claim>, 5> _claim_event_q;
+    ares::bounded_queue<std::unique_ptr<AresFrame::Poll>, 5> _poll_event_q;
     ares::bounded_queue<std::unique_ptr<AresFrame::Log>, 100> _log_event_q;
     ares::bounded_queue<std::unique_ptr<AresFrame::PktRx>, 500> _pkt_rx_event_q;
     ares::bounded_queue<std::unique_ptr<AresFrame::PktTx>, 3> _pkt_tx_event_q;
