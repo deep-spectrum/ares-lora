@@ -156,9 +156,7 @@ class LoraSerialConfig:
         rx_period: How often (in seconds) the serial driver polls the serial receive buffer.
         serial_timeout: The serial RX timeout (in seconds).
         start_callback: Event handler for start events. Signature: [seconds: int, nsecs: int] -> None
-        heartbeat_callback: Event handler for heartbeat events. Signature: [source_id: int, read: bool] -> None
-        claim_callback: Event handler for claim master events. Signature: [source_id: int] -> None
-        master: Designate the connected node as the master node.
+        poll_callback: Event handler for poll events. Signature: [source_id: int] -> None
         log_callback: Event handler for log events. Signature: [source_id: int, msg: str] -> None
     """
     port: str = ""
@@ -166,9 +164,7 @@ class LoraSerialConfig:
     rx_period: float = 0.1
     serial_timeout: float = 0.1
     start_callback: Callable[[int, int], None] | None = None
-    heartbeat_callback: Callable[[int, bool], None] | None = None
-    claim_callback: Callable[[int], None] | None = None
-    master: bool = False
+    poll_callback: Callable[[int], None] | None = None
     log_callback: Callable[[int, str], None] = None
 
 
@@ -240,12 +236,10 @@ class LoraSerial:
             response_timeout=config.response_timeout,
             rx_period=config.rx_period,
             serial_timeout=config.serial_timeout,
-            master=config.master,
         )
 
         self._start_cb = config.start_callback
-        self._heartbeat_cb = config.heartbeat_callback
-        self._claim_cb = config.claim_callback
+        self._poll_cb = config.poll_callback
         self._log_cb = config.log_callback
         self._dev = _AresSerial(configs)
         self._nodes: dict[int, int] = {}
@@ -260,8 +254,7 @@ class LoraSerial:
         self._logger = logger
 
         self._start_thread: Thread | None = None
-        self._heartbeat_thread: Thread | None = None
-        self._claim_thread: Thread | None = None
+        self._poll_thread: Thread | None = None
         self._log_thread: Thread | None = None
         self._pkt_rx_thread: Thread | None = None
         self._pkt_tx_thread: Thread | None = None
@@ -297,25 +290,14 @@ class LoraSerial:
                 if self._start_cb is not None:
                     self._start_cb(sec, usec)
 
-    def _heartbeat_event_handle(self):
+    def _poll_event_handle(self):
         while True:
             try:
-                src_id, ready, broadcast = self._dev.wait_heartbeat_event()
+                src_id = self._dev.wait_poll_event()
             except AresThreadTerminate:
                 break
-
-            logger.info(f"Received heartbeat message: (source: {src_id}, ready: {ready}, broadcasted: {broadcast}")
-            if self._heartbeat_cb is not None:
-                self._heartbeat_cb(src_id, ready)
-
-    def _claim_event_handle(self):
-        while True:
-            try:
-                src_id = self._dev.wait_claim_event()
-            except AresThreadTerminate:
-                break
-            if self._claim_cb is not None:
-                self._claim_cb(src_id)
+            if self._poll_cb is not None:
+                self._poll_cb(src_id)
 
     def _log_event_handle(self):
         while True:
@@ -492,31 +474,36 @@ class LoraSerial:
         return None
 
     @lora_serial_command
-    def send_heartbeat(self, ready: bool, strobe_count: int = 3, timeout: float = 20.0) -> None:
-        """Send a heartbeat over LoRa.
+    def send_poll(self, node_id: int, poll_response_timeout: float = 30.0, timeout: float = 20.0) -> bool:
+        """Poll a node on the LoRa network for a heartbeat.
 
         Args:
-            ready: Flag indicating that the system is ready to start collecting data.
-            strobe_count: The number of times to transmit the heartbeat.
-            timeout: The timeout of the transmission.
+            node_id: The node to poll.
+            poll_response_timeout: The amount of time to wait for a response from the target node.
+            timeout: The timeout per a transmission
 
         Raises:
-            ValueError: The strobe count is invalid.
-            TimeoutError: No response from the firmware within the configured timeout.
+            ValueError: The node ID is invalid.
+            TimeoutError: No response from firmware within the timeout.
+            TimeoutError: No response from the polled node within the poll response timeout.
             LoraException: Firmware responded with an error code.
+
+        Returns:
+            The ready status of the polled node.
         """
-        if strobe_count <= 0:
-            raise ValueError("strobe_count must be a positive, non-zero integer")
+        if node_id <= 0 or node_id > 65535:
+            raise ValueError("Not a valid node")
         prev_timeout = self._dev.get_response_timeout()
         self._dev.set_response_timeout(timeout)
         try:
-            code = self._dev.send_heartbeat(ready, strobe_count)
+            ready, code = self._dev.send_poll(node_id, poll_response_timeout)
         except Exception:
             self._dev.set_response_timeout(prev_timeout)
             raise
         else:
             self._dev.set_response_timeout(prev_timeout)
         self._check_ret_code(code)
+        return ready
 
     @lora_serial_command
     def send_log(self, log_msg: str, broadcast: bool = False, dst_id: int | None = None, strobe_count: int = 3,
@@ -742,13 +729,9 @@ class LoraSerial:
         assert isinstance(self._start_thread, Thread)
         self._start_thread.start()
 
-        self._heartbeat_thread = Thread(target=self._heartbeat_event_handle)
-        assert isinstance(self._heartbeat_thread, Thread)
-        self._heartbeat_thread.start()
-
-        self._claim_thread = Thread(target=self._claim_event_handle)
-        assert isinstance(self._claim_thread, Thread)
-        self._claim_thread.start()
+        self._poll_thread = Thread(target=self._poll_event_handle)
+        assert isinstance(self._poll_thread, Thread)
+        self._poll_thread.start()
 
         self._log_thread = Thread(target=self._log_event_handle)
         assert isinstance(self._log_thread, Thread)
@@ -795,12 +778,8 @@ class LoraSerial:
             self._start_thread.join()
             self._start_thread = None
 
-        if self._heartbeat_thread is not None:
-            self._heartbeat_thread.join()
-            self._heartbeat_thread = None
-
-        if self._claim_thread is not None:
-            self._claim_thread.join()
+        if self._poll_thread is not None:
+            self._poll_thread.join()
             self._claim_thread = None
 
         if self._log_thread is not None:
@@ -868,6 +847,24 @@ class LoraSerial:
         with self._tx_stats_lock:
             ret = self._tx_stats
         return ret
+
+    @property
+    def ready(self):
+        """The ready status of this node.
+
+        Returns:
+            The currently set ready status.
+        """
+        return self._dev.ready
+
+    @ready.setter
+    def ready(self, value: bool):
+        """The ready status of this node.
+
+        Args:
+            value: The new ready status.
+        """
+        self._dev.ready = value
 
 
 class BleTransfer:
