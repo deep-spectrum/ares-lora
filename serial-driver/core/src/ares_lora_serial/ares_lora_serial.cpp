@@ -53,6 +53,9 @@ PYBIND11_MODULE(_ares_lora_serial, m, py::mod_gil_not_used()) {
         .def("lora_config", &AresSerial::lora_config, py::arg("config"))
         .def("led", &AresSerial::led, py::arg("led_id"), py::arg("state"),
              "Retrieve or set the LED state")
+        .def("send_poll", &AresSerial::send_poll, py::arg("id"),
+             py::arg("timeout"))
+        .def_property("ready", &AresSerial::get_ready, &AresSerial::set_ready)
         .def("send_log", &AresSerial::send_log,
              "Send a logging message over LoRa")
         .def("version", &AresSerial::version, "Retrieve the firmware version")
@@ -72,6 +75,7 @@ PYBIND11_MODULE(_ares_lora_serial, m, py::mod_gil_not_used()) {
              py::arg("timeout"))
         .def("get_response_timeout", &AresSerial::get_response_timeout)
         .def("wait_start_event", &AresSerial::wait_start_event)
+        .def("wait_poll_event", &AresSerial::wait_poll_event)
         .def("wait_log_event", &AresSerial::wait_log_event)
         .def("wait_packet_rx_event", &AresSerial::wait_packet_rx_event)
         .def("wait_packet_tx_done_event",
@@ -447,10 +451,16 @@ py::tuple AresSerial::send_poll(uint16_t id,
     return py::make_tuple(ready, ret);
 }
 
-void AresSerial::ready(bool new_state) {
+void AresSerial::set_ready(bool new_state) {
     py::gil_scoped_release release;
     std::unique_lock lock(_heartbeat_work.sem);
     _heartbeat_work.ready = new_state;
+}
+
+bool AresSerial::get_ready() {
+    py::gil_scoped_release release;
+    std::unique_lock lock(_heartbeat_work.sem);
+    return _heartbeat_work.ready;
 }
 
 py::tuple AresSerial::send_log(const std::string &log_msg, bool broadcast,
