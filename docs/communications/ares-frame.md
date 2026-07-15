@@ -17,7 +17,7 @@ described as follows:
 | LORA_CONFIG      |   2   |    RX     | Set new LoRa modem configurations                                                |
 | LED              |   3   |   TX/RX   | Set or read the LED state/action                                                 |
 | HEARTBEAT        |   4   |   TX/RX   | Heartbeat indicating that the node is working and if it is ready to collect data |
-| CLAIM            |   5   |   TX/RX   | Claim master node request                                                        |
+| POLL             |   5   |   TX/RX   | Poll node request                                                                |
 | LOG              |   6   |   TX/RX   | Logging message                                                                  |
 | LOG_ACK          |   7   |    TX     | Logging message received acknowledgement                                         |
 | VERSION          |   8   |   TX/RX   | Firmware versions                                                                |
@@ -180,7 +180,7 @@ The payload is structured as follows:
 
 | Field    | Description                                                       |
 |:---------|:------------------------------------------------------------------|
-| Flags    | `bit 0`: ready <br> `bit 1`: broadcast <br> `bit 7:2`: Reserved   |
+| Flags    | `bit 0`: ready <br> `bit 7:1`: Reserved                           |
 | TX Count | How many times to send the heartbeat message.                     |
 | Node ID  | The node ID the message is directed to, or the node ID of source. |
 
@@ -194,9 +194,9 @@ The payload is structured as follows:
     of the message.
 
 
-## CLAIM Frame
+## POLL Frame
 
-The claim frame is used to indicate which node is the master node in the network. The payload is structured as follows:
+The poll frame is used to poll for a heartbeat for a specific node. The payload is structured as follows:
 
 |           |            |
 |-----------|:----------:|
