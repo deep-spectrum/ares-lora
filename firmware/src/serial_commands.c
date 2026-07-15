@@ -136,6 +136,10 @@ static void handle_setting(const struct ares_serial *serial,
     if (frame->payload.SETTING.setting == ARES_SETTING_ID ||
         frame->payload.SETTING.setting == ARES_SETTING_PANID) {
         refresh_modem_id();
+
+        if (frame->payload.SETTING.setting == ARES_SETTING_ID) {
+            (void)ares_set_ble_node(setting);
+        }
     }
 
     send_ack_frame(serial, frame, 0);
