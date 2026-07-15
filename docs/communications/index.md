@@ -26,11 +26,6 @@ or it can send a message directly to another node. The only time when broadcasti
 needs to send a message to every node that is listening. The LoRa communication protocol for direct messages does
 not enforce acknowledgement messages, however, for directed messages, some acknowledgement is recommended.
 
-When a node is communicating over LoRa, it will send the same packet on the network the specified amount of times (whether
-it is specified by the host or just loaded from the settings). There is one exception, when sending logs to a specific
-node. When sending logs to a specific node, the destination node is expected to acknowledge the packet. If it doesn't
-get acknowledged, then the driver will retry or throw an error after it has tried the specified number of times.
-
 |                                                                        |                                               |
 |:----------------------------------------------------------------------:|:---------------------------------------------:|
 |        ![Packet Normal Communication](assets/packet-normal.png)        | ![Packet Directed Log](assets/packet-log.png) |
