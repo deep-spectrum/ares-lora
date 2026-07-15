@@ -780,7 +780,7 @@ class LoraSerial:
 
         if self._poll_thread is not None:
             self._poll_thread.join()
-            self._claim_thread = None
+            self._poll_thread = None
 
         if self._log_thread is not None:
             self._log_thread.join()

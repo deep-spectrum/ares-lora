@@ -67,7 +67,7 @@ static void handle_poll(const struct ares_lora *lora,
     };
 
     if (packet->type != ARES_PKT_TYPE_DIRECT) {
-        // Invalid. Claim should always be direct.
+        // Invalid. Poll should always be direct.
         return;
     }
 
@@ -84,7 +84,7 @@ static void handle_heartbeat(const struct ares_lora *lora,
     };
 
     if (packet->type != ARES_PKT_TYPE_DIRECT) {
-        // Invalid. Claim should always be direct.
+        // Invalid. Heartbeat should always be direct.
         return;
     }
 

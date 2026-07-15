@@ -233,9 +233,26 @@ class AresSerial {
      */
     py::tuple led(uint8_t id, uint8_t state);
 
+    /**
+     * Poll a node for a heartbeat.
+     *
+     * @param[in] id The node to send the poll message to.
+     * @param[in] timeout The poll response timeout.
+     *
+     * @return py::tuple<ready, ACK'ed error code>
+     */
     py::tuple send_poll(uint16_t id, const std::chrono::seconds &timeout);
 
+    /**
+     * Set the ready state of a node.
+     * @param[in] new_state The new ready state.
+     */
     void set_ready(bool new_state);
+
+    /**
+     * Retrieve the current ready state of the node.
+     * @return The current ready state.
+     */
     bool get_ready();
 
     /**
@@ -340,6 +357,10 @@ class AresSerial {
      */
     py::tuple wait_start_event();
 
+    /**
+     * Wait for a poll message to be received.
+     * @return The source ID of the poll message.
+     */
     uint16_t wait_poll_event();
 
     /**
@@ -442,7 +463,7 @@ class AresSerial {
         ares::Work work;
         AresSerial *obj;
         uint16_t id = 0;
-        bool ready = false; // todo: make setter for this in parent class
+        bool ready = false;
         ares::semaphore<> sem{};
     };
 
