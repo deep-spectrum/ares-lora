@@ -1015,7 +1015,7 @@ bool AresSerial::_wait_heartbeat(uint16_t id,
         throw AresTimeoutError("Timed out waiting for a heartbeat response");
     }
 
-    return heartbeat.id;
+    return heartbeat.ready;
 }
 
 void AresSerial::_heartbeat_event(const AresFrame::Heartbeat &heartbeat) {
