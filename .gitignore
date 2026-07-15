@@ -4,5 +4,6 @@ build*/
 .venv/
 __pycache__
 firmware/lora_private_key.pem
+cmake-build*
 /docs/serial-driver/cpp-api/
 /docs/firmware/firmware-docs/

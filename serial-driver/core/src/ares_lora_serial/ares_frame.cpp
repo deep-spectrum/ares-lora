@@ -145,8 +145,8 @@ void AresFrame::serialize(std::vector<uint8_t> &bytearray) {
         _serialize_heartbeat(std::get<Heartbeat>(_tx_payload), bytearray);
         break;
     }
-    case CLAIM: {
-        _serialize_claim(std::get<Claim>(_tx_payload), bytearray);
+    case POLL: {
+        _serialize_poll(std::get<Poll>(_tx_payload), bytearray);
         break;
     }
     case LOG: {
@@ -227,9 +227,9 @@ void AresFrame::parse(const std::vector<uint8_t> &bytearray,
                                payload_len);
         break;
     }
-    case CLAIM: {
-        _deserialize_claim(&bytearray[start_index + payload_offset],
-                           payload_len);
+    case POLL: {
+        _deserialize_poll(&bytearray[start_index + payload_offset],
+                          payload_len);
         break;
     }
     case LOG: {
@@ -344,13 +344,12 @@ uint16_t AresFrame::_payload_size() const {
         ret = sizeof(Led::state) + sizeof(Led::led);
         break;
     }
-    case CLAIM: {
-        ret = sizeof(Claim::id);
+    case POLL: {
+        ret = sizeof(Poll::id);
         break;
     }
     case HEARTBEAT: {
-        ret = sizeof(Heartbeat::tx_cnt) + sizeof(Heartbeat::id) +
-              sizeof(uint8_t); // flags are bit-packed
+        ret = sizeof(Heartbeat::id) + sizeof(uint8_t); // flags are bit-packed
         break;
     }
     case LOG: {
@@ -527,17 +526,13 @@ void AresFrame::_serialize_heartbeat(const Heartbeat &payload,
     if (payload.ready) {
         flags |= 1;
     }
-    if (payload.broadcast) {
-        flags |= 2;
-    }
 
     buffer.emplace_back(flags);
-    SERIALIZE(tx_cnt);
     SERIALIZE(id);
 }
 
-void AresFrame::_serialize_claim(const Claim &payload,
-                                 std::vector<uint8_t> &buffer) {
+void AresFrame::_serialize_poll(const Poll &payload,
+                                std::vector<uint8_t> &buffer) {
     SERIALIZE(id);
 }
 
@@ -635,16 +630,14 @@ void AresFrame::_deserialize_heartbeat(const uint8_t *buf, size_t len) {
     ARG_UNUSED(len);
     DESERIALIZE_INIT(Heartbeat, 1);
     DESERIALIZE_SET(ready, (buf[0] & 1) != 0);
-    DESERIALIZE_SET(broadcast, (buf[0] & 2) != 0);
     // No need to advance here. Offset is already set to 1 byte...
-    DESERIALIZE(tx_cnt);
     DESERIALIZE(id);
     DESERIALIZE_FINALIZE();
 }
 
-void AresFrame::_deserialize_claim(const uint8_t *buf, size_t len) {
+void AresFrame::_deserialize_poll(const uint8_t *buf, size_t len) {
     ARG_UNUSED(len);
-    DESERIALIZE_INIT(Claim);
+    DESERIALIZE_INIT(Poll);
     DESERIALIZE(id);
     DESERIALIZE_FINALIZE();
 }

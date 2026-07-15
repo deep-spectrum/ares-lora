@@ -26,8 +26,8 @@ There are a variety of payloads that these packets can send which are described 
 | Type      | Value | Packet Types Allowed | Description                    |
 |:----------|:-----:|:--------------------:|:-------------------------------|
 | START     |   0   |   Broadcast/Direct   | Start time.                    |
-| HEARTBEAT |   1   |   Broadcast/Direct   | Heartbeat from slave nodes.    |
-| CLAIM     |   2   |        Direct        | Claim master message.          |
+| POLL      |   1   |        Direct        | Query a node for a heartbeat.  |
+| HEARTBEAT |   2   |        Direct        | Heartbeat from polled nodes.   |
 | LOG       |   3   |   Broadcast/Direct   | Send log message over network. |
 | LOG_ACK   |   4   |        Direct        | Log message acknowledgement.   |
 
@@ -43,11 +43,16 @@ node or broadcasted to all the nodes in the area. The payload is structured as f
 
 * __Payload size__: 16 bytes
 
+## POLL Payload Type
+
+Poll payloads are used to query a node for its heartbeat and readiness status. This message must be a direct message. 
+The payload is empty.
+
 ## HEARTBEAT Payload Type:
 
-Heartbeat payloads are used to indicate that a node is online and whether it is ready to start collecting data or not.
-They can either be directed at a certain node or broadcasted to all the nodes in the area. The payload is structured as 
-follows:
+Heartbeat payloads are used to acknowledge poll messages. This indicates that a node is online and whether it is ready 
+to start collecting data or not. They must be directed to the node that sent the poll message. The payload is 
+structured as follows:
 
 |           |        |
 |-----------|:------:|
@@ -55,11 +60,6 @@ follows:
 | __Type__  | `bool` |
 
 * __Payload size__: 1 byte
-
-## CLAIM Payload Type
-
-Claim payloads are used to indicate to a certain node that the sender is the master node of the network. This message
-must be a direct message. The payload for this type is empty.
 
 ## LOG Payload Type
 

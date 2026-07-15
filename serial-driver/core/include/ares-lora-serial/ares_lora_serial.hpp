@@ -100,11 +100,6 @@ struct AresSerialConfigs {
     std::chrono::milliseconds rx_period = 100ms;
 
     /**
-     * Designates the driver as the master node.
-     */
-    bool master = false;
-
-    /**
      * Alpha parameter for the Gamma distribution.
      */
     double alpha = 1.0;
@@ -239,12 +234,26 @@ class AresSerial {
     py::tuple led(uint8_t id, uint8_t state);
 
     /**
-     * Send a heartbeat message over the LoRa network.
-     * @param ready Flag indicating the system is ready to collect data.
-     * @param tx_cnt The amount of times to transmit the heartbeat.
-     * @return The ACK'ed error code from the firmware.
+     * Poll a node for a heartbeat.
+     *
+     * @param[in] id The node to send the poll message to.
+     * @param[in] timeout The poll response timeout.
+     *
+     * @return py::tuple<ready, ACK'ed error code>
      */
-    int send_heartbeat(bool ready, uint8_t tx_cnt);
+    py::tuple send_poll(uint16_t id, const std::chrono::seconds &timeout);
+
+    /**
+     * Set the ready state of a node.
+     * @param[in] new_state The new ready state.
+     */
+    void set_ready(bool new_state);
+
+    /**
+     * Retrieve the current ready state of the node.
+     * @return The current ready state.
+     */
+    bool get_ready();
 
     /**
      * Send a logging message over the LoRa network.
@@ -349,16 +358,10 @@ class AresSerial {
     py::tuple wait_start_event();
 
     /**
-     * Wait for a heartbeat message to be received.
-     * @return tuple[src_id, ready, broadcast]
+     * Wait for a poll message to be received.
+     * @return The source ID of the poll message.
      */
-    py::tuple wait_heartbeat_event();
-
-    /**
-     * Wait for a claim message to be received.
-     * @return src_id
-     */
-    uint16_t wait_claim_event();
+    uint16_t wait_poll_event();
 
     /**
      * Wait for a log message to be received.
@@ -460,17 +463,19 @@ class AresSerial {
         ares::Work work;
         AresSerial *obj;
         uint16_t id = 0;
+        bool ready = false;
         ares::semaphore<> sem{};
     };
 
-    bool _master;
-    uint16_t _claimed_host = 0;
+    ares::semaphore<> _heartbeat_sem;
+    uint16_t _expected_heartbeat_id = 0;
+    bool _wait_heartbeat(uint16_t id, const std::chrono::seconds &timeout);
     void _heartbeat_event(const AresFrame::Heartbeat &heartbeat);
+
+    void _poll_event(const AresFrame::Poll &poll);
     static void _heartbeat_handler(ares::Work *work);
     HeartbeatWork _heartbeat_work;
-    int _heartbeat_claim_host(uint16_t destination_id);
-
-    void _claim_event(const AresFrame::Claim &claim);
+    void _send_heartbeat(uint16_t id, bool ready);
 
     ares::SpinLock _log_spinlock;
     uint16_t _log_id = 0;
@@ -498,9 +503,9 @@ class AresSerial {
     void _packet_tx_event(const AresFrame::PktTx &msg);
 
     ares::bounded_queue<std::unique_ptr<AresFrame::Start>, 5> _start_event_q;
-    ares::bounded_queue<std::unique_ptr<AresFrame::Heartbeat>, 10>
+    ares::bounded_queue<std::unique_ptr<AresFrame::Heartbeat>, 5>
         _heartbeat_event_q;
-    ares::bounded_queue<std::unique_ptr<AresFrame::Claim>, 5> _claim_event_q;
+    ares::bounded_queue<std::unique_ptr<AresFrame::Poll>, 5> _poll_event_q;
     ares::bounded_queue<std::unique_ptr<AresFrame::Log>, 100> _log_event_q;
     ares::bounded_queue<std::unique_ptr<AresFrame::PktRx>, 500> _pkt_rx_event_q;
     ares::bounded_queue<std::unique_ptr<AresFrame::PktTx>, 3> _pkt_tx_event_q;

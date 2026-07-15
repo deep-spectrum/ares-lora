@@ -56,6 +56,24 @@ static void handle_start(const struct ares_lora *lora,
     ares_serial_write_frame(serial, &frame);
 }
 
+static void handle_poll(const struct ares_lora *lora,
+                        const struct ares_packet *packet) {
+    ARG_UNUSED(lora);
+
+    const struct ares_serial *serial = ares_serial_backend_uart_get_ptr();
+    struct ares_frame frame = {
+        .type = ARES_FRAME_POLL,
+        .payload.POLL = packet->source_id,
+    };
+
+    if (packet->type != ARES_PKT_TYPE_DIRECT) {
+        // Invalid. Poll should always be direct.
+        return;
+    }
+
+    ares_serial_write_frame(serial, &frame);
+}
+
 static void handle_heartbeat(const struct ares_lora *lora,
                              const struct ares_packet *packet) {
     ARG_UNUSED(lora);
@@ -65,31 +83,14 @@ static void handle_heartbeat(const struct ares_lora *lora,
         .type = ARES_FRAME_HEARTBEAT,
     };
 
-    CHECK_DIRECTED_PACKET(packet);
+    if (packet->type != ARES_PKT_TYPE_DIRECT) {
+        // Invalid. Heartbeat should always be direct.
+        return;
+    }
 
     frame.payload.HEARTBEAT.flags.ready =
         packet->payload.payload.HEARTBEAT.ready;
-    frame.payload.HEARTBEAT.flags.broadcast =
-        packet->type == ARES_PKT_TYPE_BROADCAST;
     frame.payload.HEARTBEAT.id = packet->source_id;
-
-    ares_serial_write_frame(serial, &frame);
-}
-
-static void handle_claim(const struct ares_lora *lora,
-                         const struct ares_packet *packet) {
-    ARG_UNUSED(lora);
-
-    const struct ares_serial *serial = ares_serial_backend_uart_get_ptr();
-    struct ares_frame frame = {
-        .type = ARES_FRAME_CLAIM,
-        .payload.CLAIM = packet->source_id,
-    };
-
-    if (packet->type != ARES_PKT_TYPE_DIRECT) {
-        // Invalid. Claim should always be direct.
-        return;
-    }
 
     ares_serial_write_frame(serial, &frame);
 }
@@ -185,8 +186,8 @@ static void handle_log_ack(const struct ares_lora *lora,
 
 static struct ares_lora_command commands[] = {
     {ARES_PKT_PAYLOAD_START, handle_start},
+    {ARES_PKT_PAYLOAD_POLL, handle_poll},
     {ARES_PKT_PAYLOAD_HEARTBEAT, handle_heartbeat},
-    {ARES_PKT_PAYLOAD_CLAIM, handle_claim},
     {ARES_PKT_PAYLOAD_LOG, handle_log},
     {ARES_PKT_PAYLOAD_LOG_ACK, handle_log_ack},
 };
