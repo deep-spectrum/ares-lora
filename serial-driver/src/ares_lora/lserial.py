@@ -849,7 +849,7 @@ class LoraSerial:
         return ret
 
     @property
-    def ready(self):
+    def ready(self) -> bool:
         """The ready status of this node.
 
         Returns:
