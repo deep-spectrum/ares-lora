@@ -632,6 +632,7 @@ int AresSerial::reboot(uint8_t delay) {
 
     if (ret == 0) {
         stop();
+        _serial.close();
         _wait_until_reboot_done(delay);
     }
 
