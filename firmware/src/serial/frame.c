@@ -376,6 +376,10 @@ static void deserialize(struct ares_frame *frame, const uint8_t *buf) {
                          BLE_IMAGE_CHUNK.len);
         break;
     }
+        case ARES_FRAME_REBOOT: {
+            FDESERIALIZE(REBOOT);
+            break;
+        }
     default: {
         // ARES_FRAME_LOG_ACK, ARES_FRAME_ACK, ARES_FRAME_FRAMING_ERROR,
         // and ARES_FRAME_DBG are TX only

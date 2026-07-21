@@ -22,6 +22,7 @@
 #include <zephyr/init.h>
 #include <zephyr/kernel.h>
 #include <zephyr/version.h>
+#include <zephyr/sys/reboot.h>
 
 enum connected_state {
     DISCONNECTED,
@@ -43,8 +44,8 @@ struct subscribe_work {
     struct k_spinlock lock;
 };
 
-struct connect_work connect_work = {};
-struct subscribe_work subscribe_work = {};
+static struct connect_work connect_work = {};
+static struct subscribe_work subscribe_work = {};
 
 static void connected_work_handler(struct k_work *work) {
     struct connect_work *cwork = CONTAINER_OF(work, struct connect_work, work);
@@ -75,6 +76,12 @@ static void subscribe_work_handler(struct k_work *work) {
 
     ares_serial_write_frame(swork->serial, &frame);
 }
+
+static void reboot_work_handler(struct k_work *work) {
+    ARG_UNUSED(work);
+    sys_reboot(SYS_REBOOT_COLD);
+}
+K_WORK_DELAYABLE_DEFINE(reboot_work, reboot_work_handler);
 
 static void ble_connected(void) {
     // This is guaranteed to run before the mtu exchange.
@@ -363,6 +370,26 @@ static void handle_ble_image_chunk(const struct ares_serial *serial,
     send_ack_frame(serial, frame, ret);
 }
 
+static void handle_reboot(const struct ares_serial *serial, struct ares_frame *frame) {
+    const uint8_t min = 5, max = 30;
+    uint8_t reboot_time = frame->payload.REBOOT;
+    int ret;
+
+    if (reboot_time < min) {
+        reboot_time = min;
+    } else if (reboot_time > max) {
+        reboot_time = max;
+    }
+
+    ret = k_work_schedule(&reboot_work, K_SECONDS(reboot_time));
+
+    if (ret > 0) {
+        ret = 0;
+    }
+
+    send_ack_frame(serial, frame, ret);
+}
+
 static int initialize_ble(const struct ares_serial *serial) {
     struct ares_ble_init_data init_data = {
         .cb = {
@@ -397,6 +424,7 @@ static struct ares_serial_command commands[] = {
     {ARES_FRAME_BLE_DISCONNECT, handle_ble_disconnect},
     {ARES_FRAME_BLE_CHUNKS, handle_ble_chunks},
     {ARES_FRAME_BLE_IMAGE_CHUNK, handle_ble_image_chunk},
+    {ARES_FRAME_REBOOT, handle_reboot},
 };
 
 static int init_serial_handlers(void) {
