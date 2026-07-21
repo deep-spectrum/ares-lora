@@ -298,6 +298,26 @@ static void handle_version(const struct ares_serial *serial,
     ares_serial_write_frame(serial, frame);
 }
 
+static int helper_ble_enable(void) {
+    uint32_t id = 0;
+
+    int ret = retrieve_setting(ARES_SETTING_ID, &id);
+    if (ret < 0) {
+        return ret;
+    }
+
+    if (id == 0) {
+        return -ENODEV;
+    }
+
+    ret = ares_set_ble_node(id);
+    if (ret < 0) {
+        return ret;
+    }
+
+    return ares_enable_ble();
+}
+
 static void handle_ble_state(const struct ares_serial *serial,
                              struct ares_frame *frame) {
     switch (frame->payload.BLE_STATE) {
@@ -308,7 +328,7 @@ static void handle_ble_state(const struct ares_serial *serial,
     }
     case 1: {
         frame->type = ARES_FRAME_ACK;
-        frame->payload.ACK = ares_enable_ble();
+        frame->payload.ACK = helper_ble_enable();
         break;
     }
     case 2: {
