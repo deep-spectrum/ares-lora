@@ -83,7 +83,6 @@ enum ares_frame_type {
     ARES_FRAME_DBG = 11,           ///< Debug frames, TX only.
     ARES_FRAME_PKT_RX = 12,        ///< Packet received, TX only.
     ARES_FRAME_PKT_TX = 13,        ///< Packet transmitted, TX only.
-    ARES_FRAME_REBOOT = 20, ///< Reboot device after a short delay, Rx only.
 
     // BLE
     ARES_FRAME_BLE_STATE = 14,      ///< Enable/disable BLE.
@@ -95,6 +94,8 @@ enum ares_frame_type {
     ARES_FRAME_BLE_CHUNKS = 18, ///< Tell the central device how many chunks are
                                 ///< going to be sent.
     ARES_FRAME_BLE_IMAGE_CHUNK = 19, ///< Send a chunk to the central device.
+
+    ARES_FRAME_REBOOT = 20, ///< Reboot device after a short delay, Rx only.
 
     ARES_FRAME_TYPE_INVALID, ///< Invalid frame.
 };
