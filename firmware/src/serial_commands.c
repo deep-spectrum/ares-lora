@@ -21,8 +21,8 @@
 #include <zephyr/app_version.h>
 #include <zephyr/init.h>
 #include <zephyr/kernel.h>
-#include <zephyr/version.h>
 #include <zephyr/sys/reboot.h>
+#include <zephyr/version.h>
 
 enum connected_state {
     DISCONNECTED,
@@ -370,7 +370,8 @@ static void handle_ble_image_chunk(const struct ares_serial *serial,
     send_ack_frame(serial, frame, ret);
 }
 
-static void handle_reboot(const struct ares_serial *serial, struct ares_frame *frame) {
+static void handle_reboot(const struct ares_serial *serial,
+                          struct ares_frame *frame) {
     const uint8_t min = 5, max = 30;
     uint8_t reboot_time = frame->payload.REBOOT;
     int ret;

@@ -73,7 +73,7 @@ class AresFrame {
         DBG = 11,           ///< Debug message (RX)
         PKT_RX = 12,        ///< Packet Received (RX)
         PKT_TX = 13,        ///< Packet transmitted (RX)
-        REBOOT = 20, ///< Reboot (TX)
+        REBOOT = 20,        ///< Reboot (TX)
 
         BLE_STATE = 14,       ///< Set or retrieve the BLE state (TX/RX)
         BLE_CONNECTED = 15,   ///< BLE connect state change (RX)
@@ -780,7 +780,8 @@ class AresFrame {
                                       std::vector<uint8_t> &buffer);
     static void _serialize_ble_image(const BleImage &payload,
                                      std::vector<uint8_t> &buffer);
-    static void _serialize_reboot(const Reboot &payload, std::vector<uint8_t> &buffer);
+    static void _serialize_reboot(const Reboot &payload,
+                                  std::vector<uint8_t> &buffer);
 
     void _deserialize_setting(const uint8_t *buf, size_t len);
     void _deserialize_led(const uint8_t *buf, size_t len);

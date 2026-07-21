@@ -69,16 +69,16 @@ enum ares_frame_error {
  * @brief Frame types.
  */
 enum ares_frame_type {
-    ARES_FRAME_SETTING = 0,       ///< SETTING frame.
-    ARES_FRAME_START = 1,         ///< Start time frame.
-    ARES_FRAME_LORA_CONFIG = 2,   ///< LoRa configuration frame.
-    ARES_FRAME_LED = 3,           ///< Control LED state.
-    ARES_FRAME_HEARTBEAT = 4,     ///< LoRa Heart Beat frame.
-    ARES_FRAME_POLL = 5,          ///< LoRa poll node for heartbeat.
-    ARES_FRAME_LOG = 6,           ///< Log message.
-    ARES_FRAME_LOG_ACK = 7,       ///< Log message ACK from LoRa.
-    ARES_FRAME_VERSION = 8,       ///< Version information.
-    ARES_FRAME_ACK = 9,           ///< ACK frame.
+    ARES_FRAME_SETTING = 0,        ///< SETTING frame.
+    ARES_FRAME_START = 1,          ///< Start time frame.
+    ARES_FRAME_LORA_CONFIG = 2,    ///< LoRa configuration frame.
+    ARES_FRAME_LED = 3,            ///< Control LED state.
+    ARES_FRAME_HEARTBEAT = 4,      ///< LoRa Heart Beat frame.
+    ARES_FRAME_POLL = 5,           ///< LoRa poll node for heartbeat.
+    ARES_FRAME_LOG = 6,            ///< Log message.
+    ARES_FRAME_LOG_ACK = 7,        ///< Log message ACK from LoRa.
+    ARES_FRAME_VERSION = 8,        ///< Version information.
+    ARES_FRAME_ACK = 9,            ///< ACK frame.
     ARES_FRAME_FRAMING_ERROR = 10, ///< Framing error frame. TX only.
     ARES_FRAME_DBG = 11,           ///< Debug frames, TX only.
     ARES_FRAME_PKT_RX = 12,        ///< Packet received, TX only.
@@ -86,13 +86,13 @@ enum ares_frame_type {
     ARES_FRAME_REBOOT = 20, ///< Reboot device after a short delay, Rx only.
 
     // BLE
-    ARES_FRAME_BLE_STATE = 14,       ///< Enable/disable BLE.
-    ARES_FRAME_BLE_CONNECTED = 15,   ///< Indicate that BLE has been connected or
-                                ///< disconnected from. Tx only.
-    ARES_FRAME_BLE_DISCONNECT = 16,  ///< Terminate the current BLE connection.
-    ARES_FRAME_BLE_SUBSCRIBED = 17,  ///< Indicate that an attribute got
-                                ///< subscribed/unsubscribed from. Tx only.
-    ARES_FRAME_BLE_CHUNKS = 18,      ///< Tell the central device how many chunks are
+    ARES_FRAME_BLE_STATE = 14,      ///< Enable/disable BLE.
+    ARES_FRAME_BLE_CONNECTED = 15,  ///< Indicate that BLE has been connected or
+                                    ///< disconnected from. Tx only.
+    ARES_FRAME_BLE_DISCONNECT = 16, ///< Terminate the current BLE connection.
+    ARES_FRAME_BLE_SUBSCRIBED = 17, ///< Indicate that an attribute got
+                                    ///< subscribed/unsubscribed from. Tx only.
+    ARES_FRAME_BLE_CHUNKS = 18, ///< Tell the central device how many chunks are
                                 ///< going to be sent.
     ARES_FRAME_BLE_IMAGE_CHUNK = 19, ///< Send a chunk to the central device.
 
