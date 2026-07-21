@@ -837,7 +837,7 @@ void AresSerial::_check_crash() {
 void AresSerial::_wait_until_reboot_done(uint8_t delay) {
     constexpr uint8_t min = 5;
     constexpr uint8_t max = 30;
-    constexpr int added_time = 5;
+    constexpr int added_time = 1;
     py::gil_scoped_release release;
     int delay__;
 
