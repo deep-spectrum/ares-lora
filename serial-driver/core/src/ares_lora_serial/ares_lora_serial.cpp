@@ -62,6 +62,7 @@ PYBIND11_MODULE(_ares_lora_serial, m, py::mod_gil_not_used()) {
         .def("ble_state", &AresSerial::ble_state, py::arg("value"))
         .def("ble_disconnect", &AresSerial::ble_disconnect)
         .def("ble_send_image", &AresSerial::ble_send_image, py::arg("image"))
+        .def("reboot", &AresSerial::reboot, py::arg("delay"))
         .def("register_logger_callbacks",
              &AresSerial::register_logger_callbacks, py::arg("dbg"),
              py::arg("info"), py::arg("warning"), py::arg("error"),
@@ -608,6 +609,36 @@ py::tuple AresSerial::ble_send_image(const py::bytes &image) {
     return _ble_send_image(image_);
 }
 
+int AresSerial::reboot(uint8_t delay) {
+    LOG_DBG("Reboot command received.");
+    AresFrame frame{AresFrame::REBOOT, AresFrame::Reboot{delay}};
+    AresResponse response = _send_frame(frame, _response_timeout);
+
+    int ret = -1;
+
+    switch (response.type) {
+    case AresResponse::ACK: {
+        ret = std::get<AresFrame::AckErrorCode>(response.payload);
+        break;
+    }
+    case AresResponse::BAD_FRAME: {
+        _handle_bad_frame(response);
+        break;
+    }
+    default: {
+        throw std::runtime_error("Received invalid response");
+    }
+    }
+
+    if (ret == 0) {
+        stop();
+        _serial.close();
+        _wait_until_reboot_done(delay);
+    }
+
+    return ret;
+}
+
 void AresSerial::register_logger_callbacks(
     const std::function<void(const std::string &)> &dbg,
     const std::function<void(const std::string &)> &info,
@@ -801,6 +832,28 @@ void AresSerial::_check_crash() {
         stop();
         std::rethrow_exception(_exception);
     }
+}
+
+void AresSerial::_wait_until_reboot_done(uint8_t delay) {
+    constexpr uint8_t min = 5;
+    constexpr uint8_t max = 30;
+    constexpr int added_time = 1;
+    py::gil_scoped_release release;
+    int delay__;
+
+    if (delay < min) {
+        delay__ = min;
+    } else if (delay > max) {
+        delay__ = max;
+    } else {
+        delay__ = delay;
+    }
+
+    delay__ += added_time;
+
+    const auto delay_ = std::chrono::seconds{delay__};
+
+    std::this_thread::sleep_for(delay_);
 }
 
 void AresSerial::_process_frames_helper() {

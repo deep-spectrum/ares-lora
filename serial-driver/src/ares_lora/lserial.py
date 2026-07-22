@@ -606,6 +606,26 @@ class LoraSerial:
         codes = self._dev.ble_send_image(data)
         self._check_ret_code(codes)
 
+    @lora_serial_command
+    def reboot(self, delay: int):
+        """Reboot the connected device.
+
+        Args:
+            delay: The amount of seconds to wait for the reboot to occur.
+
+        Raises:
+            TimeoutError: No response from the firmware within the configured timeout.
+            LoraException: Firmware responded with an error code.
+
+        Notes:
+            If the reboot was a success, then the driver needs to be started again. This will
+            automatically stop the driver. If the port is unable to be reopened, then a new
+            driver instance will be needed.
+        """
+        code = self._dev.reboot(delay)
+        self._check_ret_code(code)
+        self._driver_started.clear()
+
     def wait_connection_changed_event(self, block: bool = True, timeout: float | None = None) -> bool:
         """Wait for a connection event from BLE.
 

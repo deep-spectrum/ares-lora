@@ -169,6 +169,10 @@ void AresFrame::serialize(std::vector<uint8_t> &bytearray) {
         _serialize_ble_image(std::get<BleImage>(_tx_payload), bytearray);
         break;
     }
+    case REBOOT: {
+        _serialize_reboot(std::get<Reboot>(_tx_payload), bytearray);
+        break;
+    }
     case BLE_DISCONNECT: {
         // nop
         break;
@@ -375,6 +379,10 @@ uint16_t AresFrame::_payload_size() const {
         ret = payload._img_split[payload._idx].size();
         break;
     }
+    case REBOOT: {
+        ret = sizeof(Reboot::delay);
+        break;
+    }
     case BLE_DISCONNECT: {
         // nop
         break;
@@ -569,6 +577,11 @@ void AresFrame::_serialize_ble_image(const BleImage &payload,
                                      std::vector<uint8_t> &buffer) {
     buffer.insert(buffer.end(), payload._img_split[payload._idx].begin(),
                   payload._img_split[payload._idx].end());
+}
+
+void AresFrame::_serialize_reboot(const Reboot &payload,
+                                  std::vector<uint8_t> &buffer) {
+    SERIALIZE(delay);
 }
 
 #define Z_DESERIALIZE_INIT_DEFAULT(class_)                                     \
