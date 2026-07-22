@@ -35,6 +35,15 @@ static struct modem_id modem_id;
         }                                                                      \
     } while (0)
 
+#define DIRECTED_PACKET_REQUIRED(packet)                                       \
+    do {                                                                       \
+        if ((packet)->type != ARES_PKT_TYPE_DIRECT ||                          \
+            ((packet)->destination_id != modem_id.id ||                        \
+             (packet)->pan_id != modem_id.pan_id)) {                           \
+            return;                                                            \
+        }                                                                      \
+    } while (0)
+
 static void handle_start(const struct ares_lora *lora,
                          const struct ares_packet *packet) {
     ARG_UNUSED(lora);
@@ -66,10 +75,7 @@ static void handle_poll(const struct ares_lora *lora,
         .payload.POLL = packet->source_id,
     };
 
-    if (packet->type != ARES_PKT_TYPE_DIRECT) {
-        // Invalid. Poll should always be direct.
-        return;
-    }
+    DIRECTED_PACKET_REQUIRED(packet);
 
     ares_serial_write_frame(serial, &frame);
 }
@@ -83,10 +89,7 @@ static void handle_heartbeat(const struct ares_lora *lora,
         .type = ARES_FRAME_HEARTBEAT,
     };
 
-    if (packet->type != ARES_PKT_TYPE_DIRECT) {
-        // Invalid. Heartbeat should always be direct.
-        return;
-    }
+    DIRECTED_PACKET_REQUIRED(packet);
 
     frame.payload.HEARTBEAT.flags.ready =
         packet->payload.payload.HEARTBEAT.ready;
@@ -113,9 +116,7 @@ static void ack_log(const struct ares_lora *lora,
             },
     };
 
-    if (packet->type != ARES_PKT_TYPE_DIRECT) {
-        return;
-    }
+    DIRECTED_PACKET_REQUIRED(packet);
 
     ares_lora_set_packet_id(lora, &ack);
     ares_lora_write_packet(lora, &ack);
@@ -174,12 +175,7 @@ static void handle_log_ack(const struct ares_lora *lora,
             },
     };
 
-    CHECK_DIRECTED_PACKET(packet);
-
-    if (packet->type == ARES_PKT_TYPE_BROADCAST) {
-        // invalid
-        return;
-    }
+    DIRECTED_PACKET_REQUIRED(packet);
 
     ares_serial_write_frame(serial, &frame);
 }
