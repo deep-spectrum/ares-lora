@@ -310,6 +310,17 @@ class AresSerial {
     py::tuple ble_send_image(const py::bytes &image);
 
     /**
+     * Reboot the connected device.
+     *
+     * @param[in] delay The amount of seconds to wait before the reboot.
+     *
+     * @warning This will stop the driver and close the port.
+     *
+     * @return ACK'ed error code
+     */
+    int reboot(uint8_t delay);
+
+    /**
      * Register logging redirects.
      *
      * @param[in] dbg Debug message callback.
@@ -405,6 +416,7 @@ class AresSerial {
     std::exception_ptr _exception;
 
     void _check_crash();
+    static void _wait_until_reboot_done(uint8_t delay);
 
     std::chrono::milliseconds _response_timeout;
     std::chrono::milliseconds _rx_period;
