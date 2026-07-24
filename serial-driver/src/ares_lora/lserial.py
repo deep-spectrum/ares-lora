@@ -624,7 +624,7 @@ class LoraSerial:
         """
         code = self._dev.reboot(delay)
         self._check_ret_code(code)
-        self._driver_started.clear()
+        self._stop_driver()
 
     def wait_connection_changed_event(self, block: bool = True, timeout: float | None = None) -> bool:
         """Wait for a connection event from BLE.
