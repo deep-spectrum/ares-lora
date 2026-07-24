@@ -48,11 +48,11 @@ static struct pwm_led pwm_leds[] = { // NOLINT(*-interfaces-global-init)
     },
 };
 
-struct pwm_led *pwm_led_from_blink_work(struct k_work_delayable *dwork) {
+static struct pwm_led *pwm_led_from_blink_work(struct k_work_delayable *dwork) {
     return CONTAINER_OF(dwork, struct pwm_led, blink_work);
 }
 
-struct pwm_led *pwm_led_from_fade_work(struct k_work_delayable *dwork) {
+static struct pwm_led *pwm_led_from_fade_work(struct k_work_delayable *dwork) {
     return CONTAINER_OF(dwork, struct pwm_led, fade_work);
 }
 
