@@ -143,7 +143,26 @@ static size_t calculate_packet_size(const struct ares_packet *packet) {
                     PSIZEOF_FIELD(LOG_ACK.log_id);
         break;
     }
-    case ARES_PKT_PAYLOAD_POLL: {
+    case ARES_PKT_PAYLOAD_ACK:
+    case ARES_PKT_PAYLOAD_NACK: {
+        overhead += PSIZEOF_FIELD(ACK_NACK);
+        break;
+    }
+    case ARES_PKT_PAYLOAD_CONFIG: {
+        overhead += PSIZEOF_FIELD(CONFIG_.type) + PSIZEOF_FIELD(CONFIG_.config);
+        break;
+    }
+    case ARES_PKT_PAYLOAD_CONFIG_POLL: {
+        overhead += PSIZEOF_FIELD(CONFIG_POLL_);
+        break;
+    }
+    case ARES_PKT_PAYLOAD_CONFIG_RESP: {
+        overhead += PSIZEOF_FIELD(CONFIG_RESP_);
+        break;
+    }
+    case ARES_PKT_PAYLOAD_POLL:
+    case ARES_PKT_PAYLOAD_ABORT:
+    case ARES_PKT_PAYLOAD_READY: {
         // nop
         break;
     }
@@ -245,7 +264,27 @@ static void serialize(uint8_t *buf, size_t len,
         PSERIALIZE(LOG_ACK.log_id);
         break;
     }
-    case ARES_PKT_PAYLOAD_POLL: {
+    case ARES_PKT_PAYLOAD_ACK:
+    case ARES_PKT_PAYLOAD_NACK: {
+        PSERIALIZE(ACK_NACK);
+        break;
+    }
+    case ARES_PKT_PAYLOAD_CONFIG: {
+        PSERIALIZE(CONFIG_.type);
+        PSERIALIZE(CONFIG_.config);
+        break;
+    }
+    case ARES_PKT_PAYLOAD_CONFIG_POLL: {
+        PSERIALIZE(CONFIG_POLL_);
+        break;
+    }
+    case ARES_PKT_PAYLOAD_CONFIG_RESP: {
+        PSERIALIZE(CONFIG_RESP_);
+        break;
+    }
+    case ARES_PKT_PAYLOAD_POLL:
+    case ARES_PKT_PAYLOAD_ABORT:
+    case ARES_PKT_PAYLOAD_READY: {
         // nop
         break;
     }
@@ -348,7 +387,27 @@ static void deserialize(struct ares_packet *packet, const uint8_t *buf) {
         PDESERIALIZE(LOG_ACK.log_id);
         break;
     }
-    case ARES_PKT_PAYLOAD_POLL: {
+    case ARES_PKT_PAYLOAD_ACK:
+    case ARES_PKT_PAYLOAD_NACK: {
+        PDESERIALIZE(ACK_NACK);
+        break;
+    }
+    case ARES_PKT_PAYLOAD_CONFIG: {
+        PDESERIALIZE(CONFIG_.type);
+        PDESERIALIZE(CONFIG_.config);
+        break;
+    }
+    case ARES_PKT_PAYLOAD_CONFIG_POLL: {
+        PDESERIALIZE(CONFIG_POLL_);
+        break;
+    }
+    case ARES_PKT_PAYLOAD_CONFIG_RESP: {
+        PDESERIALIZE(CONFIG_RESP_);
+        break;
+    }
+    case ARES_PKT_PAYLOAD_POLL:
+    case ARES_PKT_PAYLOAD_ABORT:
+    case ARES_PKT_PAYLOAD_READY: {
         // nop
         break;
     }
