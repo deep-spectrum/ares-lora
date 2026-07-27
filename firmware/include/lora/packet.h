@@ -284,6 +284,7 @@ int serialize_ares_packet(uint8_t *buf, size_t len,
  *
  * @return 0 on success.
  * @return -EINVAL on invalid parameters or packet not valid.
+ * @return negative error code from ares_packet_valid.
  */
 int deserialize_ares_packet(struct ares_packet *packet, const uint8_t *buf,
                             size_t len);

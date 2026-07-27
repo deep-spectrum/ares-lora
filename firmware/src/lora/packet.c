@@ -416,8 +416,9 @@ static void deserialize(struct ares_packet *packet, const uint8_t *buf) {
 
 int deserialize_ares_packet(struct ares_packet *packet, const uint8_t *buf,
                             size_t len) {
-    if (!ares_packet_valid(buf, len)) {
-        return -EINVAL;
+    int ret = ares_packet_valid(buf, len);
+    if (ret < 0) {
+        return ret;
     }
 
     __ASSERT_NO_MSG(buf != NULL);
