@@ -468,6 +468,23 @@ class AresSerial {
 
     static void _handle_bad_frame(const AresResponse &response);
 
+    struct LoraAckWork {
+        LoraAckWork(ares::work_handler_t handler, AresSerial *ctx)
+            : work(std::move(handler)), obj(ctx) {}
+        ~LoraAckWork() { work.work_flush(); }
+        ares::Work work;
+        AresSerial *obj;
+        uint16_t id = 0;
+        AresFrame::LoRaAck::AckedMessage acked_message =
+            AresFrame::LoRaAck::INVALID;
+        ares::semaphore<> sem{};
+    };
+
+    static void _lora_msg_ack_handler(ares::Work *work);
+    LoraAckWork _lora_ack_work;
+    void _send_lora_ack(uint16_t id,
+                        AresFrame::LoRaAck::AckedMessage acked_message);
+
     struct HeartbeatWork {
         HeartbeatWork(ares::work_handler_t handler, AresSerial *ctx)
             : work(std::move(handler)), obj(ctx) {}

@@ -129,6 +129,7 @@ AresSerial::AresSerial(const AresSerialConfigs &configs)
     : _response_timeout(configs.response_timeout),
       _rx_period(configs.rx_period), _rx_task([this] { _read_serial(); }),
       _processing_task([this] { _process_frames(); }),
+      _lora_ack_work(_lora_msg_ack_handler, this),
       _heartbeat_work(_heartbeat_handler, this),
       _mac_backoff(configs.alpha, configs.beta), _generator(_rd()) {
     SerialInternal::SerialAttributes attr;
@@ -827,6 +828,45 @@ void AresSerial::cancel_events() {
     _stop_event_queues();
 }
 
+void AresSerial::_lora_msg_ack_handler(ares::Work *work) {
+    LoraAckWork *lwork = ares::container_of(work, &LoraAckWork::work);
+    uint16_t id = lwork->id;
+    AresFrame::LoRaAck::AckedMessage message = lwork->acked_message;
+    lwork->sem.give();
+    lwork->obj->_send_lora_ack(id, message);
+}
+
+void AresSerial::_send_lora_ack(
+    uint16_t id, AresFrame::LoRaAck::AckedMessage acked_message) {
+    AresFrame frame(AresFrame::LORA_ACK, AresFrame::LoRaAck{id, acked_message});
+
+    AresResponse response;
+
+    try {
+        response =
+            _send_frame_released(frame, std::chrono::milliseconds::max());
+    } catch (const std::exception &e) {
+        LOG_ERR("_send_frame_released(): %s", e.what());
+        return;
+    }
+
+    switch (response.type) {
+    case AresResponse::ACK: {
+        LOG_DBG("Send heartbeat ACK'ed: %d",
+                std::get<AresFrame::AckErrorCode>(response.payload));
+        break;
+    }
+    case AresResponse::BAD_FRAME: {
+        LOG_ERR("Bad frame response received in heartbeat handler");
+        break;
+    }
+    default: {
+        LOG_ERR("Received invalid response");
+        break;
+    }
+    }
+}
+
 void AresSerial::_check_crash() {
     if (_exception) {
         stop();
@@ -1040,6 +1080,13 @@ void AresSerial::_start_event(const AresFrame::Start &start_frame) {
     LOG_INF("Start event received: (%ld, %lu, %u, %d, %d, %u)", start_frame.sec,
             start_frame.usec, start_frame.id, start_frame.broadcast,
             start_frame.seq_cnt, start_frame.packet_id);
+
+    if (!start_frame.broadcast) {
+        _lora_ack_work.sem.take();
+        _lora_ack_work.id = start_frame.id;
+        _lora_ack_work.acked_message = AresFrame::LoRaAck::START;
+        _work_q.submit(&_lora_ack_work.work);
+    }
 
     put_no_except(start_frame, _start_event_q, 100ms);
 }
