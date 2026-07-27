@@ -156,7 +156,8 @@ static size_t calculate_packet_size(const struct ares_packet *packet) {
         break;
     }
     case ARES_PKT_PAYLOAD_CONFIG_RESP: {
-        overhead += PSIZEOF_FIELD(CONFIG_RESP_);
+        overhead += PSIZEOF_FIELD(CONFIG_RESP_.type) +
+                    PSIZEOF_FIELD(CONFIG_RESP_.config);
         break;
     }
     case ARES_PKT_PAYLOAD_POLL:
@@ -277,7 +278,8 @@ static void serialize(uint8_t *buf, size_t len,
         break;
     }
     case ARES_PKT_PAYLOAD_CONFIG_RESP: {
-        PSERIALIZE(CONFIG_RESP_);
+        PSERIALIZE(CONFIG_RESP_.type);
+        PSERIALIZE(CONFIG_RESP_.config);
         break;
     }
     case ARES_PKT_PAYLOAD_POLL:
@@ -399,7 +401,8 @@ static void deserialize(struct ares_packet *packet, const uint8_t *buf) {
         break;
     }
     case ARES_PKT_PAYLOAD_CONFIG_RESP: {
-        PDESERIALIZE(CONFIG_RESP_);
+        PDESERIALIZE(CONFIG_RESP_.type);
+        PDESERIALIZE(CONFIG_RESP_.config);
         break;
     }
     case ARES_PKT_PAYLOAD_POLL:

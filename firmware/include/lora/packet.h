@@ -171,7 +171,10 @@ struct ares_packet_payload {
 
         uint8_t CONFIG_POLL_;
 
-        uint64_t CONFIG_RESP_;
+        struct {
+            uint8_t type;
+            uint64_t config;
+        } CONFIG_RESP_;
 
     } payload;
 };

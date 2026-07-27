@@ -460,7 +460,11 @@ static void handle_node_config_response(const struct ares_serial *serial,
         .payload =
             {
                 .type = ARES_PKT_PAYLOAD_CONFIG_RESP,
-                .payload.CONFIG_RESP_ = frame->payload.NODE_CONFIG_RESP.config,
+                .payload.CONFIG_RESP_ =
+                    {
+                        .type = frame->payload.NODE_CONFIG_RESP.type,
+                        .config = frame->payload.NODE_CONFIG_RESP.config,
+                    },
             },
     };
 

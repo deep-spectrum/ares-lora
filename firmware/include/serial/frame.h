@@ -253,6 +253,7 @@ struct ares_frame {
 
         struct {
             uint16_t id;
+            uint8_t type;
             uint64_t config;
         } NODE_CONFIG_RESP; ///< ARES_FRAME_NODE_CONFIG_RESP
 

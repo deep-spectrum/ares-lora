@@ -133,6 +133,7 @@ static size_t calculate_frame_length(const struct ares_frame *frame) {
     }
     case ARES_FRAME_NODE_CONFIG_RESP: {
         payload_len = FSIZEOF_FIELD(NODE_CONFIG_RESP.id) +
+                      FSIZEOF_FIELD(NODE_CONFIG_RESP.type) +
                       FSIZEOF_FIELD(NODE_CONFIG_RESP.config);
         break;
     }
@@ -292,6 +293,7 @@ static void serialize(uint8_t *buf, const struct ares_frame *frame,
     }
     case ARES_FRAME_NODE_CONFIG_RESP: {
         FSERIALIZE(NODE_CONFIG_RESP.id);
+        FSERIALIZE(NODE_CONFIG_RESP.type);
         FSERIALIZE(NODE_CONFIG_RESP.config);
         break;
     }
@@ -464,6 +466,7 @@ static void deserialize(struct ares_frame *frame, const uint8_t *buf) {
     }
     case ARES_FRAME_NODE_CONFIG_RESP: {
         FDESERIALIZE(NODE_CONFIG_RESP.id);
+        FDESERIALIZE(NODE_CONFIG_RESP.type);
         FDESERIALIZE(NODE_CONFIG_RESP.config);
         break;
     }

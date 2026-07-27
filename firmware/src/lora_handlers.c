@@ -262,7 +262,8 @@ static void handle_config_poll_response(const struct ares_lora *lora,
         .payload.NODE_CONFIG_RESP =
             {
                 .id = packet->source_id,
-                .config = packet->payload.payload.CONFIG_RESP_,
+                .config = packet->payload.payload.CONFIG_RESP_.config,
+                .type = packet->payload.payload.CONFIG_RESP_.type,
             },
     };
 
