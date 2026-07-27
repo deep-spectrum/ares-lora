@@ -73,7 +73,6 @@ class AresFrame {
         DBG = 11,           ///< Debug message (RX)
         PKT_RX = 12,        ///< Packet Received (RX)
         PKT_TX = 13,        ///< Packet transmitted (RX)
-        REBOOT = 20,        ///< Reboot (TX)
 
         BLE_STATE = 14,       ///< Set or retrieve the BLE state (TX/RX)
         BLE_CONNECTED = 15,   ///< BLE connect state change (RX)
@@ -81,6 +80,16 @@ class AresFrame {
         BLE_SUBSCRIBED = 17,  ///< BLE service subscription change (RX)
         BLE_CHUNK = 18,       ///< BLE tell central how many chunks (TX)
         BLE_IMAGE_CHUNK = 19, ///< BLE transfer image chunk (TX)
+
+        REBOOT = 20,           ///< Reboot (TX)
+        LORA_ACK = 21,         ///< LoRa packet Acknowledge (TX/RX)
+        ABORT = 22,            ///< Abort measurement (TX/RX)
+        NODE_CONFIG = 23,      ///< Configure receiver node (TX/RX)
+        NODE_CONFIG_POLL = 24, ///< Poll a receiver node's configs (TX/RX)
+        NODE_CONFIG_RESP = 25, ///< Poll response for configurations
+                               ///< poll (TX/RX)
+        NODE_READY = 26, ///< Indication that the coordinator is ready to start
+                         ///< reception (TX/RX)
 
         DRIVER_STOP, ///< Frame used to stop the core driver.
         UNKNOWN,     ///< Unknown frame
@@ -587,6 +596,68 @@ class AresFrame {
         uint8_t delay = 5;
     };
 
+    struct LoRaAck {
+        enum AckedMessage : uint16_t {
+            START,  ///< Directed start message.
+            ABORT,  ///< Directed abort message.
+            CONFIG, ///< Node configuration message.
+            READY,  ///< Directed ready message.
+
+            INVALID,
+        };
+
+        uint16_t id = 0;
+        AckedMessage message_type = INVALID;
+    };
+
+    struct Abort {
+        bool broadcast = false;
+        uint16_t id = 0;
+    };
+
+    enum NodeConfigType : uint8_t {
+        SAVE_FOLDER,
+        BANDWIDTH,
+        CENTER_FREQ,
+        DURATION,
+        REF_LEVEL,
+
+        INVALID,
+    };
+
+    struct NodeConfigSaveFolder {
+        uint16_t year = 0;
+        uint8_t month = 0;
+        uint8_t day = 0;
+        uint8_t hour = 0;
+        uint8_t minute = 0;
+        uint8_t second = 0;
+    };
+
+    using NodeConfigData =
+        std::variant<std::monostate, NodeConfigSaveFolder, uint32_t, double>;
+
+    struct NodeConfig {
+        uint16_t id = 0;
+        NodeConfigType type = INVALID;
+        NodeConfigData config = std::monostate();
+    };
+
+    struct NodeConfigPoll {
+        uint16_t id = 0;
+        NodeConfigType type = INVALID;
+    };
+
+    struct NodeConfigResponse {
+        uint16_t id = 0;
+        NodeConfigData config = std::monostate();
+    };
+
+    struct NodeReady {
+        bool broadcast = false;
+        uint16_t id = 0;
+    };
+
     /**
      * @typedef TxTypes
      *
@@ -594,7 +665,9 @@ class AresFrame {
      */
     using TxTypes =
         std::variant<std::monostate, Setting, Start, LoraConfig, Led, Heartbeat,
-                     Poll, Log, Version, BleState, BleChunk, BleImage, Reboot>;
+                     Poll, Log, Version, BleState, BleChunk, BleImage, Reboot,
+                     LoRaAck, Abort, NodeConfig, NodeConfigPoll,
+                     NodeConfigResponse, NodeReady>;
 
     /**
      * @typedef RxTypes
@@ -604,7 +677,8 @@ class AresFrame {
     using RxTypes =
         std::variant<std::monostate, Setting, Start, AckErrorCode, FramingError,
                      Led, Heartbeat, Poll, Log, Version, LogAck, Dbg, PktRx,
-                     PktTx, BleState, BleConnect, BleSubscribed>;
+                     PktTx, BleState, BleConnect, BleSubscribed, LoRaAck, Abort,
+                     NodeConfig, NodeConfigPoll, NodeConfigResponse, NodeReady>;
 
     /**
      * @typedef ResponseTypes
@@ -782,6 +856,19 @@ class AresFrame {
                                      std::vector<uint8_t> &buffer);
     static void _serialize_reboot(const Reboot &payload,
                                   std::vector<uint8_t> &buffer);
+    static void _serialize_lora_ack(const LoRaAck &payload,
+                                    std::vector<uint8_t> &buffer);
+    static void _serialize_abort(const Abort &payload,
+                                 std::vector<uint8_t> &buffer);
+    static void _serialize_node_config(const NodeConfig &payload,
+                                       std::vector<uint8_t> &buffer);
+    static void _serialize_node_config_poll(const NodeConfigPoll &payload,
+                                            std::vector<uint8_t> &buffer);
+    static void
+    _serialize_node_config_response(const NodeConfigResponse &payload,
+                                    std::vector<uint8_t> &buffer);
+    static void _serialize_node_ready(const NodeReady &payload,
+                                      std::vector<uint8_t> &buffer);
 
     void _deserialize_setting(const uint8_t *buf, size_t len);
     void _deserialize_led(const uint8_t *buf, size_t len);
@@ -799,6 +886,12 @@ class AresFrame {
     void _deserialize_ble_state(const uint8_t *buf, size_t len);
     void _deserialize_ble_connected(const uint8_t *buf, size_t len);
     void _deserialize_ble_subscribed(const uint8_t *buf, size_t len);
+    void _deserialize_lora_ack(const uint8_t *buf, size_t len);
+    void _deserialize_abort(const uint8_t *buf, size_t len);
+    void _deserialize_node_config(const uint8_t *buf, size_t len);
+    void _deserialize_node_config_poll(const uint8_t *buf, size_t len);
+    void _deserialize_node_config_response(const uint8_t *buf, size_t len);
+    void _deserialize_node_ready(const uint8_t *buf, size_t len);
 };
 
 #endif // ARES_ARES_FRAME_HPP
