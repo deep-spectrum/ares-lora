@@ -143,9 +143,8 @@ static size_t calculate_packet_size(const struct ares_packet *packet) {
                     PSIZEOF_FIELD(LOG_ACK.log_id);
         break;
     }
-    case ARES_PKT_PAYLOAD_ACK:
-    case ARES_PKT_PAYLOAD_NACK: {
-        overhead += PSIZEOF_FIELD(ACK_NACK);
+    case ARES_PKT_PAYLOAD_ACK: {
+        overhead += PSIZEOF_FIELD(ACK);
         break;
     }
     case ARES_PKT_PAYLOAD_CONFIG: {
@@ -264,9 +263,8 @@ static void serialize(uint8_t *buf, size_t len,
         PSERIALIZE(LOG_ACK.log_id);
         break;
     }
-    case ARES_PKT_PAYLOAD_ACK:
-    case ARES_PKT_PAYLOAD_NACK: {
-        PSERIALIZE(ACK_NACK);
+    case ARES_PKT_PAYLOAD_ACK: {
+        PSERIALIZE(ACK);
         break;
     }
     case ARES_PKT_PAYLOAD_CONFIG: {
@@ -387,9 +385,8 @@ static void deserialize(struct ares_packet *packet, const uint8_t *buf) {
         PDESERIALIZE(LOG_ACK.log_id);
         break;
     }
-    case ARES_PKT_PAYLOAD_ACK:
-    case ARES_PKT_PAYLOAD_NACK: {
-        PDESERIALIZE(ACK_NACK);
+    case ARES_PKT_PAYLOAD_ACK: {
+        PDESERIALIZE(ACK);
         break;
     }
     case ARES_PKT_PAYLOAD_CONFIG: {
