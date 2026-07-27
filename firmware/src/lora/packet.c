@@ -433,55 +433,55 @@ int deserialize_ares_packet(struct ares_packet *packet, const uint8_t *buf,
     return 0;
 }
 
-bool ares_packet_valid(const uint8_t *buf, size_t len) {
+int ares_packet_valid(const uint8_t *buf, size_t len) {
     enum ares_packet_type type;
     enum ares_packet_payload_type ptype;
     size_t payload_len;
     crc16_t crc;
 
     if (buf == NULL || len < ARES_PACKET_MIN_OVERHEAD) {
-        return false;
+        return -EINVAL;
     }
 
     if (memcmp(&buf[ARES_PACKET_HEADER_OFFSET], &header,
                ARES_PACKET_HEADER_OVERHEAD) != 0) {
         // invalid header
-        return false;
+        return -EILSEQ;
     }
 
     type = buf[ARES_PACKET_TYPE_OFFSET];
     if (type >= ARES_PKT_TYPE_INVALID) {
         // invalid type
-        return false;
+        return -ENOENT;
     }
 
     ptype = buf[ARES_PACKET_PAYLOAD_TYPE_OFFSET(type)];
     if (ptype >= ARES_PKT_PAYLOAD_INVALID) {
         // invalid packet type
-        return false;
+        return -ENOEXEC;
     }
 
     (void)memcpy(&payload_len, &buf[ARES_PACKET_LEN_OFFSET],
                  ARES_PACKET_LEN_OVERHEAD);
     if ((payload_len + ARES_PACKET_OVERHEAD(type)) > len) {
         // invalid length (avoid accessing memory we are not supposed to access)
-        return false;
+        return -ENOBUFS;
     }
 
     if (memcmp(&buf[ARES_PACKET_FOOTER_OFFSET(type, payload_len)], &footer,
                ARES_PACKET_FOOTER_OVERHEAD) != 0) {
         // invalid footer
-        return false;
+        return -EILSEQ;
     }
 
     crc = compute_crc(buf, ARES_PACKET_CRC_OFFSET(type, payload_len));
     if (memcmp(&crc, &buf[ARES_PACKET_CRC_OFFSET(type, payload_len)],
                ARES_PACKET_CRC_OVERHEAD) != 0) {
         // invalid crc
-        return false;
+        return -EBADMSG;
     }
 
-    return true;
+    return 0;
 }
 
 int ares_packet_present(const uint8_t *buf, size_t len,

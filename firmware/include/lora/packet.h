@@ -295,10 +295,15 @@ int deserialize_ares_packet(struct ares_packet *packet, const uint8_t *buf,
  * @param[in] buf Pointer to the start of the packet in the buffer.
  * @param[in] len The length of the packet in the buffer.
  *
- * @return `true` if the packet is valid.
- * @return `false` if the inputs or the packet are invalid.
+ * @return @p 0 if the packet is valid.
+ * @return @p -EINVAL if parameters are invalid.
+ * @return @p -EILSEQ if invalid header or footer.
+ * @return @p -ENOENT if packet type is invalid.
+ * @return @p -ENOEXEC if payload type is invalid.
+ * @return @p -ENOBUFS if length is invalid.
+ * @return @p -EBADMSG if crc is invalid.
  */
-bool ares_packet_valid(const uint8_t *buf, size_t len);
+int ares_packet_valid(const uint8_t *buf, size_t len);
 
 /**
  * @brief Function to check if there is an ares packet in the buffer.
