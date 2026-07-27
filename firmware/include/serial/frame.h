@@ -262,7 +262,7 @@ struct ares_frame {
                 uint8_t reserved : 7;
             } flags;
             uint16_t id;
-        } READY; ///< ARES_FRAME_READY
+        } NODE_READY; ///< ARES_FRAME_NODE_READY
 
     } payload;
 };
