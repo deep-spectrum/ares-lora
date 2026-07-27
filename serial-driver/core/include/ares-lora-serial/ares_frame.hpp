@@ -634,6 +634,7 @@ class AresFrame {
         uint8_t second = 0;
     };
 
+    static constexpr size_t NodeConfigData_size = 8;
     using NodeConfigData =
         std::variant<std::monostate, NodeConfigSaveFolder, uint32_t, double>;
 
@@ -648,10 +649,7 @@ class AresFrame {
         NodeConfigType type = INVALID;
     };
 
-    struct NodeConfigResponse {
-        uint16_t id = 0;
-        NodeConfigData config = std::monostate();
-    };
+    using NodeConfigResponse = NodeConfig;
 
     struct NodeReady {
         bool broadcast = false;
@@ -666,8 +664,7 @@ class AresFrame {
     using TxTypes =
         std::variant<std::monostate, Setting, Start, LoraConfig, Led, Heartbeat,
                      Poll, Log, Version, BleState, BleChunk, BleImage, Reboot,
-                     LoRaAck, Abort, NodeConfig, NodeConfigPoll,
-                     NodeConfigResponse, NodeReady>;
+                     LoRaAck, Abort, NodeConfig, NodeConfigPoll, NodeReady>;
 
     /**
      * @typedef RxTypes
@@ -678,7 +675,7 @@ class AresFrame {
         std::variant<std::monostate, Setting, Start, AckErrorCode, FramingError,
                      Led, Heartbeat, Poll, Log, Version, LogAck, Dbg, PktRx,
                      PktTx, BleState, BleConnect, BleSubscribed, LoRaAck, Abort,
-                     NodeConfig, NodeConfigPoll, NodeConfigResponse, NodeReady>;
+                     NodeConfig, NodeConfigPoll, NodeReady>;
 
     /**
      * @typedef ResponseTypes
@@ -860,6 +857,8 @@ class AresFrame {
                                     std::vector<uint8_t> &buffer);
     static void _serialize_abort(const Abort &payload,
                                  std::vector<uint8_t> &buffer);
+    static uint64_t _serialize_node_config(NodeConfigType type,
+                                           const NodeConfigData &payload);
     static void _serialize_node_config(const NodeConfig &payload,
                                        std::vector<uint8_t> &buffer);
     static void _serialize_node_config_poll(const NodeConfigPoll &payload,
@@ -888,6 +887,8 @@ class AresFrame {
     void _deserialize_ble_subscribed(const uint8_t *buf, size_t len);
     void _deserialize_lora_ack(const uint8_t *buf, size_t len);
     void _deserialize_abort(const uint8_t *buf, size_t len);
+    static NodeConfigData _deserialize_node_config_data(NodeConfigType type,
+                                                        uint64_t config);
     void _deserialize_node_config(const uint8_t *buf, size_t len);
     void _deserialize_node_config_poll(const uint8_t *buf, size_t len);
     void _deserialize_node_config_response(const uint8_t *buf, size_t len);
