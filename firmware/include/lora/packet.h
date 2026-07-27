@@ -109,11 +109,19 @@
  * @brief Packet payload types.
  */
 enum ares_packet_payload_type {
-    ARES_PKT_PAYLOAD_START = 0,     ///< Start data collection packet.
-    ARES_PKT_PAYLOAD_POLL = 1,      ///< Poll packet
-    ARES_PKT_PAYLOAD_HEARTBEAT = 2, ///< Heartbeat packet.
-    ARES_PKT_PAYLOAD_LOG = 3,       ///< Log packet.
-    ARES_PKT_PAYLOAD_LOG_ACK = 4,   ///< Log acknowledge packet.
+    ARES_PKT_PAYLOAD_START = 0,        ///< Start data collection packet.
+    ARES_PKT_PAYLOAD_POLL = 1,         ///< Poll packet
+    ARES_PKT_PAYLOAD_HEARTBEAT = 2,    ///< Heartbeat packet.
+    ARES_PKT_PAYLOAD_LOG = 3,          ///< Log packet.
+    ARES_PKT_PAYLOAD_LOG_ACK = 4,      ///< Log acknowledge packet.
+    ARES_PKT_PAYLOAD_ACK = 5,          ///< Acknowledge directed messages.
+    ARES_PKT_PAYLOAD_NACK = 6,         ///< Direct message not acknowledged.
+    ARES_PKT_PAYLOAD_ABORT = 7,        ///< Abort measurements started.
+    ARES_PKT_PAYLOAD_CONFIG = 8,       ///< Configure the node.
+    ARES_PKT_PAYLOAD_CONFIG_POLL = 9,  ///< Poll for a configuration.
+    ARES_PKT_PAYLOAD_CONFIG_RESP = 10, ///< Configuration poll response.
+    ARES_PKT_PAYLOAD_READY = 11,       ///< Indicate to the other nodes that
+                                       ///< the coordinator node is ready.
 
     ARES_PKT_PAYLOAD_INVALID, ///< Invalid packet type.
 };
@@ -154,6 +162,20 @@ struct ares_packet_payload {
             uint8_t num_parts;
             uint16_t log_id;
         } LOG_ACK;
+
+        uint16_t ACK;
+
+        uint16_t NACK;
+
+        struct {
+            uint8_t type;
+            uint16_t config;
+        } CONFIG_;
+
+        uint8_t CONFIG_POLL_;
+
+        uint64_t CONFIG_RESP_;
+
     } payload;
 };
 
