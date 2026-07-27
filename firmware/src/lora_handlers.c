@@ -185,7 +185,12 @@ static void handle_ack(const struct ares_lora *lora,
     ARG_UNUSED(lora);
     const struct ares_serial *serial = ares_serial_backend_uart_get_ptr();
     struct ares_frame frame = {
-        .type = ARES_FRAME_TYPE_INVALID, // TODO
+        .type = ARES_FRAME_LORA_ACK,
+        .payload.LORA_ACK =
+            {
+                .id = packet->source_id,
+                .payload_type = packet->payload.payload.ACK,
+            },
     };
 
     DIRECTED_PACKET_REQUIRED(packet);
@@ -198,7 +203,12 @@ static void handle_abort(const struct ares_lora *lora,
     ARG_UNUSED(lora);
     const struct ares_serial *serial = ares_serial_backend_uart_get_ptr();
     struct ares_frame frame = {
-        .type = ARES_FRAME_TYPE_INVALID, // TODO
+        .type = ARES_FRAME_ABORT,
+        .payload.ABORT =
+            {
+                .id = packet->source_id,
+                .flags.broadcast = packet->type == ARES_PKT_TYPE_BROADCAST,
+            },
     };
 
     CHECK_DIRECTED_PACKET(packet);
@@ -211,7 +221,13 @@ static void handle_config(const struct ares_lora *lora,
     ARG_UNUSED(lora);
     const struct ares_serial *serial = ares_serial_backend_uart_get_ptr();
     struct ares_frame frame = {
-        .type = ARES_FRAME_TYPE_INVALID, // TODO
+        .type = ARES_FRAME_NODE_CONFIG,
+        .payload.NODE_CONFIG =
+            {
+                .type = packet->payload.payload.CONFIG_.type,
+                .id = packet->source_id,
+                .config = packet->payload.payload.CONFIG_.config,
+            },
     };
 
     DIRECTED_PACKET_REQUIRED(packet);
@@ -224,7 +240,12 @@ static void handle_config_poll(const struct ares_lora *lora,
     ARG_UNUSED(lora);
     const struct ares_serial *serial = ares_serial_backend_uart_get_ptr();
     struct ares_frame frame = {
-        .type = ARES_FRAME_TYPE_INVALID, // TODO
+        .type = ARES_FRAME_NODE_CONFIG_POLL,
+        .payload.NODE_CONFIG_POLL =
+            {
+                .type = packet->payload.payload.CONFIG_POLL_,
+                .id = packet->source_id,
+            },
     };
 
     DIRECTED_PACKET_REQUIRED(packet);
@@ -237,7 +258,12 @@ static void handle_config_poll_response(const struct ares_lora *lora,
     ARG_UNUSED(lora);
     const struct ares_serial *serial = ares_serial_backend_uart_get_ptr();
     struct ares_frame frame = {
-        .type = ARES_FRAME_TYPE_INVALID, // TODO
+        .type = ARES_FRAME_NODE_CONFIG_RESP,
+        .payload.NODE_CONFIG_RESP =
+            {
+                .id = packet->source_id,
+                .config = packet->payload.payload.CONFIG_RESP_,
+            },
     };
 
     DIRECTED_PACKET_REQUIRED(packet);
@@ -250,7 +276,12 @@ static void handle_ready(const struct ares_lora *lora,
     ARG_UNUSED(lora);
     const struct ares_serial *serial = ares_serial_backend_uart_get_ptr();
     struct ares_frame frame = {
-        .type = ARES_FRAME_TYPE_INVALID, // TODO
+        .type = ARES_FRAME_NODE_READY,
+        .payload.NODE_READY =
+            {
+                .id = packet->source_id,
+                .flags.broadcast = packet->type == ARES_PKT_TYPE_BROADCAST,
+            },
     };
 
     CHECK_DIRECTED_PACKET(packet);
