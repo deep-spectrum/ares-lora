@@ -180,12 +180,96 @@ static void handle_log_ack(const struct ares_lora *lora,
     ares_serial_write_frame(serial, &frame);
 }
 
+static void handle_ack(const struct ares_lora *lora,
+                       const struct ares_packet *packet) {
+    ARG_UNUSED(lora);
+    const struct ares_serial *serial = ares_serial_backend_uart_get_ptr();
+    struct ares_frame frame = {
+        .type = ARES_FRAME_TYPE_INVALID, // TODO
+    };
+
+    DIRECTED_PACKET_REQUIRED(packet);
+
+    ares_serial_write_frame(serial, &frame);
+}
+
+static void handle_abort(const struct ares_lora *lora,
+                         const struct ares_packet *packet) {
+    ARG_UNUSED(lora);
+    const struct ares_serial *serial = ares_serial_backend_uart_get_ptr();
+    struct ares_frame frame = {
+        .type = ARES_FRAME_TYPE_INVALID, // TODO
+    };
+
+    CHECK_DIRECTED_PACKET(packet);
+
+    ares_serial_write_frame(serial, &frame);
+}
+
+static void handle_config(const struct ares_lora *lora,
+                          const struct ares_packet *packet) {
+    ARG_UNUSED(lora);
+    const struct ares_serial *serial = ares_serial_backend_uart_get_ptr();
+    struct ares_frame frame = {
+        .type = ARES_FRAME_TYPE_INVALID, // TODO
+    };
+
+    DIRECTED_PACKET_REQUIRED(packet);
+
+    ares_serial_write_frame(serial, &frame);
+}
+
+static void handle_config_poll(const struct ares_lora *lora,
+                               const struct ares_packet *packet) {
+    ARG_UNUSED(lora);
+    const struct ares_serial *serial = ares_serial_backend_uart_get_ptr();
+    struct ares_frame frame = {
+        .type = ARES_FRAME_TYPE_INVALID, // TODO
+    };
+
+    DIRECTED_PACKET_REQUIRED(packet);
+
+    ares_serial_write_frame(serial, &frame);
+}
+
+static void handle_config_poll_response(const struct ares_lora *lora,
+                                        const struct ares_packet *packet) {
+    ARG_UNUSED(lora);
+    const struct ares_serial *serial = ares_serial_backend_uart_get_ptr();
+    struct ares_frame frame = {
+        .type = ARES_FRAME_TYPE_INVALID, // TODO
+    };
+
+    DIRECTED_PACKET_REQUIRED(packet);
+
+    ares_serial_write_frame(serial, &frame);
+}
+
+static void handle_ready(const struct ares_lora *lora,
+                         const struct ares_packet *packet) {
+    ARG_UNUSED(lora);
+    const struct ares_serial *serial = ares_serial_backend_uart_get_ptr();
+    struct ares_frame frame = {
+        .type = ARES_FRAME_TYPE_INVALID, // TODO
+    };
+
+    CHECK_DIRECTED_PACKET(packet);
+
+    ares_serial_write_frame(serial, &frame);
+}
+
 static struct ares_lora_command commands[] = {
     {ARES_PKT_PAYLOAD_START, handle_start},
     {ARES_PKT_PAYLOAD_POLL, handle_poll},
     {ARES_PKT_PAYLOAD_HEARTBEAT, handle_heartbeat},
     {ARES_PKT_PAYLOAD_LOG, handle_log},
     {ARES_PKT_PAYLOAD_LOG_ACK, handle_log_ack},
+    {ARES_PKT_PAYLOAD_ACK, handle_ack},
+    {ARES_PKT_PAYLOAD_ABORT, handle_abort},
+    {ARES_PKT_PAYLOAD_CONFIG, handle_config},
+    {ARES_PKT_PAYLOAD_CONFIG_POLL, handle_config_poll},
+    {ARES_PKT_PAYLOAD_CONFIG_RESP, handle_config_poll_response},
+    {ARES_PKT_PAYLOAD_READY, handle_ready},
 };
 
 static int init_lora_handlers(void) {
