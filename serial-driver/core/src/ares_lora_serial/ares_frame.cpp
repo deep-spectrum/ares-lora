@@ -174,6 +174,32 @@ void AresFrame::serialize(std::vector<uint8_t> &bytearray) {
         _serialize_reboot(std::get<Reboot>(_tx_payload), bytearray);
         break;
     }
+    case LORA_ACK: {
+        _serialize_lora_ack(std::get<LoRaAck>(_tx_payload), bytearray);
+        break;
+    }
+    case ABORT: {
+        _serialize_abort(std::get<Abort>(_tx_payload), bytearray);
+        break;
+    }
+    case NODE_CONFIG: {
+        _serialize_node_config(std::get<NodeConfig>(_tx_payload), bytearray);
+        break;
+    }
+    case NODE_CONFIG_POLL: {
+        _serialize_node_config_poll(std::get<NodeConfigPoll>(_tx_payload),
+                                    bytearray);
+        break;
+    }
+    case NODE_CONFIG_RESP: {
+        _serialize_node_config_response(
+            std::get<NodeConfigResponse>(_tx_payload), bytearray);
+        break;
+    }
+    case NODE_READY: {
+        _serialize_node_ready(std::get<NodeReady>(_tx_payload), bytearray);
+        break;
+    }
     case BLE_DISCONNECT: {
         // nop
         break;
@@ -278,6 +304,36 @@ void AresFrame::parse(const std::vector<uint8_t> &bytearray,
     case BLE_SUBSCRIBED: {
         _deserialize_ble_subscribed(&bytearray[start_index + payload_offset],
                                     payload_len);
+        break;
+    }
+    case LORA_ACK: {
+        _deserialize_lora_ack(&bytearray[start_index + payload_offset],
+                              payload_len);
+        break;
+    }
+    case ABORT: {
+        _deserialize_abort(&bytearray[start_index + payload_offset],
+                           payload_len);
+        break;
+    }
+    case NODE_CONFIG: {
+        _deserialize_node_config(&bytearray[start_index + payload_offset],
+                                 payload_len);
+        break;
+    }
+    case NODE_CONFIG_POLL: {
+        _deserialize_node_config_poll(&bytearray[start_index + payload_offset],
+                                      payload_len);
+        break;
+    }
+    case NODE_CONFIG_RESP: {
+        _deserialize_node_config_response(
+            &bytearray[start_index + payload_offset], payload_len);
+        break;
+    }
+    case NODE_READY: {
+        _deserialize_node_ready(&bytearray[start_index + payload_offset],
+                                payload_len);
         break;
     }
     default: {
@@ -712,6 +768,7 @@ void AresFrame::_serialize_node_config_response(
     uint64_t config = _serialize_node_config(payload.type, payload.config);
 
     SERIALIZE(id);
+    SERIALIZE(type);
     SERIALIZE_LOCAL_VAR(config);
 }
 
