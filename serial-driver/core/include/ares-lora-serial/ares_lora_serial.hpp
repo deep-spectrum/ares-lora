@@ -202,9 +202,11 @@ class AresSerial {
      * @param id The ID to send the start message to. Ignored if broadcast is
      * set.
      * @param broadcast Broadcast the start time to all the listening nodes.
+     * @param ack_timeout The amount of seconds to wait for an ACK.
      * @return The ACK'ed error code from firmware.
      */
-    int send_start(int64_t sec, uint64_t usec, uint16_t id, bool broadcast);
+    int send_start(int64_t sec, uint64_t usec, uint16_t id, bool broadcast,
+                   const std::chrono::seconds &ack_timeout);
 
     /**
      * Configure the LoRa modem.
@@ -482,8 +484,13 @@ class AresSerial {
 
     static void _lora_msg_ack_handler(ares::Work *work);
     LoraAckWork _lora_ack_work;
+    ares::semaphore<> _ack_sem;
+    uint16_t _expected_ack_id = 0;
     void _send_lora_ack(uint16_t id,
                         AresFrame::LoRaAck::AckedMessage acked_message);
+    void _wait_lora_ack(uint16_t id, const std::chrono::seconds &timeout,
+                        AresFrame::LoRaAck::AckedMessage expected_message);
+    void _lora_ack_event(const AresFrame::LoRaAck &ack);
 
     struct HeartbeatWork {
         HeartbeatWork(ares::work_handler_t handler, AresSerial *ctx)
@@ -542,6 +549,7 @@ class AresSerial {
         _ble_connect_event_q;
     ares::bounded_queue<std::unique_ptr<AresFrame::BleSubscribed>, 10>
         _ble_subscribe_event_q;
+    ares::bounded_queue<std::unique_ptr<AresFrame::LoRaAck>, 5> _lora_ack_q;
     bool _stop_event_queues();
 
     struct BleInfo {

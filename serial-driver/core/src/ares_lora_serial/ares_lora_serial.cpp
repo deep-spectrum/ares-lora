@@ -49,7 +49,7 @@ PYBIND11_MODULE(_ares_lora_serial, m, py::mod_gil_not_used()) {
              py::arg("value"))
         .def("setting_get", &AresSerial::setting_get, py::arg("setting_id"))
         .def("start", &AresSerial::send_start, py::arg("sec"), py::arg("usec"),
-             py::arg("id"), py::arg("broadcast"))
+             py::arg("id"), py::arg("broadcast"), py::arg("ack_timeout"))
         .def("lora_config", &AresSerial::lora_config, py::arg("config"))
         .def("led", &AresSerial::led, py::arg("led_id"), py::arg("state"),
              "Retrieve or set the LED state")
@@ -329,7 +329,8 @@ py::tuple AresSerial::setting_get(uint16_t id) {
 }
 
 int AresSerial::send_start(int64_t sec, uint64_t usec, uint16_t id,
-                           bool broadcast) {
+                           bool broadcast,
+                           const std::chrono::seconds &ack_timeout) {
     _check_crash();
     AresFrame frame(AresFrame::START,
                     AresFrame::Start{sec, usec, id, 0, broadcast, 0});
@@ -349,6 +350,10 @@ int AresSerial::send_start(int64_t sec, uint64_t usec, uint16_t id,
     default: {
         throw std::runtime_error("Received invalid response");
     }
+    }
+
+    if (!broadcast) {
+        _wait_lora_ack(id, ack_timeout, AresFrame::LoRaAck::START);
     }
 
     return ret;
@@ -867,6 +872,57 @@ void AresSerial::_send_lora_ack(
     }
 }
 
+void AresSerial::_wait_lora_ack(
+    uint16_t id, const std::chrono::seconds &timeout,
+    AresFrame::LoRaAck::AckedMessage expected_message) {
+    py::gil_scoped_release release;
+    AresFrame::LoRaAck ack;
+    bool timed_out = false;
+    auto now = std::chrono::steady_clock::now;
+
+    auto to_time = now() + timeout;
+    while ((id != ack.id || expected_message != ack.message_type) &&
+           !timed_out) {
+        try {
+            ack = *_lora_ack_q.get(
+                std::chrono::duration_cast<std::chrono::milliseconds>(timeout));
+        } catch (const ares::queue_exception &e) {
+            timed_out = e.reason() == ares::queue_exception::QUEUE_TIMEOUT;
+            continue;
+        }
+
+        timed_out = now() > to_time;
+    }
+
+    if (timed_out) {
+        throw AresTimeoutError("Timed out waiting for an acknowledgement");
+    }
+}
+
+template <typename T, size_t size>
+static void put_no_except(const T &item,
+                          ares::bounded_queue<std::unique_ptr<T>, size> &q,
+                          const std::chrono::milliseconds &timeout) {
+    try {
+        q.put(std::make_unique<T>(item), timeout);
+    } catch (const ares::queue_exception &) {
+        // nop
+    }
+}
+
+void AresSerial::_lora_ack_event(const AresFrame::LoRaAck &ack) {
+    LOG_INF("ACK received from %d", ack.id);
+    {
+        std::unique_lock lock(_ack_sem);
+        if (ack.id != _expected_ack_id) {
+            LOG_WRN("Late ACK received or spurious ACK received");
+            return;
+        }
+    }
+
+    put_no_except(ack, _lora_ack_q, 100ms);
+}
+
 void AresSerial::_check_crash() {
     if (_exception) {
         stop();
@@ -951,6 +1007,10 @@ void AresSerial::_process_frames_helper() {
         case AresFrame::BLE_SUBSCRIBED: {
             _ble_subscribe_event(
                 std::get<AresFrame::BleSubscribed>(frame.payload));
+            break;
+        }
+        case AresFrame::LORA_ACK: {
+            _lora_ack_event(std::get<AresFrame::LoRaAck>(frame.payload));
             break;
         }
         case AresFrame::DRIVER_STOP: {
@@ -1062,17 +1122,6 @@ void AresSerial::_publish_response(const AresFrame::Decoded &frame) {
         frame.payload);
 
     _response_queue.put(response);
-}
-
-template <typename T, size_t size>
-static void put_no_except(const T &item,
-                          ares::bounded_queue<std::unique_ptr<T>, size> &q,
-                          const std::chrono::milliseconds &timeout) {
-    try {
-        q.put(std::make_unique<T>(item), timeout);
-    } catch (const ares::queue_exception &) {
-        // nop
-    }
 }
 
 void AresSerial::_start_event(const AresFrame::Start &start_frame) {
