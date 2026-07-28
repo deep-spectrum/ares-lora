@@ -63,6 +63,8 @@ PYBIND11_MODULE(_ares_lora_serial, m, py::mod_gil_not_used()) {
         .def("ble_disconnect", &AresSerial::ble_disconnect)
         .def("ble_send_image", &AresSerial::ble_send_image, py::arg("image"))
         .def("reboot", &AresSerial::reboot, py::arg("delay"))
+        .def("abort", &AresSerial::abort, py::arg("broadcast"), py::arg("id"),
+             py::arg("ack_timeout"))
         .def("register_logger_callbacks",
              &AresSerial::register_logger_callbacks, py::arg("dbg"),
              py::arg("info"), py::arg("warning"), py::arg("error"),
@@ -84,6 +86,7 @@ PYBIND11_MODULE(_ares_lora_serial, m, py::mod_gil_not_used()) {
         .def("wait_ble_connect_event", &AresSerial::wait_ble_connection_event)
         .def("wait_ble_subscribe_event",
              &AresSerial::wait_ble_subscription_event)
+        .def("wait_abort_event", &AresSerial::wait_abort_event)
         .def("cancel_events", &AresSerial::cancel_events);
 
     py::register_local_exception<AresTimeoutError>(m, "AresTimeout",
@@ -332,6 +335,13 @@ int AresSerial::send_start(int64_t sec, uint64_t usec, uint16_t id,
                            bool broadcast,
                            const std::chrono::seconds &ack_timeout) {
     _check_crash();
+
+    if (!broadcast) {
+        py::gil_scoped_release release;
+        std::unique_lock lock(_ack_sem);
+        _expected_ack_id = id;
+    }
+
     AresFrame frame(AresFrame::START,
                     AresFrame::Start{sec, usec, id, 0, broadcast, 0});
     AresResponse response = _send_frame(frame, _response_timeout);
@@ -645,6 +655,42 @@ int AresSerial::reboot(uint8_t delay) {
     return ret;
 }
 
+int AresSerial::abort(bool broadcast, uint16_t id,
+                      const std::chrono::seconds &ack_timeout) {
+    _check_crash();
+
+    if (!broadcast) {
+        py::gil_scoped_release release;
+        std::unique_lock lock(_ack_sem);
+        _expected_ack_id = id;
+    }
+
+    AresFrame frame{AresFrame::ABORT, AresFrame::Abort{broadcast, id}};
+    AresResponse response = _send_frame(frame, _response_timeout);
+
+    int ret = -1;
+
+    switch (response.type) {
+    case AresResponse::ACK: {
+        ret = std::get<AresFrame::AckErrorCode>(response.payload);
+        break;
+    }
+    case AresResponse::BAD_FRAME: {
+        _handle_bad_frame(response);
+        break;
+    }
+    default: {
+        throw std::runtime_error("Received invalid response");
+    }
+    }
+
+    if (!broadcast) {
+        _wait_lora_ack(id, ack_timeout, AresFrame::LoRaAck::ABORT);
+    }
+
+    return ret;
+}
+
 void AresSerial::register_logger_callbacks(
     const std::function<void(const std::string &)> &dbg,
     const std::function<void(const std::string &)> &info,
@@ -826,6 +872,12 @@ py::tuple AresSerial::wait_ble_subscription_event() {
     AresFrame::BleSubscribed event;
     wait_event_queue_released(event, _ble_subscribe_event_q);
     return py::make_tuple(event.chunk, event.image);
+}
+
+py::tuple AresSerial::wait_abort_event() {
+    AresFrame::Abort event;
+    wait_event_queue_released(event, _abort_event_q);
+    return py::make_tuple(event.id, event.broadcast);
 }
 
 void AresSerial::cancel_events() {
@@ -1011,6 +1063,10 @@ void AresSerial::_process_frames_helper() {
         }
         case AresFrame::LORA_ACK: {
             _lora_ack_event(std::get<AresFrame::LoRaAck>(frame.payload));
+            break;
+        }
+        case AresFrame::ABORT: {
+            _abort_event(std::get<AresFrame::Abort>(frame.payload));
             break;
         }
         case AresFrame::DRIVER_STOP: {
@@ -1328,6 +1384,20 @@ bool AresSerial::_stop_event_queues() {
     success = put_noexcept(_ble_connect_event_q) && success;
     success = put_noexcept(_ble_subscribe_event_q) && success;
     return success;
+}
+
+void AresSerial::_abort_event(const AresFrame::Abort &event) {
+    LOG_INF("Abort event received (source id: %d, broadcast: %d)", event.id,
+            event.broadcast);
+
+    if (!event.broadcast) {
+        _lora_ack_work.sem.take();
+        _lora_ack_work.id = event.id;
+        _lora_ack_work.acked_message = AresFrame::LoRaAck::ABORT;
+        _work_q.submit(&_lora_ack_work.work);
+    }
+
+    put_no_except(event, _abort_event_q, 100ms);
 }
 
 void AresSerial::_ble_connect_event(const AresFrame::BleConnect &event) {

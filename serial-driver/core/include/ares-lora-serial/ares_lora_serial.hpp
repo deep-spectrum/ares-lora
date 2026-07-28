@@ -322,6 +322,9 @@ class AresSerial {
      */
     int reboot(uint8_t delay);
 
+    int abort(bool broadcast, uint16_t id,
+              const std::chrono::seconds &ack_timeout);
+
     /**
      * Register logging redirects.
      *
@@ -405,6 +408,9 @@ class AresSerial {
      * @return tuple[subscription statuses, ...]
      */
     py::tuple wait_ble_subscription_event();
+
+    // tuple[broadcast, id]
+    py::tuple wait_abort_event();
 
     /**
      * Throw AresThreadTerminate exceptions in threads waiting on event queues.
@@ -550,7 +556,10 @@ class AresSerial {
     ares::bounded_queue<std::unique_ptr<AresFrame::BleSubscribed>, 10>
         _ble_subscribe_event_q;
     ares::bounded_queue<std::unique_ptr<AresFrame::LoRaAck>, 5> _lora_ack_q;
+    ares::bounded_queue<std::unique_ptr<AresFrame::Abort>, 3> _abort_event_q;
     bool _stop_event_queues();
+
+    void _abort_event(const AresFrame::Abort &event);
 
     struct BleInfo {
         struct Subscriptions {
