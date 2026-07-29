@@ -20,8 +20,11 @@ logger = logging.getLogger("ares_lora")
 class LoraException(Exception):
     """Exception class for LoRa related exceptions."""
 
-    def __init__(self, code: int):
-        super().__init__(strerror(code))
+    def __init__(self, code: int, extra_str: str | None = None):
+        err = strerror(code)
+        if extra_str is not None:
+            err = f"{extra_str}: {err}"
+        super().__init__(err)
 
 
 class SettingId(IntEnum):
@@ -377,14 +380,19 @@ class LoraSerial:
             self._ble_subscribe_events.put(subscriptions)
 
     @staticmethod
-    def _check_ret_code(code: int | tuple[int, ...]):
+    def _check_ret_code(code: int | tuple[int, ...] | dict[str, int]):
         if isinstance(code, int):
             if code != 0:
                 raise LoraException(code)
             return
-        for c in code:
+        if isinstance(code, tuple):
+            for c in code:
+                if c != 0:
+                    raise LoraException(c)
+            return
+        for key, c in code.items():
             if c != 0:
-                raise LoraException(c)
+                raise LoraException(c, key)
 
     @lora_serial_command
     def setting(self, setting_id: SettingId, value: int | None = None) -> int | None:
@@ -651,6 +659,19 @@ class LoraSerial:
         self._dev.set_response_timeout(timeout)
         try:
             ret = self._dev.abort(broadcast, destination_id, ack_timeout)
+        except Exception:
+            self._dev.set_response_timeout(prev_timeout)
+            raise
+        else:
+            self._dev.set_response_timeout(prev_timeout)
+        self._check_ret_code(ret)
+
+    @lora_serial_command
+    def send_node_configs(self, destination_id: int, timeout: float = 20.0, ack_timeout: float = 5.0, **kwargs):
+        prev_timeout = self._dev.get_response_timeout()
+        self._dev.set_response_timeout(timeout)
+        try:
+            ret: dict[str, int] = self._dev.node_config(destination_id, ack_timeout, **kwargs)
         except Exception:
             self._dev.set_response_timeout(prev_timeout)
             raise
@@ -925,6 +946,10 @@ class LoraSerial:
             value: The new ready status.
         """
         self._dev.ready = value
+
+    @property
+    def node_configs(self) -> dict[str, float | int | datetime]:
+        return self._dev.node_configs
 
 
 class BleTransfer:
