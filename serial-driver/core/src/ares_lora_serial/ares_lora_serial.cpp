@@ -1693,6 +1693,7 @@ void AresSerial::_handle_node_config_poll_event(
     }
     }
 
+    LOG_DBG("Node response work submitted");
     _work_q.submit(&_node_response_work.work);
 }
 
@@ -1710,8 +1711,9 @@ void AresSerial::_node_config_response_work_handler(ares::Work *work) {
 void AresSerial::_send_node_config_response(uint16_t id,
                                             AresFrame::NodeConfigType type,
                                             AresFrame::NodeConfigData data) {
-    AresFrame frame(AresFrame::NODE_CONFIG_RESP,
-                    AresFrame::NodeConfigResponse{id, type, data});
+    AresFrame frame(
+        AresFrame::NODE_CONFIG_RESP,
+        AresFrame::NodeConfigResponse{.id = id, .type = type, .config = data});
 
     AresResponse response;
 

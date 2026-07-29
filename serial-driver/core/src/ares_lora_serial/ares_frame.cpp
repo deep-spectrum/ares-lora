@@ -462,7 +462,8 @@ uint16_t AresFrame::_payload_size() const {
         break;
     }
     case NODE_CONFIG_RESP: {
-        ret = sizeof(NodeConfigResponse::id) + NodeConfigData_size;
+        ret = sizeof(NodeConfigResponse::id) + NodeConfigData_size +
+              sizeof(NodeConfigResponse::type);
         break;
     }
     case NODE_READY: {

@@ -679,6 +679,26 @@ class LoraSerial:
             self._dev.set_response_timeout(prev_timeout)
         self._check_ret_code(ret)
 
+    @lora_serial_command
+    def poll_node_config(self, node_id: int, timeout: float = 20.0, ack_timeout: float = 5.0, *args):
+        prev_timeout = self._dev.get_response_timeout()
+        self._dev.set_response_timeout(timeout)
+        try:
+            ret_: dict[str, tuple[int, float | int | datetime]] = self._dev.poll_node_configs(node_id, ack_timeout, *args)
+        except Exception:
+            self._dev.set_response_timeout(prev_timeout)
+            raise
+        else:
+            self._dev.set_response_timeout(prev_timeout)
+        codes: dict[str, int] = {}
+        ret: dict[str, float | int | datetime] = {}
+        for key, value in ret_.items():
+            codes[key] = value[0]
+            ret[key] = value[1]
+        self._check_ret_code(codes)
+        return ret
+
+
     def wait_connection_changed_event(self, block: bool = True, timeout: float | None = None) -> bool:
         """Wait for a connection event from BLE.
 
