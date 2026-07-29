@@ -162,6 +162,7 @@ class LoraSerialConfig:
         poll_callback: Event handler for poll events. Signature: [source_id: int] -> None
         log_callback: Event handler for log events. Signature: [source_id: int, msg: str] -> None
         abort_callback: Event handler for abortion events. Signature: [source_id: int, broadcasted: bool] -> None
+        run_ready_callback: Event handler for run ready notification events. Signature: [source_id: int, broadcasted: bool] -> None
     """
     port: str = ""
     response_timeout: float = 2.0
@@ -171,6 +172,7 @@ class LoraSerialConfig:
     poll_callback: Callable[[int], None] | None = None
     log_callback: Callable[[int, str], None] | None = None
     abort_callback: Callable[[int, bool], None] | None = None
+    run_ready_callback: Callable[[int, bool], None] | None = None
 
 
 @dataclass
@@ -247,6 +249,7 @@ class LoraSerial:
         self._poll_cb = config.poll_callback
         self._log_cb = config.log_callback
         self._abort_cb = config.abort_callback
+        self._run_ready_cb = config.run_ready_callback
         self._dev = _AresSerial(configs)
         self._nodes: dict[int, int] = {}
         self._log_msg: dict[int, LogMessage] = {}
@@ -265,6 +268,7 @@ class LoraSerial:
         self._pkt_rx_thread: Thread | None = None
         self._pkt_tx_thread: Thread | None = None
         self._abort_event_thread: Thread | None = None
+        self._node_ready_event_thread: Thread | None = None
 
         self._wait_ble_connect_event: Thread | None = None
         self._wait_ble_subscribe_event: Thread | None = None
@@ -360,6 +364,16 @@ class LoraSerial:
 
             if self._abort_cb is not None:
                 self._abort_cb(source_id, broadcast)
+
+    def _node_ready_event_handler(self):
+        while True:
+            try:
+                source_id, broadcast = self._dev.wait_node_ready_event()
+            except AresThreadTerminate:
+                break
+
+            if self._run_ready_cb is not None:
+                self._run_ready_cb(source_id, broadcast)
 
     def _ble_connect_event_handle(self):
         while True:
@@ -684,7 +698,8 @@ class LoraSerial:
         prev_timeout = self._dev.get_response_timeout()
         self._dev.set_response_timeout(timeout)
         try:
-            ret_: dict[str, tuple[int, float | int | datetime]] = self._dev.poll_node_configs(node_id, ack_timeout, *args)
+            ret_: dict[str, tuple[int, float | int | datetime]] = self._dev.poll_node_configs(node_id, ack_timeout,
+                                                                                              *args)
         except Exception:
             self._dev.set_response_timeout(prev_timeout)
             raise
@@ -698,6 +713,23 @@ class LoraSerial:
         self._check_ret_code(codes)
         return ret
 
+    @lora_serial_command
+    def notify_run_ready(self, broadcast: bool = True, destination_id: int | None = None, timeout: float = 20.0,
+                         ack_timeout=5.0):
+        if not broadcast and (destination_id is None or destination_id <= 0):
+            raise ValueError("Direct messages must have a valid destination specified")
+        if destination_id is None:
+            destination_id = 0
+        prev_timeout = self._dev.get_response_timeout()
+        self._dev.set_response_timeout(timeout)
+        try:
+            ret = self._dev.notify_run_ready(broadcast, destination_id, ack_timeout)
+        except Exception:
+            self._dev.set_response_timeout(prev_timeout)
+            raise
+        else:
+            self._dev.set_response_timeout(prev_timeout)
+        self._check_ret_code(ret)
 
     def wait_connection_changed_event(self, block: bool = True, timeout: float | None = None) -> bool:
         """Wait for a connection event from BLE.
@@ -850,6 +882,10 @@ class LoraSerial:
         assert isinstance(self._abort_event_thread, Thread)
         self._abort_event_thread.start()
 
+        self._node_ready_event_thread = Thread(target=self._node_ready_event_handler)
+        assert isinstance(self._node_ready_event_thread, Thread)
+        self._node_ready_event_thread.start()
+
         self._driver_started.set()
 
         global _instances
@@ -902,6 +938,10 @@ class LoraSerial:
         if self._abort_event_thread is not None:
             self._abort_event_thread.join()
             self._abort_event_thread = None
+
+        if self._node_ready_event_thread is not None:
+            self._node_ready_event_thread.join()
+            self._node_ready_event_thread = None
 
         self._driver_started.clear()
 
