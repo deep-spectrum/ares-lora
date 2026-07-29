@@ -1183,6 +1183,11 @@ void AresSerial::_process_frames_helper() {
                 std::get<AresFrame::NodeConfigResponse>(frame.payload));
             break;
         }
+        case AresFrame::NODE_READY: {
+            _handle_node_ready_event(
+                std::get<AresFrame::NodeReady>(frame.payload));
+            break;
+        }
         case AresFrame::DRIVER_STOP: {
             stopped = _stop_event_queues();
             break;
