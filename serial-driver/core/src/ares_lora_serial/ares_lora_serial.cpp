@@ -1422,6 +1422,7 @@ bool AresSerial::_stop_event_queues() {
     success = put_noexcept(_pkt_tx_event_q) && success;
     success = put_noexcept(_ble_connect_event_q) && success;
     success = put_noexcept(_ble_subscribe_event_q) && success;
+    success = put_noexcept(_abort_event_q) && success;
     return success;
 }
 
@@ -1574,6 +1575,7 @@ void AresSerial::_handle_node_config_event(
     switch (config.type) {
     case AresFrame::SAVE_FOLDER: {
         auto sf = std::get<AresFrame::NodeConfigSaveFolder>(config.config);
+        LOG_DBG("Received folder name: (%d, %d, %d, %d, %d, %d)", sf.year, sf.month, sf.day, sf.hour, sf.minute, sf.second);
         _node_configs.save_folder = ares::DateTime(
             sf.year, sf.month, sf.day, sf.hour, sf.minute, sf.second);
         break;
