@@ -421,6 +421,8 @@ class AresSerial {
      */
     void cancel_events();
 
+    py::dict get_node_config();
+
   private:
     Serial::Serial _serial;
     ares::WorkQ _work_q;
@@ -573,6 +575,8 @@ class AresSerial {
         double center_freq = 0;
         double ref_level = 0;
         uint32_t duration = 0;
+
+        ares::semaphore<> sem{};
     };
     NodeConfigs _node_configs;
 
@@ -583,6 +587,7 @@ class AresSerial {
                                       std::vector<AresFrame> &frames,
                                       const std::chrono::seconds &ack_timeout);
     void _handle_node_config_event(const AresFrame::NodeConfig &config);
+    void _get_node_configs_released(NodeConfigs &copy);
 
     struct BleInfo {
         struct Subscriptions {

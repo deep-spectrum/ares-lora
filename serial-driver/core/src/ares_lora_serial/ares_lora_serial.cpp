@@ -65,6 +65,8 @@ PYBIND11_MODULE(_ares_lora_serial, m, py::mod_gil_not_used()) {
         .def("reboot", &AresSerial::reboot, py::arg("delay"))
         .def("abort", &AresSerial::abort, py::arg("broadcast"), py::arg("id"),
              py::arg("ack_timeout"))
+        .def("node_config", &AresSerial::node_config, py::arg("id"),
+             py::arg("ack_timeout"))
         .def("register_logger_callbacks",
              &AresSerial::register_logger_callbacks, py::arg("dbg"),
              py::arg("info"), py::arg("warning"), py::arg("error"),
@@ -87,7 +89,8 @@ PYBIND11_MODULE(_ares_lora_serial, m, py::mod_gil_not_used()) {
         .def("wait_ble_subscribe_event",
              &AresSerial::wait_ble_subscription_event)
         .def("wait_abort_event", &AresSerial::wait_abort_event)
-        .def("cancel_events", &AresSerial::cancel_events);
+        .def("cancel_events", &AresSerial::cancel_events)
+        .def_property_readonly("node_configs", &AresSerial::get_node_config);
 
     py::register_local_exception<AresTimeoutError>(m, "AresTimeout",
                                                    PyExc_TimeoutError);
@@ -897,6 +900,20 @@ py::tuple AresSerial::wait_abort_event() {
     return py::make_tuple(event.id, event.broadcast);
 }
 
+py::dict AresSerial::get_node_config() {
+    NodeConfigs copy;
+    _get_node_configs_released(copy);
+
+    py::dict ret;
+    ret["folder_dt"] = copy.save_folder.time_point();
+    ret["bandwidth"] = copy.bandwidth;
+    ret["center_freq"] = copy.center_freq;
+    ret["duration"] = copy.duration;
+    ret["ref_level"] = copy.ref_level;
+
+    return ret;
+}
+
 void AresSerial::cancel_events() {
     LOG_DBG("Cancelling event queues");
     _stop_event_queues();
@@ -1552,6 +1569,8 @@ void AresSerial::_handle_node_config_event(
     _lora_ack_work.acked_message = AresFrame::LoRaAck::CONFIG;
     _work_q.submit(&_lora_ack_work.work);
 
+    std::unique_lock lock(_node_configs.sem);
+
     switch (config.type) {
     case AresFrame::SAVE_FOLDER: {
         auto sf = std::get<AresFrame::NodeConfigSaveFolder>(config.config);
@@ -1583,6 +1602,17 @@ void AresSerial::_handle_node_config_event(
         throw std::runtime_error("Received invalid config");
     }
     }
+}
+
+void AresSerial::_get_node_configs_released(NodeConfigs &copy) {
+    py::gil_scoped_release release;
+    std::unique_lock lock(_node_configs.sem);
+
+    copy.save_folder = _node_configs.save_folder;
+    copy.bandwidth = _node_configs.bandwidth;
+    copy.center_freq = _node_configs.center_freq;
+    copy.duration = _node_configs.duration;
+    copy.ref_level = _node_configs.ref_level;
 }
 
 void AresSerial::_ble_connect_event(const AresFrame::BleConnect &event) {
