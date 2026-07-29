@@ -335,6 +335,9 @@ class AresSerial {
     py::dict node_config_poll(uint16_t id, const std::chrono::seconds &timeout,
                               const py::args &args);
 
+    int notify_run_ready(bool broadcast, uint16_t id,
+                         const std::chrono::seconds &timeout);
+
     /**
      * Register logging redirects.
      *
@@ -421,6 +424,8 @@ class AresSerial {
 
     // tuple[broadcast, id]
     py::tuple wait_abort_event();
+
+    py::tuple wait_node_ready_event();
 
     /**
      * Throw AresThreadTerminate exceptions in threads waiting on event queues.
@@ -571,6 +576,8 @@ class AresSerial {
     ares::bounded_queue<std::unique_ptr<AresFrame::Abort>, 3> _abort_event_q;
     ares::bounded_queue<std::unique_ptr<AresFrame::NodeConfigResponse>, 3>
         _node_config_response_event_q;
+    ares::bounded_queue<std::unique_ptr<AresFrame::NodeReady>, 3>
+        _node_ready_event_q;
     bool _stop_event_queues();
 
     void _abort_event(const AresFrame::Abort &event);
@@ -630,6 +637,8 @@ class AresSerial {
     py::dict
     _send_node_config_poll_frames(uint16_t id, std::vector<AresFrame> &frames,
                                   const std::chrono::seconds &ack_timeout);
+
+    void _handle_node_ready_event(const AresFrame::NodeReady &event);
 
     struct BleInfo {
         struct Subscriptions {

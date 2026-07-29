@@ -69,6 +69,8 @@ PYBIND11_MODULE(_ares_lora_serial, m, py::mod_gil_not_used()) {
              py::arg("ack_timeout"))
         .def("poll_node_configs", &AresSerial::node_config_poll, py::arg("id"),
              py::arg("ack_timeout"))
+        .def("notify_run_ready", &AresSerial::notify_run_ready,
+             py::arg("broadcast"), py::arg("id"), py::arg("timeout"))
         .def("register_logger_callbacks",
              &AresSerial::register_logger_callbacks, py::arg("dbg"),
              py::arg("info"), py::arg("warning"), py::arg("error"),
@@ -91,6 +93,7 @@ PYBIND11_MODULE(_ares_lora_serial, m, py::mod_gil_not_used()) {
         .def("wait_ble_subscribe_event",
              &AresSerial::wait_ble_subscription_event)
         .def("wait_abort_event", &AresSerial::wait_abort_event)
+        .def("wait_node_ready_event", &AresSerial::wait_node_ready_event)
         .def("cancel_events", &AresSerial::cancel_events)
         .def_property_readonly("node_configs", &AresSerial::get_node_config);
 
@@ -731,6 +734,42 @@ py::dict AresSerial::node_config_poll(uint16_t id,
     return _send_node_config_poll_frames(id, config_poll_frames, timeout);
 }
 
+int AresSerial::notify_run_ready(bool broadcast, uint16_t id,
+                                 const std::chrono::seconds &timeout) {
+    _check_crash();
+
+    if (!broadcast) {
+        py::gil_scoped_release release;
+        std::unique_lock lock(_ack_sem);
+        _expected_ack_id = id;
+    }
+
+    AresFrame frame(AresFrame::NODE_READY, AresFrame::NodeReady{broadcast, id});
+    AresResponse response = _send_frame(frame, _response_timeout);
+
+    int ret = -1;
+
+    switch (response.type) {
+    case AresResponse::ACK: {
+        ret = std::get<AresFrame::AckErrorCode>(response.payload);
+        break;
+    }
+    case AresResponse::BAD_FRAME: {
+        _handle_bad_frame(response);
+        break;
+    }
+    default: {
+        throw std::runtime_error("Received invalid response");
+    }
+    }
+
+    if (!broadcast) {
+        _wait_lora_ack(id, timeout, AresFrame::LoRaAck::READY);
+    }
+
+    return ret;
+}
+
 void AresSerial::register_logger_callbacks(
     const std::function<void(const std::string &)> &dbg,
     const std::function<void(const std::string &)> &info,
@@ -917,6 +956,12 @@ py::tuple AresSerial::wait_ble_subscription_event() {
 py::tuple AresSerial::wait_abort_event() {
     AresFrame::Abort event;
     wait_event_queue_released(event, _abort_event_q);
+    return py::make_tuple(event.id, event.broadcast);
+}
+
+py::tuple AresSerial::wait_node_ready_event() {
+    AresFrame::NodeReady event;
+    wait_event_queue_released(event, _node_ready_event_q);
     return py::make_tuple(event.id, event.broadcast);
 }
 
@@ -1453,6 +1498,7 @@ bool AresSerial::_stop_event_queues() {
     success = put_noexcept(_ble_connect_event_q) && success;
     success = put_noexcept(_ble_subscribe_event_q) && success;
     success = put_noexcept(_abort_event_q) && success;
+    success = put_noexcept(_node_ready_event_q) && success;
     return success;
 }
 
@@ -1936,6 +1982,20 @@ py::dict AresSerial::_send_node_config_poll_frames(
     }
 
     return ret;
+}
+
+void AresSerial::_handle_node_ready_event(const AresFrame::NodeReady &event) {
+    LOG_INF("Received node ready event from %d (broadcast: %d)", event.id,
+            event.broadcast);
+
+    if (!event.broadcast) {
+        _lora_ack_work.sem.take();
+        _lora_ack_work.id = event.id;
+        _lora_ack_work.acked_message = AresFrame::LoRaAck::READY;
+        _work_q.submit(&_lora_ack_work.work);
+    }
+
+    put_no_except(event, _node_ready_event_q, 100ms);
 }
 
 void AresSerial::_ble_connect_event(const AresFrame::BleConnect &event) {
