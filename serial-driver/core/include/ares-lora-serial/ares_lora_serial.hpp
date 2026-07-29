@@ -166,6 +166,9 @@ struct AresLoraConfig {
  * @class AresSerial
  *
  * Serial driver class for communicating with Ares LoRa devices.
+ * @todo This is getting out of hand. This shit really should be refactored into
+ * independently operated and reusable parts with this class being the interface
+ * between Python and C++. DO NOT USE INHERITANCE TO DO THIS!
  */
 class AresSerial {
   public:
@@ -328,6 +331,9 @@ class AresSerial {
 
     py::dict node_config(uint16_t id, const std::chrono::seconds &timeout,
                          const py::kwargs &kwargs);
+
+    py::dict node_config_poll(uint16_t id, const std::chrono::seconds &timeout,
+                              const py::args &args);
 
     /**
      * Register logging redirects.
@@ -563,6 +569,8 @@ class AresSerial {
         _ble_subscribe_event_q;
     ares::bounded_queue<std::unique_ptr<AresFrame::LoRaAck>, 5> _lora_ack_q;
     ares::bounded_queue<std::unique_ptr<AresFrame::Abort>, 3> _abort_event_q;
+    ares::bounded_queue<std::unique_ptr<AresFrame::NodeConfigResponse>, 3>
+        _node_config_response_event_q;
     bool _stop_event_queues();
 
     void _abort_event(const AresFrame::Abort &event);
@@ -588,6 +596,40 @@ class AresSerial {
                                       const std::chrono::seconds &ack_timeout);
     void _handle_node_config_event(const AresFrame::NodeConfig &config);
     void _get_node_configs_released(NodeConfigs &copy);
+
+    struct NodeConfigPollResponseWork {
+        NodeConfigPollResponseWork(ares::work_handler_t handler,
+                                   AresSerial *ctx)
+            : work(std::move(handler)), obj(ctx) {}
+        ~NodeConfigPollResponseWork() { work.work_flush(); }
+
+        ares::Work work;
+        AresSerial *obj;
+        uint16_t id = 0;
+        AresFrame::NodeConfigType type = AresFrame::INVALID;
+        AresFrame::NodeConfigData config = std::monostate();
+
+        ares::semaphore<> sem{};
+    };
+
+    NodeConfigPollResponseWork _node_response_work;
+    void _handle_node_config_poll_event(const AresFrame::NodeConfigPoll &event);
+    static void _node_config_response_work_handler(ares::Work *work);
+    ares::semaphore<> _node_config_response_sem{};
+    uint16_t _expected_node_config_response_id = 0;
+    void _send_node_config_response(uint16_t id, AresFrame::NodeConfigType type,
+                                    AresFrame::NodeConfigData data);
+    void _handle_node_config_response_event(
+        const AresFrame::NodeConfigResponse &event);
+    bool _wait_config_response(uint16_t id, const std::chrono::seconds &timeout,
+                               AresFrame::NodeConfigType expected_type,
+                               AresFrame::NodeConfigResponse &response);
+    static void _parse_node_config_poll_args(uint16_t id,
+                                             std::vector<AresFrame> &frames,
+                                             const py::args &args);
+    py::dict
+    _send_node_config_poll_frames(uint16_t id, std::vector<AresFrame> &frames,
+                                  const std::chrono::seconds &ack_timeout);
 
     struct BleInfo {
         struct Subscriptions {
