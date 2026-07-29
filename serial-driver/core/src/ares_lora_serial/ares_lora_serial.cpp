@@ -691,6 +691,23 @@ int AresSerial::abort(bool broadcast, uint16_t id,
     return ret;
 }
 
+py::dict AresSerial::node_config(uint16_t id,
+                                 const std::chrono::seconds &timeout,
+                                 const py::kwargs &kwargs) {
+    _check_crash();
+
+    {
+        py::gil_scoped_release release;
+        std::unique_lock lock(_ack_sem);
+        _expected_ack_id = id;
+    }
+
+    std::vector<AresFrame> config_frames;
+    _parse_node_config_kwargs(id, config_frames, kwargs);
+
+    return _send_node_config_frames(id, config_frames, timeout);
+}
+
 void AresSerial::register_logger_callbacks(
     const std::function<void(const std::string &)> &dbg,
     const std::function<void(const std::string &)> &info,
@@ -1069,6 +1086,11 @@ void AresSerial::_process_frames_helper() {
             _abort_event(std::get<AresFrame::Abort>(frame.payload));
             break;
         }
+        case AresFrame::NODE_CONFIG: {
+            _handle_node_config_event(
+                std::get<AresFrame::NodeConfig>(frame.payload));
+            break;
+        }
         case AresFrame::DRIVER_STOP: {
             stopped = _stop_event_queues();
             break;
@@ -1398,6 +1420,169 @@ void AresSerial::_abort_event(const AresFrame::Abort &event) {
     }
 
     put_no_except(event, _abort_event_q, 100ms);
+}
+
+void AresSerial::_parse_node_config_kwargs(uint16_t id,
+                                           std::vector<AresFrame> &frames,
+                                           const py::kwargs &kwargs) {
+    if (kwargs.contains("folder_dt") && !kwargs["folder_dt"].is_none()) {
+        ares::DateTime dt(
+            kwargs["folder_dt"].cast<std::chrono::system_clock::time_point>());
+        AresFrame::NodeConfigSaveFolder save_folder{
+            .year = static_cast<uint16_t>(dt.year()),
+            .month = static_cast<uint8_t>(dt.month()),
+            .day = static_cast<uint8_t>(dt.day()),
+            .hour = static_cast<uint8_t>(dt.hour()),
+            .minute = static_cast<uint8_t>(dt.minute()),
+            .second = static_cast<uint8_t>(dt.second()),
+        };
+        AresFrame frame(AresFrame::NODE_CONFIG,
+                        AresFrame::NodeConfig{
+                            .id = id,
+                            .type = AresFrame::SAVE_FOLDER,
+                            .config = save_folder,
+                        });
+        frames.emplace_back(frame);
+    }
+
+    if (kwargs.contains("bandwidth") && !kwargs["bandwidth"].is_none()) {
+        AresFrame frame(AresFrame::NODE_CONFIG,
+                        AresFrame::NodeConfig{
+                            .id = id,
+                            .type = AresFrame::BANDWIDTH,
+                            .config = kwargs["bandwidth"].cast<double>(),
+                        });
+        frames.emplace_back(frame);
+    }
+
+    if (kwargs.contains("center_freq") && !kwargs["center_freq"].is_none()) {
+        AresFrame frame(AresFrame::NODE_CONFIG,
+                        AresFrame::NodeConfig{
+                            .id = id,
+                            .type = AresFrame::CENTER_FREQ,
+                            .config = kwargs["center_freq"].cast<double>(),
+                        });
+        frames.emplace_back(frame);
+    }
+
+    if (kwargs.contains("ref_level") && !kwargs["ref_level"].is_none()) {
+        AresFrame frame(AresFrame::NODE_CONFIG,
+                        AresFrame::NodeConfig{
+                            .id = id,
+                            .type = AresFrame::REF_LEVEL,
+                            .config = kwargs["ref_level"].cast<double>(),
+                        });
+        frames.emplace_back(frame);
+    }
+
+    if (kwargs.contains("duration") && !kwargs["duration"].is_none()) {
+        AresFrame frame(AresFrame::NODE_CONFIG,
+                        AresFrame::NodeConfig{
+                            .id = id,
+                            .type = AresFrame::DURATION,
+                            .config = kwargs["duration"].cast<uint32_t>(),
+                        });
+        frames.emplace_back(frame);
+    }
+}
+
+py::dict
+AresSerial::_send_node_config_frames(uint16_t id,
+                                     std::vector<AresFrame> &frames,
+                                     const std::chrono::seconds &ack_timeout) {
+    py::dict ret;
+
+    for (auto &frame : frames) {
+        AresResponse response = _send_frame(frame, _response_timeout);
+
+        int code = -1;
+
+        switch (response.type) {
+        case AresResponse::ACK: {
+            code = std::get<AresFrame::AckErrorCode>(response.payload);
+            break;
+        }
+        case AresResponse::BAD_FRAME: {
+            _handle_bad_frame(response);
+            break;
+        }
+        default: {
+            throw std::runtime_error("Received invalid response");
+        }
+        }
+
+        switch (std::get<AresFrame::NodeConfig>(frame.tx_payload()).type) {
+        case AresFrame::SAVE_FOLDER: {
+            ret["folder_dt"] = code;
+            break;
+        }
+        case AresFrame::BANDWIDTH: {
+            ret["bandwidth"] = code;
+            break;
+        }
+        case AresFrame::CENTER_FREQ: {
+            ret["center_freq"] = code;
+            break;
+        }
+        case AresFrame::DURATION: {
+            ret["duration"] = code;
+            break;
+        }
+        case AresFrame::REF_LEVEL: {
+            ret["ref_level"] = code;
+            break;
+        }
+        default: {
+            throw std::runtime_error("Invalid node config sent");
+        }
+        }
+
+        _wait_lora_ack(id, ack_timeout, AresFrame::LoRaAck::CONFIG);
+    }
+
+    return ret;
+}
+
+void AresSerial::_handle_node_config_event(
+    const AresFrame::NodeConfig &config) {
+    LOG_INF("Received node config message from %d (type: %d)", config.id,
+            static_cast<int>(config.type));
+    _lora_ack_work.sem.take();
+    _lora_ack_work.id = config.id;
+    _lora_ack_work.acked_message = AresFrame::LoRaAck::CONFIG;
+    _work_q.submit(&_lora_ack_work.work);
+
+    switch (config.type) {
+    case AresFrame::SAVE_FOLDER: {
+        auto sf = std::get<AresFrame::NodeConfigSaveFolder>(config.config);
+        _node_configs.save_folder = ares::DateTime(
+            sf.year, sf.month, sf.day, sf.hour, sf.minute, sf.second);
+        break;
+    }
+    case AresFrame::BANDWIDTH: {
+        auto bw = std::get<double>(config.config);
+        _node_configs.bandwidth = bw;
+        break;
+    }
+    case AresFrame::CENTER_FREQ: {
+        auto cf = std::get<double>(config.config);
+        _node_configs.center_freq = cf;
+        break;
+    }
+    case AresFrame::REF_LEVEL: {
+        auto rl = std::get<double>(config.config);
+        _node_configs.ref_level = rl;
+        break;
+    }
+    case AresFrame::DURATION: {
+        auto dur = std::get<uint32_t>(config.config);
+        _node_configs.duration = dur;
+        break;
+    }
+    default: {
+        throw std::runtime_error("Received invalid config");
+    }
+    }
 }
 
 void AresSerial::_ble_connect_event(const AresFrame::BleConnect &event) {

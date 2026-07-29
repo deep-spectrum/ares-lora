@@ -13,6 +13,7 @@
 
 #include <ares-lora-serial/ares_frame.hpp>
 #include <ares/data-structures/queue.hpp>
+#include <ares/datetime/datetime.hpp>
 #include <ares/serial/serial.hpp>
 #include <ares/synchronization/semaphore.hpp>
 #include <ares/synchronization/spinlock.hpp>
@@ -325,6 +326,9 @@ class AresSerial {
     int abort(bool broadcast, uint16_t id,
               const std::chrono::seconds &ack_timeout);
 
+    py::dict node_config(uint16_t id, const std::chrono::seconds &timeout,
+                         const py::kwargs &kwargs);
+
     /**
      * Register logging redirects.
      *
@@ -560,6 +564,25 @@ class AresSerial {
     bool _stop_event_queues();
 
     void _abort_event(const AresFrame::Abort &event);
+
+    struct NodeConfigs {
+        NodeConfigs() = default;
+
+        ares::DateTime save_folder;
+        double bandwidth = 0;
+        double center_freq = 0;
+        double ref_level = 0;
+        uint32_t duration = 0;
+    };
+    NodeConfigs _node_configs;
+
+    static void _parse_node_config_kwargs(uint16_t id,
+                                          std::vector<AresFrame> &frames,
+                                          const py::kwargs &kwargs);
+    py::dict _send_node_config_frames(uint16_t id,
+                                      std::vector<AresFrame> &frames,
+                                      const std::chrono::seconds &ack_timeout);
+    void _handle_node_config_event(const AresFrame::NodeConfig &config);
 
     struct BleInfo {
         struct Subscriptions {

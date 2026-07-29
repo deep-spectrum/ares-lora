@@ -376,6 +376,10 @@ size_t AresFrame::total_frames() const {
     return ret;
 }
 
+AresFrame::AresFrameType AresFrame::type() const { return _type; }
+
+AresFrame::TxTypes AresFrame::tx_payload() const { return _tx_payload; }
+
 uint16_t AresFrame::_payload_size() const {
     uint16_t ret = 0;
 

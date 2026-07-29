@@ -814,6 +814,18 @@ class AresFrame {
      */
     [[nodiscard]] size_t total_frames() const;
 
+    /**
+     * Retrieve the frame type without decoding.
+     * @return The frame type.
+     */
+    [[nodiscard]] AresFrameType type() const;
+
+    /**
+     * Retrieve the frame tx payload.
+     * @return The frame payload.
+     */
+    [[nodiscard]] TxTypes tx_payload() const;
+
   private:
     enum FrameDirection { TX, RX, UNSPECIFIED };
     bool _new_frame = true;
