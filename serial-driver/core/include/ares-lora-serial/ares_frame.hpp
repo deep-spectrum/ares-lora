@@ -58,7 +58,7 @@ class AresFrame {
      *
      * Frame types for communication with the LoRa module.
      */
-    enum AresFrameType : unsigned int {
+    enum AresFrameType : uint16_t {
         SETTING = 0,        ///< Setting get/set (TX/RX)
         START = 1,          ///< Start time (TX/RX)
         LORA_CONFIG = 2,    ///< LoRa modem configuration (TX)
@@ -596,18 +596,21 @@ class AresFrame {
         uint8_t delay = 5;
     };
 
-    struct LoRaAck {
-        enum AckedMessage : uint16_t {
-            START,  ///< Directed start message.
-            ABORT,  ///< Directed abort message.
-            CONFIG, ///< Node configuration message.
-            READY,  ///< Directed ready message.
-
-            INVALID,
-        };
-
+    /**
+     * @struct LoraAck
+     * Payload data for acknowledging directed lora messages.
+     */
+    struct LoraAck {
+        /**
+         * On transmission, the node id the ack message should be directed to.
+         * On reception, the node id the ack message came from.
+         */
         uint16_t id = 0;
-        AckedMessage message_type = INVALID;
+
+        /**
+         * The message being acknowledged.
+         */
+        AresFrameType message_type = UNKNOWN;
     };
 
     struct Abort {
@@ -664,7 +667,7 @@ class AresFrame {
     using TxTypes =
         std::variant<std::monostate, Setting, Start, LoraConfig, Led, Heartbeat,
                      Poll, Log, Version, BleState, BleChunk, BleImage, Reboot,
-                     LoRaAck, Abort, NodeConfig, NodeConfigPoll, NodeReady>;
+                     LoraAck, Abort, NodeConfig, NodeConfigPoll, NodeReady>;
 
     /**
      * @typedef RxTypes
@@ -674,7 +677,7 @@ class AresFrame {
     using RxTypes =
         std::variant<std::monostate, Setting, Start, AckErrorCode, FramingError,
                      Led, Heartbeat, Poll, Log, Version, LogAck, Dbg, PktRx,
-                     PktTx, BleState, BleConnect, BleSubscribed, LoRaAck, Abort,
+                     PktTx, BleState, BleConnect, BleSubscribed, LoraAck, Abort,
                      NodeConfig, NodeConfigPoll, NodeReady>;
 
     /**
@@ -865,7 +868,7 @@ class AresFrame {
                                      std::vector<uint8_t> &buffer);
     static void _serialize_reboot(const Reboot &payload,
                                   std::vector<uint8_t> &buffer);
-    static void _serialize_lora_ack(const LoRaAck &payload,
+    static void _serialize_lora_ack(const LoraAck &payload,
                                     std::vector<uint8_t> &buffer);
     static void _serialize_abort(const Abort &payload,
                                  std::vector<uint8_t> &buffer);

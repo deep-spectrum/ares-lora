@@ -500,8 +500,7 @@ class AresSerial {
         ares::Work work;
         AresSerial *obj;
         uint16_t id = 0;
-        AresFrame::LoRaAck::AckedMessage acked_message =
-            AresFrame::LoRaAck::INVALID;
+        AresFrame::AresFrameType acked_message = AresFrame::UNKNOWN;
         ares::semaphore<> sem{};
     };
 
@@ -509,11 +508,10 @@ class AresSerial {
     LoraAckWork _lora_ack_work;
     ares::semaphore<> _ack_sem;
     uint16_t _expected_ack_id = 0;
-    void _send_lora_ack(uint16_t id,
-                        AresFrame::LoRaAck::AckedMessage acked_message);
+    void _send_lora_ack(uint16_t id, AresFrame::AresFrameType acked_message);
     void _wait_lora_ack(uint16_t id, const std::chrono::seconds &timeout,
-                        AresFrame::LoRaAck::AckedMessage expected_message);
-    void _lora_ack_event(const AresFrame::LoRaAck &ack);
+                        AresFrame::AresFrameType expected_message);
+    void _lora_ack_event(const AresFrame::LoraAck &ack);
 
     struct HeartbeatWork {
         HeartbeatWork(ares::work_handler_t handler, AresSerial *ctx)
@@ -572,7 +570,7 @@ class AresSerial {
         _ble_connect_event_q;
     ares::bounded_queue<std::unique_ptr<AresFrame::BleSubscribed>, 10>
         _ble_subscribe_event_q;
-    ares::bounded_queue<std::unique_ptr<AresFrame::LoRaAck>, 5> _lora_ack_q;
+    ares::bounded_queue<std::unique_ptr<AresFrame::LoraAck>, 5> _lora_ack_q;
     ares::bounded_queue<std::unique_ptr<AresFrame::Abort>, 3> _abort_event_q;
     ares::bounded_queue<std::unique_ptr<AresFrame::NodeConfigResponse>, 3>
         _node_config_response_event_q;

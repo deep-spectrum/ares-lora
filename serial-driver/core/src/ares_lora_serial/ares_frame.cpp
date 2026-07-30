@@ -175,7 +175,7 @@ void AresFrame::serialize(std::vector<uint8_t> &bytearray) {
         break;
     }
     case LORA_ACK: {
-        _serialize_lora_ack(std::get<LoRaAck>(_tx_payload), bytearray);
+        _serialize_lora_ack(std::get<LoraAck>(_tx_payload), bytearray);
         break;
     }
     case ABORT: {
@@ -445,7 +445,7 @@ uint16_t AresFrame::_payload_size() const {
         break;
     }
     case LORA_ACK: {
-        ret = sizeof(LoRaAck::id) + sizeof(LoRaAck::message_type);
+        ret = sizeof(LoraAck::id) + sizeof(LoraAck::message_type);
         break;
     }
     case ABORT: {
@@ -677,7 +677,7 @@ void AresFrame::_serialize_reboot(const Reboot &payload,
     SERIALIZE(delay);
 }
 
-void AresFrame::_serialize_lora_ack(const LoRaAck &payload,
+void AresFrame::_serialize_lora_ack(const LoraAck &payload,
                                     std::vector<uint8_t> &buffer) {
     SERIALIZE(id);
     SERIALIZE(message_type);
@@ -955,7 +955,7 @@ void AresFrame::_deserialize_ble_subscribed(const uint8_t *buf, size_t len) {
 
 void AresFrame::_deserialize_lora_ack(const uint8_t *buf, size_t len) {
     ARG_UNUSED(len);
-    DESERIALIZE_INIT(LoRaAck);
+    DESERIALIZE_INIT(LoraAck);
     DESERIALIZE(id);
     DESERIALIZE(message_type);
     DESERIALIZE_FINALIZE();

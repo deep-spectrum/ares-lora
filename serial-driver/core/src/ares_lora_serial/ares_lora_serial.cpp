@@ -372,7 +372,7 @@ int AresSerial::send_start(int64_t sec, uint64_t usec, uint16_t id,
     }
 
     if (!broadcast) {
-        _wait_lora_ack(id, ack_timeout, AresFrame::LoRaAck::START);
+        _wait_lora_ack(id, ack_timeout, AresFrame::START);
     }
 
     return ret;
@@ -694,7 +694,7 @@ int AresSerial::abort(bool broadcast, uint16_t id,
     }
 
     if (!broadcast) {
-        _wait_lora_ack(id, ack_timeout, AresFrame::LoRaAck::ABORT);
+        _wait_lora_ack(id, ack_timeout, AresFrame::ABORT);
     }
 
     return ret;
@@ -764,7 +764,7 @@ int AresSerial::notify_run_ready(bool broadcast, uint16_t id,
     }
 
     if (!broadcast) {
-        _wait_lora_ack(id, timeout, AresFrame::LoRaAck::READY);
+        _wait_lora_ack(id, timeout, AresFrame::NODE_READY);
     }
 
     return ret;
@@ -987,14 +987,14 @@ void AresSerial::cancel_events() {
 void AresSerial::_lora_msg_ack_handler(ares::Work *work) {
     LoraAckWork *lwork = ares::container_of(work, &LoraAckWork::work);
     uint16_t id = lwork->id;
-    AresFrame::LoRaAck::AckedMessage message = lwork->acked_message;
+    AresFrame::AresFrameType message = lwork->acked_message;
     lwork->sem.give();
     lwork->obj->_send_lora_ack(id, message);
 }
 
-void AresSerial::_send_lora_ack(
-    uint16_t id, AresFrame::LoRaAck::AckedMessage acked_message) {
-    AresFrame frame(AresFrame::LORA_ACK, AresFrame::LoRaAck{id, acked_message});
+void AresSerial::_send_lora_ack(uint16_t id,
+                                AresFrame::AresFrameType acked_message) {
+    AresFrame frame(AresFrame::LORA_ACK, AresFrame::LoraAck{id, acked_message});
 
     AresResponse response;
 
@@ -1023,11 +1023,11 @@ void AresSerial::_send_lora_ack(
     }
 }
 
-void AresSerial::_wait_lora_ack(
-    uint16_t id, const std::chrono::seconds &timeout,
-    AresFrame::LoRaAck::AckedMessage expected_message) {
+void AresSerial::_wait_lora_ack(uint16_t id,
+                                const std::chrono::seconds &timeout,
+                                AresFrame::AresFrameType expected_message) {
     py::gil_scoped_release release;
-    AresFrame::LoRaAck ack;
+    AresFrame::LoraAck ack;
     bool timed_out = false;
     auto now = std::chrono::steady_clock::now;
 
@@ -1061,7 +1061,7 @@ static void put_no_except(const T &item,
     }
 }
 
-void AresSerial::_lora_ack_event(const AresFrame::LoRaAck &ack) {
+void AresSerial::_lora_ack_event(const AresFrame::LoraAck &ack) {
     LOG_INF("ACK received from %d", ack.id);
     {
         std::unique_lock lock(_ack_sem);
@@ -1161,7 +1161,7 @@ void AresSerial::_process_frames_helper() {
             break;
         }
         case AresFrame::LORA_ACK: {
-            _lora_ack_event(std::get<AresFrame::LoRaAck>(frame.payload));
+            _lora_ack_event(std::get<AresFrame::LoraAck>(frame.payload));
             break;
         }
         case AresFrame::ABORT: {
@@ -1308,7 +1308,7 @@ void AresSerial::_start_event(const AresFrame::Start &start_frame) {
     if (!start_frame.broadcast) {
         _lora_ack_work.sem.take();
         _lora_ack_work.id = start_frame.id;
-        _lora_ack_work.acked_message = AresFrame::LoRaAck::START;
+        _lora_ack_work.acked_message = AresFrame::START;
         _work_q.submit(&_lora_ack_work.work);
     }
 
@@ -1514,7 +1514,7 @@ void AresSerial::_abort_event(const AresFrame::Abort &event) {
     if (!event.broadcast) {
         _lora_ack_work.sem.take();
         _lora_ack_work.id = event.id;
-        _lora_ack_work.acked_message = AresFrame::LoRaAck::ABORT;
+        _lora_ack_work.acked_message = AresFrame::ABORT;
         _work_q.submit(&_lora_ack_work.work);
     }
 
@@ -1636,7 +1636,7 @@ AresSerial::_send_node_config_frames(uint16_t id,
         }
         }
 
-        _wait_lora_ack(id, ack_timeout, AresFrame::LoRaAck::CONFIG);
+        _wait_lora_ack(id, ack_timeout, AresFrame::NODE_CONFIG);
     }
 
     return ret;
@@ -1648,7 +1648,7 @@ void AresSerial::_handle_node_config_event(
             static_cast<int>(config.type));
     _lora_ack_work.sem.take();
     _lora_ack_work.id = config.id;
-    _lora_ack_work.acked_message = AresFrame::LoRaAck::CONFIG;
+    _lora_ack_work.acked_message = AresFrame::NODE_CONFIG;
     _work_q.submit(&_lora_ack_work.work);
 
     std::unique_lock lock(_node_configs.sem);
@@ -1996,7 +1996,7 @@ void AresSerial::_handle_node_ready_event(const AresFrame::NodeReady &event) {
     if (!event.broadcast) {
         _lora_ack_work.sem.take();
         _lora_ack_work.id = event.id;
-        _lora_ack_work.acked_message = AresFrame::LoRaAck::READY;
+        _lora_ack_work.acked_message = AresFrame::NODE_READY;
         _work_q.submit(&_lora_ack_work.work);
     }
 
