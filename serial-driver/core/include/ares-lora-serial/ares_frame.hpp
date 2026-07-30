@@ -613,49 +613,144 @@ class AresFrame {
         AresFrameType message_type = UNKNOWN;
     };
 
+    /**
+     * @struct Abort
+     * Payload data for abort messages.
+     */
     struct Abort {
+        /**
+         * On transmission, indicate if the message should be broadcasted. On
+         * reception, indicates if the message was broadcasted.
+         */
         bool broadcast = false;
+
+        /**
+         * On transmission, the node id to send the abort message to if being
+         * directed. On reception, the node id the message came from.
+         */
         uint16_t id = 0;
     };
 
+    /**
+     * @enum NodeConfigType
+     * The type of configurations that can be sent over LoRa.
+     */
     enum NodeConfigType : uint8_t {
+        /**
+         * The save folder name.
+         */
         SAVE_FOLDER,
+
+        /**
+         * The bandwidth.
+         */
         BANDWIDTH,
+
+        /**
+         * The center frequency.
+         */
         CENTER_FREQ,
+
+        /**
+         * The duration.
+         */
         DURATION,
+
+        /**
+         * The reference level.
+         */
         REF_LEVEL,
 
         INVALID,
     };
 
+    /**
+     * @struct NodeConfigSaveFolder
+     * The save folder configurations.
+     */
     struct NodeConfigSaveFolder {
-        uint16_t year = 0;
-        uint8_t month = 0;
-        uint8_t day = 0;
-        uint8_t hour = 0;
-        uint8_t minute = 0;
-        uint8_t second = 0;
+        uint16_t year = 0;  ///< The calendar year.
+        uint8_t month = 0;  ///< The calendar month.
+        uint8_t day = 0;    ///< The calendar day.
+        uint8_t hour = 0;   ///< The hour of the day.
+        uint8_t minute = 0; ///< The minute in the hour.
+        uint8_t second = 0; ///< The second in the minute.
     };
 
+    /**
+     * Data size for the node configurations.
+     */
     static constexpr size_t NodeConfigData_size = 8;
+
+    /**
+     * @typedef NodeConfigData
+     *
+     * A variant representing all of the configuration data types.
+     */
     using NodeConfigData =
         std::variant<std::monostate, NodeConfigSaveFolder, uint32_t, double>;
 
+    /**
+     * @struct NodeConfig
+     * Payload data for node configuration messages.
+     */
     struct NodeConfig {
+        /**
+         * On transmission, the node id to send the configuration to. On
+         * reception, the node id the configurations are coming from.
+         */
         uint16_t id = 0;
+
+        /**
+         * The configuration type.
+         */
         NodeConfigType type = INVALID;
+
+        /**
+         * The configuration.
+         */
         NodeConfigData config = std::monostate();
     };
 
+    /**
+     * @struct NodeConfigPoll
+     * Payload for polling node configurations.
+     */
     struct NodeConfigPoll {
+        /**
+         * On transmission, the node id to poll for a configuration. On
+         * reception, the node id the poll request is coming from.
+         */
         uint16_t id = 0;
+
+        /**
+         * The configuration type being polled for.
+         */
         NodeConfigType type = INVALID;
     };
 
+    /**
+     * @typedef NodeConfigResponse
+     * Payload for node configuration poll responses. Same as the node config
+     * payload.
+     */
     using NodeConfigResponse = NodeConfig;
 
+    /**
+     * @struct NodeReady
+     * Payload for node ready notifications.
+     */
     struct NodeReady {
+        /**
+         * On transmission, indicate if the message should be broadcasted. On
+         * reception, indicates if the message was broadcasted.
+         */
         bool broadcast = false;
+
+        /**
+         * On transmission, the node id to send the abort message to if being
+         * directed. On reception, the node id the message came from.
+         */
         uint16_t id = 0;
     };
 
