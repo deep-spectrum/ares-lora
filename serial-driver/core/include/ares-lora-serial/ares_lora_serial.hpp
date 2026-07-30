@@ -326,15 +326,57 @@ class AresSerial {
      */
     int reboot(uint8_t delay);
 
+    /**
+     * Send an abort message over LoRa.
+     *
+     * @param[in] broadcast Flag indicating if the message should be broadcasted
+     * or not
+     * @param[id] id The node id to send the message to if @p broadcast is @p
+     * false.
+     * @param[in] ack_timeout The amount of time to wait for an ACK response
+     * when using the direct version.
+     *
+     * @return ACK'ed error code.
+     */
     int abort(bool broadcast, uint16_t id,
               const std::chrono::seconds &ack_timeout);
 
+    /**
+     * Send node configurations over LoRa.
+     *
+     * @param[in] id The node ID to send the configurations to.
+     * @param[in] timeout The acknowledgement timeout.
+     * @param[in] kwargs The configurations to send as keyword arguments.
+     *
+     * @return The keyword argument keys with their ACK'ed error codes.
+     */
     py::dict node_config(uint16_t id, const std::chrono::seconds &timeout,
                          const py::kwargs &kwargs);
 
+    /**
+     * Poll a node for configurations over LoRa.
+     *
+     * @param[in] id The node ID to send the node config poll request to.
+     * @param[in] timeout The acknowledgement timeout.
+     * @param[in] args The configurations to poll for as strings.
+     *
+     * @return The configurations polled for as the keys and a tuple of their
+     * error codes and responses.
+     */
     py::dict node_config_poll(uint16_t id, const std::chrono::seconds &timeout,
                               const py::args &args);
 
+    /**
+     * Send a notification over LoRa indicating that the run is ready.
+     *
+     * @param[in] broadcast Flag indicating if the message should be
+     * broadcasted.
+     * @param[in] id The node id to send the message to if @p broadcast is @p
+     * false.
+     * @param[in] timeout The acknowledgement timeout.
+     *
+     * @return The ACK'ed error code.
+     */
     int notify_run_ready(bool broadcast, uint16_t id,
                          const std::chrono::seconds &timeout);
 
@@ -422,9 +464,16 @@ class AresSerial {
      */
     py::tuple wait_ble_subscription_event();
 
-    // tuple[broadcast, id]
+    /**
+     * Wait in the waiting room of unplanned parenthood.
+     * @return tuple[broadcast, src_id]
+     */
     py::tuple wait_abort_event();
 
+    /**
+     * Wait for the event indicating that the run is ready.
+     * @return tuple[src_id, broadcast]
+     */
     py::tuple wait_node_ready_event();
 
     /**
@@ -432,6 +481,10 @@ class AresSerial {
      */
     void cancel_events();
 
+    /**
+     * Retrieve the run configurations.
+     * @return dict[str, float | int | datetime]
+     */
     py::dict get_node_config();
 
   private:
