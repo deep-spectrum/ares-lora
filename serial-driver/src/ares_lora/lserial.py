@@ -665,6 +665,20 @@ class LoraSerial:
     @lora_serial_command
     def abort(self, broadcast: bool = True, destination_id: int | None = None, ack_timeout: float = 5.0,
               timeout: float = 20.0):
+        """Send an abortion message over LoRa.
+
+        Args:
+            broadcast: Flag indicating if the message should be broadcasted or not.
+            destination_id: The node to send the message to if the message is not to be broadcasted.
+            ack_timeout: The amount of time to wait for an acknowledgement from the destination node.
+            timeout: The amount of time to wait for a response from the firmware.
+
+        Raises:
+            TimeoutError: No response from the firmware within the configured timeout.
+            TimeoutError: No acknowledgement from the destination node.
+            ValueError: The node ID is invalid.
+            LoraException: Firmware responded with an error code.
+        """
         if not broadcast and (destination_id is None or destination_id <= 0):
             raise ValueError("Direct messages must have a valid destination specified")
         if destination_id is None:
@@ -682,6 +696,26 @@ class LoraSerial:
 
     @lora_serial_command
     def send_node_configs(self, destination_id: int, timeout: float = 20.0, ack_timeout: float = 5.0, **kwargs):
+        """Send node configurations over LoRa.
+
+        Args:
+            destination_id: The node id to send the node configurations to.
+            timeout: The firmware response timeout.
+            ack_timeout: The LoRa message acknowledgement timeout.
+            **kwargs: Keyword arguments for the node configurations.
+
+        Keyword Args:
+            folder_dt (datetime): The save folder timestamp for naming purposes.
+            bandwidth (float): The bandwidth for the collection run.
+            center_freq (float): The center frequency for the collection run.
+            duration (int): The duration (in seconds) of the run.
+            ref_level (float): The reference level of the run.
+
+        Raises:
+            TimeoutError: No response from the firmware within the configured timeout.
+            TimeoutError: No acknowledgement from the destination node.
+            LoraException: Firmware responded with an error code.
+        """
         prev_timeout = self._dev.get_response_timeout()
         self._dev.set_response_timeout(timeout)
         try:
@@ -694,7 +728,27 @@ class LoraSerial:
         self._check_ret_code(ret)
 
     @lora_serial_command
-    def poll_node_config(self, node_id: int, timeout: float = 20.0, ack_timeout: float = 5.0, *args):
+    def poll_node_config(self, node_id: int, timeout: float = 20.0, ack_timeout: float = 5.0, *args) -> dict[
+        str, float | int | datetime | None]:
+        """Poll a node for its configurations.
+
+        Args:
+            node_id: The node ID to poll configurations from.
+            timeout: The firmware response timeout.
+            ack_timeout: The LoRa message acknowledgement timeout.
+            *args: The configurations to poll for.
+                Valid arguments are "folder_dt", "bandwidth", "center_freq", "duration", and "ref_level".
+
+        Returns:
+            dict[str, float | int | datetime]: If a value is None, then polling for that configuration failed.
+
+            The keys are the same values as args. Any invalid args will not be present.
+
+        Raises:
+            TimeoutError: No response from the firmware within the configured timeout.
+            TimeoutError: No acknowledgement from the destination node.
+            LoraException: Firmware responded with an error code.
+        """
         prev_timeout = self._dev.get_response_timeout()
         self._dev.set_response_timeout(timeout)
         try:
@@ -716,6 +770,20 @@ class LoraSerial:
     @lora_serial_command
     def notify_run_ready(self, broadcast: bool = True, destination_id: int | None = None, timeout: float = 20.0,
                          ack_timeout=5.0):
+        """Send a notification over LoRa to tell that the nodes should get ready to collect data.
+
+        Args:
+            broadcast: Flag indicating if the message should be broadcasted or not.
+            destination_id: The node to send the message to if the message is not to be broadcasted.
+            ack_timeout: The amount of time to wait for an acknowledgement from the destination node.
+            timeout: The amount of time to wait for a response from the firmware.
+
+        Raises:
+            TimeoutError: No response from the firmware within the configured timeout.
+            TimeoutError: No acknowledgement from the destination node.
+            ValueError: The node ID is invalid.
+            LoraException: Firmware responded with an error code.
+        """
         if not broadcast and (destination_id is None or destination_id <= 0):
             raise ValueError("Direct messages must have a valid destination specified")
         if destination_id is None:
