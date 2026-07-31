@@ -25,6 +25,11 @@ include_directories(
 set(ARES_FRAME_SRC
         # BLE
         src/ares_lora_serial/frames/ble/ble_state.cpp
+        src/ares_lora_serial/frames/ble/ble_connected.cpp
+        src/ares_lora_serial/frames/ble/ble_disconnect.cpp
+        src/ares_lora_serial/frames/ble/ble_subscribed.cpp
+        src/ares_lora_serial/frames/ble/ble_chunks.cpp
+        src/ares_lora_serial/frames/ble/ble_image_chunk.cpp
 
         # Debug
         src/ares_lora_serial/frames/debug/dbg.cpp
