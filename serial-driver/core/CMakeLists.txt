@@ -33,6 +33,7 @@ set(ARES_FRAME_SRC
         # MCU
         src/ares_lora_serial/frames/mcu/setting.cpp
         src/ares_lora_serial/frames/mcu/lora_config.cpp
+        src/ares_lora_serial/frames/mcu/led.cpp
 
         # Top level
 )
