@@ -11,4 +11,17 @@
 #ifndef ARES_ACK_HPP
 #define ARES_ACK_HPP
 
+#include <ares-lora-serial/frames/payload_base.hpp>
+
+namespace AresFrame {
+struct Ack : Internal::FramePayloadBase {
+    int32_t code = 0;
+
+    void deserialize(const uint8_t *buffer, std::size_t len) override;
+
+  private:
+    static constexpr size_t _payload_size = 4;
+};
+} // namespace AresFrame
+
 #endif // ARES_ACK_HPP
