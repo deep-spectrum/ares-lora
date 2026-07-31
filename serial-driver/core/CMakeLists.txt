@@ -42,6 +42,13 @@ set(ARES_FRAME_SRC
         src/ares_lora_serial/frames/lora/poll/poll.cpp
         src/ares_lora_serial/frames/lora/log/log.cpp
         src/ares_lora_serial/frames/lora/log/log_ack.cpp
+        src/ares_lora_serial/frames/lora/abort.cpp
+        src/ares_lora_serial/frames/lora/lora_ack.cpp
+        src/ares_lora_serial/frames/lora/config/common.cpp
+        src/ares_lora_serial/frames/lora/config/node_config.cpp
+        src/ares_lora_serial/frames/lora/config/node_config_poll.cpp
+        src/ares_lora_serial/frames/lora/config/node_config_response.cpp
+        src/ares_lora_serial/frames/lora/ready.cpp
 
         # MCU
         src/ares_lora_serial/frames/mcu/setting.cpp
@@ -50,6 +57,7 @@ set(ARES_FRAME_SRC
         src/ares_lora_serial/frames/mcu/version.cpp
         src/ares_lora_serial/frames/mcu/ack.cpp
         src/ares_lora_serial/frames/mcu/framing_error.cpp
+        src/ares_lora_serial/frames/mcu/reboot.cpp
 
         # Top level
 )
