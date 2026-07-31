@@ -28,6 +28,7 @@ set(ARES_FRAME_SRC
         # Debug
         src/ares_lora_serial/frames/debug/dbg.cpp
         src/ares_lora_serial/frames/debug/packet_rx.cpp
+        src/ares_lora_serial/frames/debug/packet_tx.cpp
 
         # LoRa
         src/ares_lora_serial/frames/lora/start.cpp
