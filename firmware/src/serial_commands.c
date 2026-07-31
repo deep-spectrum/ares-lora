@@ -218,7 +218,8 @@ static void handle_start(const struct ares_serial *serial,
                                                  : ARES_PKT_TYPE_DIRECT,
     };
 
-    send_lora_transmission(serial, frame, &packet, -1);
+    send_lora_transmission(serial, frame, &packet,
+                           (frame->payload.START.broadcast) ? -1 : 1);
 }
 
 static void handle_lora_config(const struct ares_serial *serial,
@@ -391,6 +392,103 @@ static void handle_reboot(const struct ares_serial *serial,
     send_ack_frame(serial, frame, ret);
 }
 
+static void handle_lora_ack(const struct ares_serial *serial,
+                            struct ares_frame *frame) {
+    struct ares_packet packet = {
+        .type = ARES_PKT_TYPE_DIRECT,
+        .destination_id = frame->payload.LORA_ACK.id,
+        .payload = {.type = ARES_PKT_PAYLOAD_ACK,
+                    .payload.ACK = frame->payload.LORA_ACK.payload_type},
+    };
+
+    send_lora_transmission(serial, frame, &packet, 1);
+}
+
+static void handle_abort(const struct ares_serial *serial,
+                         struct ares_frame *frame) {
+    struct ares_packet packet = {.type = (frame->payload.ABORT.flags.broadcast)
+                                             ? ARES_PKT_TYPE_BROADCAST
+                                             : ARES_PKT_TYPE_DIRECT,
+                                 .destination_id = frame->payload.ABORT.id,
+                                 .payload = {
+                                     .type = ARES_PKT_PAYLOAD_ABORT,
+                                 }};
+
+    send_lora_transmission(serial, frame, &packet,
+                           (frame->payload.ABORT.flags.broadcast) ? -1 : 1);
+}
+
+static void handle_node_config(const struct ares_serial *serial,
+                               struct ares_frame *frame) {
+    struct ares_packet packet = {
+        .type = ARES_PKT_TYPE_DIRECT,
+        .destination_id = frame->payload.NODE_CONFIG.id,
+        .payload =
+            {
+                .type = ARES_PKT_PAYLOAD_CONFIG,
+                .payload.CONFIG_ =
+                    {
+                        .type = frame->payload.NODE_CONFIG.type,
+                        .config = frame->payload.NODE_CONFIG.config,
+                    },
+            },
+    };
+
+    send_lora_transmission(serial, frame, &packet, 1);
+}
+
+static void handle_node_config_poll(const struct ares_serial *serial,
+                                    struct ares_frame *frame) {
+    struct ares_packet packet = {
+        .type = ARES_PKT_TYPE_DIRECT,
+        .destination_id = frame->payload.NODE_CONFIG_POLL.id,
+        .payload =
+            {
+                .type = ARES_PKT_PAYLOAD_CONFIG_POLL,
+                .payload.CONFIG_POLL_ = frame->payload.NODE_CONFIG_POLL.type,
+            },
+    };
+
+    send_lora_transmission(serial, frame, &packet, 1);
+}
+
+static void handle_node_config_response(const struct ares_serial *serial,
+                                        struct ares_frame *frame) {
+    struct ares_packet packet = {
+        .type = ARES_PKT_TYPE_DIRECT,
+        .destination_id = frame->payload.NODE_CONFIG_RESP.id,
+        .payload =
+            {
+                .type = ARES_PKT_PAYLOAD_CONFIG_RESP,
+                .payload.CONFIG_RESP_ =
+                    {
+                        .type = frame->payload.NODE_CONFIG_RESP.type,
+                        .config = frame->payload.NODE_CONFIG_RESP.config,
+                    },
+            },
+    };
+
+    send_lora_transmission(serial, frame, &packet, 1);
+}
+
+static void handle_node_ready(const struct ares_serial *serial,
+                              struct ares_frame *frame) {
+    struct ares_packet packet = {
+        .type = (frame->payload.NODE_READY.flags.broadcast)
+                    ? ARES_PKT_TYPE_BROADCAST
+                    : ARES_PKT_TYPE_DIRECT,
+        .destination_id = frame->payload.NODE_READY.id,
+        .payload =
+            {
+                .type = ARES_PKT_PAYLOAD_READY,
+            },
+    };
+
+    send_lora_transmission(serial, frame, &packet,
+                           (frame->payload.NODE_READY.flags.broadcast) ? -1
+                                                                       : 1);
+}
+
 static int initialize_ble(const struct ares_serial *serial) {
     struct ares_ble_init_data init_data = {
         .cb = {
@@ -426,6 +524,12 @@ static struct ares_serial_command commands[] = {
     {ARES_FRAME_BLE_CHUNKS, handle_ble_chunks},
     {ARES_FRAME_BLE_IMAGE_CHUNK, handle_ble_image_chunk},
     {ARES_FRAME_REBOOT, handle_reboot},
+    {ARES_FRAME_LORA_ACK, handle_lora_ack},
+    {ARES_FRAME_ABORT, handle_abort},
+    {ARES_FRAME_NODE_CONFIG, handle_node_config},
+    {ARES_FRAME_NODE_CONFIG_POLL, handle_node_config_poll},
+    {ARES_FRAME_NODE_CONFIG_RESP, handle_node_config_response},
+    {ARES_FRAME_NODE_READY, handle_node_ready},
 };
 
 static int init_serial_handlers(void) {

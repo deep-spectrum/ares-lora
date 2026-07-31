@@ -13,6 +13,7 @@
 
 #include <ares-lora-serial/ares_frame.hpp>
 #include <ares/data-structures/queue.hpp>
+#include <ares/datetime/datetime.hpp>
 #include <ares/serial/serial.hpp>
 #include <ares/synchronization/semaphore.hpp>
 #include <ares/synchronization/spinlock.hpp>
@@ -165,6 +166,9 @@ struct AresLoraConfig {
  * @class AresSerial
  *
  * Serial driver class for communicating with Ares LoRa devices.
+ * @todo This is getting out of hand. This shit really should be refactored into
+ * independently operated and reusable parts with this class being the interface
+ * between Python and C++. DO NOT USE INHERITANCE TO DO THIS!
  */
 class AresSerial {
   public:
@@ -202,9 +206,11 @@ class AresSerial {
      * @param id The ID to send the start message to. Ignored if broadcast is
      * set.
      * @param broadcast Broadcast the start time to all the listening nodes.
+     * @param ack_timeout The amount of seconds to wait for an ACK.
      * @return The ACK'ed error code from firmware.
      */
-    int send_start(int64_t sec, uint64_t usec, uint16_t id, bool broadcast);
+    int send_start(int64_t sec, uint64_t usec, uint16_t id, bool broadcast,
+                   const std::chrono::seconds &ack_timeout);
 
     /**
      * Configure the LoRa modem.
@@ -321,6 +327,60 @@ class AresSerial {
     int reboot(uint8_t delay);
 
     /**
+     * Send an abort message over LoRa.
+     *
+     * @param[in] broadcast Flag indicating if the message should be broadcasted
+     * or not
+     * @param[id] id The node id to send the message to if @p broadcast is @p
+     * false.
+     * @param[in] ack_timeout The amount of time to wait for an ACK response
+     * when using the direct version.
+     *
+     * @return ACK'ed error code.
+     */
+    int abort(bool broadcast, uint16_t id,
+              const std::chrono::seconds &ack_timeout);
+
+    /**
+     * Send node configurations over LoRa.
+     *
+     * @param[in] id The node ID to send the configurations to.
+     * @param[in] timeout The acknowledgement timeout.
+     * @param[in] kwargs The configurations to send as keyword arguments.
+     *
+     * @return The keyword argument keys with their ACK'ed error codes.
+     */
+    py::dict node_config(uint16_t id, const std::chrono::seconds &timeout,
+                         const py::kwargs &kwargs);
+
+    /**
+     * Poll a node for configurations over LoRa.
+     *
+     * @param[in] id The node ID to send the node config poll request to.
+     * @param[in] timeout The acknowledgement timeout.
+     * @param[in] args The configurations to poll for as strings.
+     *
+     * @return The configurations polled for as the keys and a tuple of their
+     * error codes and responses.
+     */
+    py::dict node_config_poll(uint16_t id, const std::chrono::seconds &timeout,
+                              const py::args &args);
+
+    /**
+     * Send a notification over LoRa indicating that the run is ready.
+     *
+     * @param[in] broadcast Flag indicating if the message should be
+     * broadcasted.
+     * @param[in] id The node id to send the message to if @p broadcast is @p
+     * false.
+     * @param[in] timeout The acknowledgement timeout.
+     *
+     * @return The ACK'ed error code.
+     */
+    int notify_run_ready(bool broadcast, uint16_t id,
+                         const std::chrono::seconds &timeout);
+
+    /**
      * Register logging redirects.
      *
      * @param[in] dbg Debug message callback.
@@ -405,9 +465,27 @@ class AresSerial {
     py::tuple wait_ble_subscription_event();
 
     /**
+     * Wait in the waiting room of unplanned parenthood.
+     * @return tuple[broadcast, src_id]
+     */
+    py::tuple wait_abort_event();
+
+    /**
+     * Wait for the event indicating that the run is ready.
+     * @return tuple[src_id, broadcast]
+     */
+    py::tuple wait_node_ready_event();
+
+    /**
      * Throw AresThreadTerminate exceptions in threads waiting on event queues.
      */
     void cancel_events();
+
+    /**
+     * Retrieve the run configurations.
+     * @return dict[str, float | int | datetime]
+     */
+    py::dict get_node_config();
 
   private:
     Serial::Serial _serial;
@@ -468,6 +546,26 @@ class AresSerial {
 
     static void _handle_bad_frame(const AresResponse &response);
 
+    struct LoraAckWork {
+        LoraAckWork(ares::work_handler_t handler, AresSerial *ctx)
+            : work(std::move(handler)), obj(ctx) {}
+        ~LoraAckWork() { work.work_flush(); }
+        ares::Work work;
+        AresSerial *obj;
+        uint16_t id = 0;
+        AresFrame::AresFrameType acked_message = AresFrame::UNKNOWN;
+        ares::semaphore<> sem{};
+    };
+
+    static void _lora_msg_ack_handler(ares::Work *work);
+    LoraAckWork _lora_ack_work;
+    ares::semaphore<> _ack_sem;
+    uint16_t _expected_ack_id = 0;
+    void _send_lora_ack(uint16_t id, AresFrame::AresFrameType acked_message);
+    void _wait_lora_ack(uint16_t id, const std::chrono::seconds &timeout,
+                        AresFrame::AresFrameType expected_message);
+    void _lora_ack_event(const AresFrame::LoraAck &ack);
+
     struct HeartbeatWork {
         HeartbeatWork(ares::work_handler_t handler, AresSerial *ctx)
             : work(std::move(handler)), obj(ctx) {}
@@ -525,7 +623,73 @@ class AresSerial {
         _ble_connect_event_q;
     ares::bounded_queue<std::unique_ptr<AresFrame::BleSubscribed>, 10>
         _ble_subscribe_event_q;
+    ares::bounded_queue<std::unique_ptr<AresFrame::LoraAck>, 5> _lora_ack_q;
+    ares::bounded_queue<std::unique_ptr<AresFrame::Abort>, 3> _abort_event_q;
+    ares::bounded_queue<std::unique_ptr<AresFrame::NodeConfigResponse>, 3>
+        _node_config_response_event_q;
+    ares::bounded_queue<std::unique_ptr<AresFrame::NodeReady>, 3>
+        _node_ready_event_q;
     bool _stop_event_queues();
+
+    void _abort_event(const AresFrame::Abort &event);
+
+    struct NodeConfigs {
+        NodeConfigs() = default;
+
+        ares::DateTime save_folder;
+        double bandwidth = 0;
+        double center_freq = 0;
+        double ref_level = 0;
+        uint32_t duration = 0;
+
+        ares::semaphore<> sem{};
+    };
+    NodeConfigs _node_configs;
+
+    static void _parse_node_config_kwargs(uint16_t id,
+                                          std::vector<AresFrame> &frames,
+                                          const py::kwargs &kwargs);
+    py::dict _send_node_config_frames(uint16_t id,
+                                      std::vector<AresFrame> &frames,
+                                      const std::chrono::seconds &ack_timeout);
+    void _handle_node_config_event(const AresFrame::NodeConfig &config);
+    void _get_node_configs_released(NodeConfigs &copy);
+
+    struct NodeConfigPollResponseWork {
+        NodeConfigPollResponseWork(ares::work_handler_t handler,
+                                   AresSerial *ctx)
+            : work(std::move(handler)), obj(ctx) {}
+        ~NodeConfigPollResponseWork() { work.work_flush(); }
+
+        ares::Work work;
+        AresSerial *obj;
+        uint16_t id = 0;
+        AresFrame::NodeConfigType type = AresFrame::INVALID;
+        AresFrame::NodeConfigData config = std::monostate();
+
+        ares::semaphore<> sem{};
+    };
+
+    NodeConfigPollResponseWork _node_response_work;
+    void _handle_node_config_poll_event(const AresFrame::NodeConfigPoll &event);
+    static void _node_config_response_work_handler(ares::Work *work);
+    ares::semaphore<> _node_config_response_sem{};
+    uint16_t _expected_node_config_response_id = 0;
+    void _send_node_config_response(uint16_t id, AresFrame::NodeConfigType type,
+                                    AresFrame::NodeConfigData data);
+    void _handle_node_config_response_event(
+        const AresFrame::NodeConfigResponse &event);
+    bool _wait_config_response(uint16_t id, const std::chrono::seconds &timeout,
+                               AresFrame::NodeConfigType expected_type,
+                               AresFrame::NodeConfigResponse &response);
+    static void _parse_node_config_poll_args(uint16_t id,
+                                             std::vector<AresFrame> &frames,
+                                             const py::args &args);
+    py::dict
+    _send_node_config_poll_frames(uint16_t id, std::vector<AresFrame> &frames,
+                                  const std::chrono::seconds &ack_timeout);
+
+    void _handle_node_ready_event(const AresFrame::NodeReady &event);
 
     struct BleInfo {
         struct Subscriptions {

@@ -161,7 +161,7 @@ static void dispatch(const struct ares_lora *lora, int start_index,
                                   length);
 
     if (ret < 0) {
-        LOG_ERR("Unable to deserialize frame");
+        LOG_ERR("Unable to deserialize packet");
         return;
     }
 

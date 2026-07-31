@@ -10,6 +10,7 @@
 
 #include <ares-lora-serial/ares_frame.hpp>
 #include <ares/util.h>
+#include <cassert>
 #include <cstring>
 #include <utility>
 
@@ -173,6 +174,32 @@ void AresFrame::serialize(std::vector<uint8_t> &bytearray) {
         _serialize_reboot(std::get<Reboot>(_tx_payload), bytearray);
         break;
     }
+    case LORA_ACK: {
+        _serialize_lora_ack(std::get<LoraAck>(_tx_payload), bytearray);
+        break;
+    }
+    case ABORT: {
+        _serialize_abort(std::get<Abort>(_tx_payload), bytearray);
+        break;
+    }
+    case NODE_CONFIG: {
+        _serialize_node_config(std::get<NodeConfig>(_tx_payload), bytearray);
+        break;
+    }
+    case NODE_CONFIG_POLL: {
+        _serialize_node_config_poll(std::get<NodeConfigPoll>(_tx_payload),
+                                    bytearray);
+        break;
+    }
+    case NODE_CONFIG_RESP: {
+        _serialize_node_config_response(
+            std::get<NodeConfigResponse>(_tx_payload), bytearray);
+        break;
+    }
+    case NODE_READY: {
+        _serialize_node_ready(std::get<NodeReady>(_tx_payload), bytearray);
+        break;
+    }
     case BLE_DISCONNECT: {
         // nop
         break;
@@ -279,6 +306,36 @@ void AresFrame::parse(const std::vector<uint8_t> &bytearray,
                                     payload_len);
         break;
     }
+    case LORA_ACK: {
+        _deserialize_lora_ack(&bytearray[start_index + payload_offset],
+                              payload_len);
+        break;
+    }
+    case ABORT: {
+        _deserialize_abort(&bytearray[start_index + payload_offset],
+                           payload_len);
+        break;
+    }
+    case NODE_CONFIG: {
+        _deserialize_node_config(&bytearray[start_index + payload_offset],
+                                 payload_len);
+        break;
+    }
+    case NODE_CONFIG_POLL: {
+        _deserialize_node_config_poll(&bytearray[start_index + payload_offset],
+                                      payload_len);
+        break;
+    }
+    case NODE_CONFIG_RESP: {
+        _deserialize_node_config_response(
+            &bytearray[start_index + payload_offset], payload_len);
+        break;
+    }
+    case NODE_READY: {
+        _deserialize_node_ready(&bytearray[start_index + payload_offset],
+                                payload_len);
+        break;
+    }
     default: {
         throw AresFrameError("Invalid RX type");
     }
@@ -318,6 +375,10 @@ size_t AresFrame::total_frames() const {
 
     return ret;
 }
+
+AresFrame::AresFrameType AresFrame::type() const { return _type; }
+
+AresFrame::TxTypes AresFrame::tx_payload() const { return _tx_payload; }
 
 uint16_t AresFrame::_payload_size() const {
     uint16_t ret = 0;
@@ -381,6 +442,32 @@ uint16_t AresFrame::_payload_size() const {
     }
     case REBOOT: {
         ret = sizeof(Reboot::delay);
+        break;
+    }
+    case LORA_ACK: {
+        ret = sizeof(LoraAck::id) + sizeof(LoraAck::message_type);
+        break;
+    }
+    case ABORT: {
+        ret = sizeof(Abort::id) + sizeof(Abort::broadcast);
+        break;
+    }
+    case NODE_CONFIG: {
+        ret = sizeof(NodeConfig::type) + sizeof(NodeConfig::id) +
+              NodeConfigData_size;
+        break;
+    }
+    case NODE_CONFIG_POLL: {
+        ret = sizeof(NodeConfigPoll::type) + sizeof(NodeConfigPoll::id);
+        break;
+    }
+    case NODE_CONFIG_RESP: {
+        ret = sizeof(NodeConfigResponse::id) + NodeConfigData_size +
+              sizeof(NodeConfigResponse::type);
+        break;
+    }
+    case NODE_READY: {
+        ret = sizeof(NodeReady::id) + sizeof(NodeReady::broadcast);
         break;
     }
     case BLE_DISCONNECT: {
@@ -489,6 +576,12 @@ void AresFrame::_preprocess_ble_image(BleImage &payload) {
         buffer.insert(buffer.end(), val_, val_ + sizeof(payload.field));       \
     } while (false)
 
+#define SERIALIZE_LOCAL_VAR(var)                                               \
+    do {                                                                       \
+        const auto *val_ = reinterpret_cast<const uint8_t *>(&var);            \
+        buffer.insert(buffer.end(), val_, val_ + sizeof(var));                 \
+    } while (false)
+
 void AresFrame::_serialize_setting(const Setting &payload,
                                    std::vector<uint8_t> &buffer) {
     SERIALIZE(setting_id);
@@ -584,6 +677,115 @@ void AresFrame::_serialize_reboot(const Reboot &payload,
     SERIALIZE(delay);
 }
 
+void AresFrame::_serialize_lora_ack(const LoraAck &payload,
+                                    std::vector<uint8_t> &buffer) {
+    SERIALIZE(id);
+    SERIALIZE(message_type);
+}
+
+void AresFrame::_serialize_abort(const Abort &payload,
+                                 std::vector<uint8_t> &buffer) {
+    uint8_t flags = 0;
+    if (payload.broadcast) {
+        flags |= 1;
+    }
+
+    SERIALIZE_LOCAL_VAR(flags);
+    SERIALIZE(id);
+}
+
+// todo: this will be put into ares-common
+template <typename T1, typename T2>
+static void set_bitfield(T1 &bitfield, size_t lsb, size_t num_bits, T2 value) {
+    assert(lsb < (sizeof(T1) * __CHAR_BIT__));
+    assert(num_bits != 0);
+    static_assert(sizeof(T1) >= sizeof(T2));
+    T1 mask = (static_cast<T1>(1) << num_bits) - 1;
+    T1 value_ = (static_cast<T1>(value) & mask) << lsb;
+
+    bitfield &= ~(mask << lsb);
+    bitfield |= value_;
+}
+
+template <typename T1, typename T2>
+static T2 get_bitfield(T1 bitfield, size_t lsb, size_t num_bits, T2 &value) {
+    assert(lsb < (sizeof(T1) * __CHAR_BIT__));
+    assert(num_bits != 0);
+    assert(num_bits <= (sizeof(T2) * __CHAR_BIT__));
+    static_assert(sizeof(T1) >= sizeof(T2));
+    T1 mask = (static_cast<T1>(1) << num_bits) - 1;
+    T1 value_ = (bitfield >> lsb) & mask;
+    value = static_cast<T2>(value_);
+    return value;
+}
+
+uint64_t AresFrame::_serialize_node_config(NodeConfigType type,
+                                           const NodeConfigData &payload) {
+    uint64_t ret = 0;
+
+    switch (type) {
+    case SAVE_FOLDER: {
+        NodeConfigSaveFolder config = std::get<NodeConfigSaveFolder>(payload);
+        set_bitfield(ret, 0, 6, config.second);
+        set_bitfield(ret, 6, 6, config.minute);
+        set_bitfield(ret, 12, 5, config.hour);
+        set_bitfield(ret, 17, 5, config.day);
+        set_bitfield(ret, 22, 4, config.month);
+        set_bitfield(ret, 26, 14, config.year);
+        break;
+    }
+    case DURATION: {
+        ret = static_cast<uint64_t>(std::get<uint32_t>(payload));
+        break;
+    }
+    case BANDWIDTH:
+    case CENTER_FREQ:
+    case REF_LEVEL: {
+        (void)std::memcpy(&ret, &std::get<double>(payload), sizeof(ret));
+        break;
+    }
+    default: {
+        throw AresFrameError("Invalid config type");
+        break;
+    }
+    }
+
+    return ret;
+}
+
+void AresFrame::_serialize_node_config(const NodeConfig &payload,
+                                       std::vector<uint8_t> &buffer) {
+    uint64_t config = _serialize_node_config(payload.type, payload.config);
+
+    SERIALIZE(id);
+    SERIALIZE(type);
+    SERIALIZE_LOCAL_VAR(config);
+}
+
+void AresFrame::_serialize_node_config_poll(const NodeConfigPoll &payload,
+                                            std::vector<uint8_t> &buffer) {
+    SERIALIZE(id);
+    SERIALIZE(type);
+}
+
+void AresFrame::_serialize_node_config_response(
+    const NodeConfigResponse &payload, std::vector<uint8_t> &buffer) {
+    uint64_t config = _serialize_node_config(payload.type, payload.config);
+
+    SERIALIZE(id);
+    SERIALIZE(type);
+    SERIALIZE_LOCAL_VAR(config);
+}
+
+void AresFrame::_serialize_node_ready(const NodeReady &payload,
+                                      std::vector<uint8_t> &buffer) {
+    uint8_t flags = 0;
+    set_bitfield(flags, 0, 1, payload.broadcast);
+
+    SERIALIZE_LOCAL_VAR(flags);
+    SERIALIZE(id);
+}
+
 #define Z_DESERIALIZE_INIT_DEFAULT(class_)                                     \
     class_ val_;                                                               \
     size_t offset_ = 0
@@ -604,6 +806,10 @@ void AresFrame::_serialize_reboot(const Reboot &payload,
 #define DESERIALIZE_STR(field, len)                                            \
     val_.field = std::string(buf + offset_, buf + offset_ + (len));            \
     offset_ += (len)
+
+#define DESERIALIZE_LOCAL_VAR(var)                                             \
+    memcpy(&(var), buf + offset_, sizeof(var));                                \
+    offset_ += sizeof(var)
 
 #define DESERIALIZE_SET(field, val)         val_.field = val
 
@@ -744,5 +950,100 @@ void AresFrame::_deserialize_ble_subscribed(const uint8_t *buf, size_t len) {
     DESERIALIZE_SET(chunk, (buf[0] & 1) != 0);
     DESERIALIZE_SET(image, (buf[0] & 2) != 0);
     DESERIALIZE_SET_ADVANCE(1);
+    DESERIALIZE_FINALIZE();
+}
+
+void AresFrame::_deserialize_lora_ack(const uint8_t *buf, size_t len) {
+    ARG_UNUSED(len);
+    DESERIALIZE_INIT(LoraAck);
+    DESERIALIZE(id);
+    DESERIALIZE(message_type);
+    DESERIALIZE_FINALIZE();
+}
+
+void AresFrame::_deserialize_abort(const uint8_t *buf, size_t len) {
+    ARG_UNUSED(len);
+    DESERIALIZE_INIT(Abort);
+    DESERIALIZE(broadcast);
+    DESERIALIZE(id);
+    DESERIALIZE_FINALIZE();
+}
+
+AresFrame::NodeConfigData
+AresFrame::_deserialize_node_config_data(NodeConfigType type, uint64_t config) {
+    switch (type) {
+    case SAVE_FOLDER: {
+        NodeConfigSaveFolder ret;
+        get_bitfield(config, 0, 6, ret.second);
+        get_bitfield(config, 6, 6, ret.minute);
+        get_bitfield(config, 12, 5, ret.hour);
+        get_bitfield(config, 17, 5, ret.day);
+        get_bitfield(config, 22, 4, ret.month);
+        get_bitfield(config, 26, 14, ret.year);
+        return ret;
+    }
+    case DURATION: {
+        return static_cast<uint32_t>(config);
+    }
+    case BANDWIDTH:
+    case CENTER_FREQ:
+    case REF_LEVEL: {
+        double ret;
+        (void)std::memcpy(&ret, &config, sizeof(ret));
+        return ret;
+    }
+    default: {
+        throw AresFrameError("Invalid type");
+        break;
+    }
+    }
+
+    return std::monostate();
+}
+
+void AresFrame::_deserialize_node_config(const uint8_t *buf, size_t len) {
+    ARG_UNUSED(len);
+    uint64_t config;
+    NodeConfigType type;
+    DESERIALIZE_INIT(NodeConfig);
+    DESERIALIZE(id);
+    DESERIALIZE_LOCAL_VAR(type);
+    DESERIALIZE_SET(type, type);
+    DESERIALIZE_LOCAL_VAR(config);
+    DESERIALIZE_SET(config, _deserialize_node_config_data(type, config));
+    DESERIALIZE_FINALIZE();
+}
+
+void AresFrame::_deserialize_node_config_poll(const uint8_t *buf, size_t len) {
+    ARG_UNUSED(len);
+    DESERIALIZE_INIT(NodeConfigPoll);
+    DESERIALIZE(id);
+    DESERIALIZE(type);
+    DESERIALIZE_FINALIZE();
+}
+
+void AresFrame::_deserialize_node_config_response(const uint8_t *buf,
+                                                  size_t len) {
+    ARG_UNUSED(len);
+    uint64_t config;
+    NodeConfigType type;
+    DESERIALIZE_INIT(NodeConfigResponse);
+    DESERIALIZE(id);
+    DESERIALIZE_LOCAL_VAR(type);
+    DESERIALIZE_SET(type, type);
+    DESERIALIZE_LOCAL_VAR(config);
+    DESERIALIZE_SET(config, _deserialize_node_config_data(type, config));
+    DESERIALIZE_FINALIZE();
+}
+
+void AresFrame::_deserialize_node_ready(const uint8_t *buf, size_t len) {
+    ARG_UNUSED(len);
+    uint8_t flags;
+    bool broadcast;
+    DESERIALIZE_INIT(NodeReady);
+    DESERIALIZE_LOCAL_VAR(flags);
+    get_bitfield(flags, 0, 1, broadcast);
+    DESERIALIZE_SET(broadcast, broadcast);
+    DESERIALIZE(id);
     DESERIALIZE_FINALIZE();
 }

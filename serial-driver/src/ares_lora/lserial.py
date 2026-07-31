@@ -20,8 +20,11 @@ logger = logging.getLogger("ares_lora")
 class LoraException(Exception):
     """Exception class for LoRa related exceptions."""
 
-    def __init__(self, code: int):
-        super().__init__(strerror(code))
+    def __init__(self, code: int, extra_str: str | None = None):
+        err = strerror(code)
+        if extra_str is not None:
+            err = f"{extra_str}: {err}"
+        super().__init__(err)
 
 
 class SettingId(IntEnum):
@@ -158,6 +161,8 @@ class LoraSerialConfig:
         start_callback: Event handler for start events. Signature: [seconds: int, nsecs: int] -> None
         poll_callback: Event handler for poll events. Signature: [source_id: int] -> None
         log_callback: Event handler for log events. Signature: [source_id: int, msg: str] -> None
+        abort_callback: Event handler for abortion events. Signature: [source_id: int, broadcasted: bool] -> None
+        run_ready_callback: Event handler for run ready notification events. Signature: [source_id: int, broadcasted: bool] -> None
     """
     port: str = ""
     response_timeout: float = 2.0
@@ -165,7 +170,9 @@ class LoraSerialConfig:
     serial_timeout: float = 0.1
     start_callback: Callable[[int, int], None] | None = None
     poll_callback: Callable[[int], None] | None = None
-    log_callback: Callable[[int, str], None] = None
+    log_callback: Callable[[int, str], None] | None = None
+    abort_callback: Callable[[int, bool], None] | None = None
+    run_ready_callback: Callable[[int, bool], None] | None = None
 
 
 @dataclass
@@ -241,6 +248,8 @@ class LoraSerial:
         self._start_cb = config.start_callback
         self._poll_cb = config.poll_callback
         self._log_cb = config.log_callback
+        self._abort_cb = config.abort_callback
+        self._run_ready_cb = config.run_ready_callback
         self._dev = _AresSerial(configs)
         self._nodes: dict[int, int] = {}
         self._log_msg: dict[int, LogMessage] = {}
@@ -258,6 +267,8 @@ class LoraSerial:
         self._log_thread: Thread | None = None
         self._pkt_rx_thread: Thread | None = None
         self._pkt_tx_thread: Thread | None = None
+        self._abort_event_thread: Thread | None = None
+        self._node_ready_event_thread: Thread | None = None
 
         self._wait_ble_connect_event: Thread | None = None
         self._wait_ble_subscribe_event: Thread | None = None
@@ -344,6 +355,26 @@ class LoraSerial:
             with self._tx_stats_lock:
                 self._tx_stats += count
 
+    def _abort_event_handler(self):
+        while True:
+            try:
+                broadcast, source_id = self._dev.wait_abort_event()
+            except AresThreadTerminate:
+                break
+
+            if self._abort_cb is not None:
+                self._abort_cb(source_id, broadcast)
+
+    def _node_ready_event_handler(self):
+        while True:
+            try:
+                source_id, broadcast = self._dev.wait_node_ready_event()
+            except AresThreadTerminate:
+                break
+
+            if self._run_ready_cb is not None:
+                self._run_ready_cb(source_id, broadcast)
+
     def _ble_connect_event_handle(self):
         while True:
             try:
@@ -363,14 +394,19 @@ class LoraSerial:
             self._ble_subscribe_events.put(subscriptions)
 
     @staticmethod
-    def _check_ret_code(code: int | tuple[int, ...]):
+    def _check_ret_code(code: int | tuple[int, ...] | dict[str, int]):
         if isinstance(code, int):
             if code != 0:
                 raise LoraException(code)
             return
-        for c in code:
+        if isinstance(code, tuple):
+            for c in code:
+                if c != 0:
+                    raise LoraException(c)
+            return
+        for key, c in code.items():
             if c != 0:
-                raise LoraException(c)
+                raise LoraException(c, key)
 
     @lora_serial_command
     def setting(self, setting_id: SettingId, value: int | None = None) -> int | None:
@@ -397,7 +433,7 @@ class LoraSerial:
 
     @lora_serial_command
     def start(self, sec: int, usec: int, timeout: float = 20.0, broadcast: bool = True,
-              destination_id: int | None = None) -> None:
+              destination_id: int | None = None, ack_timeout: float = 5.0) -> None:
         """Send start time over LoRa
 
         Args:
@@ -422,7 +458,7 @@ class LoraSerial:
         prev_timeout = self._dev.get_response_timeout()
         self._dev.set_response_timeout(timeout)
         try:
-            ret = self._dev.start(sec, usec, destination_id, broadcast)
+            ret = self._dev.start(sec, usec, destination_id, broadcast, ack_timeout)
         except Exception:
             self._dev.set_response_timeout(prev_timeout)
             raise
@@ -626,6 +662,143 @@ class LoraSerial:
         self._check_ret_code(code)
         self._stop_driver()
 
+    @lora_serial_command
+    def abort(self, broadcast: bool = True, destination_id: int | None = None, ack_timeout: float = 5.0,
+              timeout: float = 20.0):
+        """Send an abortion message over LoRa.
+
+        Args:
+            broadcast: Flag indicating if the message should be broadcasted or not.
+            destination_id: The node to send the message to if the message is not to be broadcasted.
+            ack_timeout: The amount of time to wait for an acknowledgement from the destination node.
+            timeout: The amount of time to wait for a response from the firmware.
+
+        Raises:
+            TimeoutError: No response from the firmware within the configured timeout.
+            TimeoutError: No acknowledgement from the destination node.
+            ValueError: The node ID is invalid.
+            LoraException: Firmware responded with an error code.
+        """
+        if not broadcast and (destination_id is None or destination_id <= 0):
+            raise ValueError("Direct messages must have a valid destination specified")
+        if destination_id is None:
+            destination_id = 0
+        prev_timeout = self._dev.get_response_timeout()
+        self._dev.set_response_timeout(timeout)
+        try:
+            ret = self._dev.abort(broadcast, destination_id, ack_timeout)
+        except Exception:
+            self._dev.set_response_timeout(prev_timeout)
+            raise
+        else:
+            self._dev.set_response_timeout(prev_timeout)
+        self._check_ret_code(ret)
+
+    @lora_serial_command
+    def send_node_configs(self, destination_id: int, timeout: float = 20.0, ack_timeout: float = 5.0, **kwargs):
+        """Send node configurations over LoRa.
+
+        Args:
+            destination_id: The node id to send the node configurations to.
+            timeout: The firmware response timeout.
+            ack_timeout: The LoRa message acknowledgement timeout.
+            **kwargs: Keyword arguments for the node configurations.
+
+        Keyword Args:
+            folder_dt (datetime): The save folder timestamp for naming purposes.
+            bandwidth (float): The bandwidth for the collection run.
+            center_freq (float): The center frequency for the collection run.
+            duration (int): The duration (in seconds) of the run.
+            ref_level (float): The reference level of the run.
+
+        Raises:
+            TimeoutError: No response from the firmware within the configured timeout.
+            TimeoutError: No acknowledgement from the destination node.
+            LoraException: Firmware responded with an error code.
+        """
+        prev_timeout = self._dev.get_response_timeout()
+        self._dev.set_response_timeout(timeout)
+        try:
+            ret: dict[str, int] = self._dev.node_config(destination_id, ack_timeout, **kwargs)
+        except Exception:
+            self._dev.set_response_timeout(prev_timeout)
+            raise
+        else:
+            self._dev.set_response_timeout(prev_timeout)
+        self._check_ret_code(ret)
+
+    @lora_serial_command
+    def poll_node_config(self, node_id: int, timeout: float = 20.0, ack_timeout: float = 5.0, *args) -> dict[
+        str, float | int | datetime | None]:
+        """Poll a node for its configurations.
+
+        Args:
+            node_id: The node ID to poll configurations from.
+            timeout: The firmware response timeout.
+            ack_timeout: The LoRa message acknowledgement timeout.
+            *args: The configurations to poll for.
+                Valid arguments are "folder_dt", "bandwidth", "center_freq", "duration", and "ref_level".
+
+        Returns:
+            dict[str, float | int | datetime]: If a value is None, then polling for that configuration failed.
+
+            The keys are the same values as args. Any invalid args will not be present.
+
+        Raises:
+            TimeoutError: No response from the firmware within the configured timeout.
+            TimeoutError: No acknowledgement from the destination node.
+            LoraException: Firmware responded with an error code.
+        """
+        prev_timeout = self._dev.get_response_timeout()
+        self._dev.set_response_timeout(timeout)
+        try:
+            ret_: dict[str, tuple[int, float | int | datetime]] = self._dev.poll_node_configs(node_id, ack_timeout,
+                                                                                              *args)
+        except Exception:
+            self._dev.set_response_timeout(prev_timeout)
+            raise
+        else:
+            self._dev.set_response_timeout(prev_timeout)
+        codes: dict[str, int] = {}
+        ret: dict[str, float | int | datetime] = {}
+        for key, value in ret_.items():
+            codes[key] = value[0]
+            ret[key] = value[1]
+        self._check_ret_code(codes)
+        return ret
+
+    @lora_serial_command
+    def notify_run_ready(self, broadcast: bool = True, destination_id: int | None = None, timeout: float = 20.0,
+                         ack_timeout=5.0):
+        """Send a notification over LoRa to tell that the nodes should get ready to collect data.
+
+        Args:
+            broadcast: Flag indicating if the message should be broadcasted or not.
+            destination_id: The node to send the message to if the message is not to be broadcasted.
+            ack_timeout: The amount of time to wait for an acknowledgement from the destination node.
+            timeout: The amount of time to wait for a response from the firmware.
+
+        Raises:
+            TimeoutError: No response from the firmware within the configured timeout.
+            TimeoutError: No acknowledgement from the destination node.
+            ValueError: The node ID is invalid.
+            LoraException: Firmware responded with an error code.
+        """
+        if not broadcast and (destination_id is None or destination_id <= 0):
+            raise ValueError("Direct messages must have a valid destination specified")
+        if destination_id is None:
+            destination_id = 0
+        prev_timeout = self._dev.get_response_timeout()
+        self._dev.set_response_timeout(timeout)
+        try:
+            ret = self._dev.notify_run_ready(broadcast, destination_id, ack_timeout)
+        except Exception:
+            self._dev.set_response_timeout(prev_timeout)
+            raise
+        else:
+            self._dev.set_response_timeout(prev_timeout)
+        self._check_ret_code(ret)
+
     def wait_connection_changed_event(self, block: bool = True, timeout: float | None = None) -> bool:
         """Wait for a connection event from BLE.
 
@@ -773,6 +946,14 @@ class LoraSerial:
         assert isinstance(self._wait_ble_subscribe_event, Thread)
         self._wait_ble_subscribe_event.start()
 
+        self._abort_event_thread = Thread(target=self._abort_event_handler)
+        assert isinstance(self._abort_event_thread, Thread)
+        self._abort_event_thread.start()
+
+        self._node_ready_event_thread = Thread(target=self._node_ready_event_handler)
+        assert isinstance(self._node_ready_event_thread, Thread)
+        self._node_ready_event_thread.start()
+
         self._driver_started.set()
 
         global _instances
@@ -821,6 +1002,14 @@ class LoraSerial:
         if self._wait_ble_connect_event is not None:
             self._wait_ble_connect_event.join()
             self._wait_ble_connect_event = None
+
+        if self._abort_event_thread is not None:
+            self._abort_event_thread.join()
+            self._abort_event_thread = None
+
+        if self._node_ready_event_thread is not None:
+            self._node_ready_event_thread.join()
+            self._node_ready_event_thread = None
 
         self._driver_started.clear()
 
@@ -885,6 +1074,10 @@ class LoraSerial:
             value: The new ready status.
         """
         self._dev.ready = value
+
+    @property
+    def node_configs(self) -> dict[str, float | int | datetime]:
+        return self._dev.node_configs
 
 
 class BleTransfer:

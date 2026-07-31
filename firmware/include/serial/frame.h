@@ -95,7 +95,16 @@ enum ares_frame_type {
                                 ///< going to be sent.
     ARES_FRAME_BLE_IMAGE_CHUNK = 19, ///< Send a chunk to the central device.
 
-    ARES_FRAME_REBOOT = 20, ///< Reboot device after a short delay, Rx only.
+    // Back to normal frames
+    ARES_FRAME_REBOOT = 20,   ///< Reboot device after a short delay, Rx only.
+    ARES_FRAME_LORA_ACK = 21, ///< Acknowledge a LoRa packet.
+    ARES_FRAME_ABORT = 22,    ///< Abort the measurement.
+    ARES_FRAME_NODE_CONFIG = 23,      ///< Configure a receiver node.
+    ARES_FRAME_NODE_CONFIG_POLL = 24, ///< Poll a receiver node configuration.
+    ARES_FRAME_NODE_CONFIG_RESP = 25, ///< Respond to a node
+                                      ///< config poll request.
+    ARES_FRAME_NODE_READY = 26,       ///< Indication that the coordinator
+                                      ///< is ready to collect data.
 
     ARES_FRAME_TYPE_INVALID, ///< Invalid frame.
 };
@@ -217,6 +226,44 @@ struct ares_frame {
         } BLE_IMAGE_CHUNK; ///< ARES_FRAME_BLE_IMAGE_CHUNK
 
         uint8_t REBOOT; /// ARES_FRAME_REBOOT
+
+        struct {
+            uint16_t id;
+            uint16_t payload_type;
+        } LORA_ACK; ///< ARES_FRAME_LORA_ACK
+
+        struct {
+            struct {
+                uint8_t broadcast : 1;
+                uint8_t reserved : 7;
+            } flags;
+            uint16_t id;
+        } ABORT; ///< ARES_FRAME_ABORT
+
+        struct {
+            uint16_t id;
+            uint8_t type;
+            uint64_t config;
+        } NODE_CONFIG; ///< ARES_FRAME_NODE_CONFIG
+
+        struct {
+            uint16_t id;
+            uint8_t type;
+        } NODE_CONFIG_POLL; ///< ARES_FRAME_NODE_CONFIG_POLL
+
+        struct {
+            uint16_t id;
+            uint8_t type;
+            uint64_t config;
+        } NODE_CONFIG_RESP; ///< ARES_FRAME_NODE_CONFIG_RESP
+
+        struct {
+            struct {
+                uint8_t broadcast : 1;
+                uint8_t reserved : 7;
+            } flags;
+            uint16_t id;
+        } NODE_READY; ///< ARES_FRAME_NODE_READY
 
     } payload;
 };

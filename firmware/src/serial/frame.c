@@ -111,6 +111,37 @@ static size_t calculate_frame_length(const struct ares_frame *frame) {
         payload_len = FSIZEOF_FIELD(BLE_SUBSCRIBED);
         break;
     }
+    case ARES_FRAME_LORA_ACK: {
+        payload_len =
+            FSIZEOF_FIELD(LORA_ACK.id) + FSIZEOF_FIELD(LORA_ACK.payload_type);
+        break;
+    }
+    case ARES_FRAME_ABORT: {
+        payload_len = FSIZEOF_FIELD(ABORT.id) + FSIZEOF_FIELD(ABORT.flags);
+        break;
+    }
+    case ARES_FRAME_NODE_CONFIG: {
+        payload_len = FSIZEOF_FIELD(NODE_CONFIG.type) +
+                      FSIZEOF_FIELD(NODE_CONFIG.config) +
+                      FSIZEOF_FIELD(NODE_CONFIG.id);
+        break;
+    }
+    case ARES_FRAME_NODE_CONFIG_POLL: {
+        payload_len = FSIZEOF_FIELD(NODE_CONFIG_POLL.type) +
+                      FSIZEOF_FIELD(NODE_CONFIG_POLL.id);
+        break;
+    }
+    case ARES_FRAME_NODE_CONFIG_RESP: {
+        payload_len = FSIZEOF_FIELD(NODE_CONFIG_RESP.id) +
+                      FSIZEOF_FIELD(NODE_CONFIG_RESP.type) +
+                      FSIZEOF_FIELD(NODE_CONFIG_RESP.config);
+        break;
+    }
+    case ARES_FRAME_NODE_READY: {
+        payload_len =
+            FSIZEOF_FIELD(NODE_READY.id) + FSIZEOF_FIELD(NODE_READY.flags);
+        break;
+    }
     default: {
         __ASSERT(false, "Invalid frame type received");
         break;
@@ -237,6 +268,38 @@ static void serialize(uint8_t *buf, const struct ares_frame *frame,
     }
     case ARES_FRAME_BLE_SUBSCRIBED: {
         FSERIALIZE(BLE_SUBSCRIBED);
+        break;
+    }
+    case ARES_FRAME_LORA_ACK: {
+        FSERIALIZE(LORA_ACK.id);
+        FSERIALIZE(LORA_ACK.payload_type);
+        break;
+    }
+    case ARES_FRAME_ABORT: {
+        FSERIALIZE(ABORT.flags);
+        FSERIALIZE(ABORT.id);
+        break;
+    }
+    case ARES_FRAME_NODE_CONFIG: {
+        FSERIALIZE(NODE_CONFIG.id);
+        FSERIALIZE(NODE_CONFIG.type);
+        FSERIALIZE(NODE_CONFIG.config);
+        break;
+    }
+    case ARES_FRAME_NODE_CONFIG_POLL: {
+        FSERIALIZE(NODE_CONFIG_POLL.id);
+        FSERIALIZE(NODE_CONFIG_POLL.type);
+        break;
+    }
+    case ARES_FRAME_NODE_CONFIG_RESP: {
+        FSERIALIZE(NODE_CONFIG_RESP.id);
+        FSERIALIZE(NODE_CONFIG_RESP.type);
+        FSERIALIZE(NODE_CONFIG_RESP.config);
+        break;
+    }
+    case ARES_FRAME_NODE_READY: {
+        FSERIALIZE(NODE_READY.flags);
+        FSERIALIZE(NODE_READY.id);
         break;
     }
     default:
@@ -378,6 +441,38 @@ static void deserialize(struct ares_frame *frame, const uint8_t *buf) {
     }
     case ARES_FRAME_REBOOT: {
         FDESERIALIZE(REBOOT);
+        break;
+    }
+    case ARES_FRAME_LORA_ACK: {
+        FDESERIALIZE(LORA_ACK.id);
+        FDESERIALIZE(LORA_ACK.payload_type);
+        break;
+    }
+    case ARES_FRAME_ABORT: {
+        FDESERIALIZE(ABORT.flags);
+        FDESERIALIZE(ABORT.id);
+        break;
+    }
+    case ARES_FRAME_NODE_CONFIG: {
+        FDESERIALIZE(NODE_CONFIG.id);
+        FDESERIALIZE(NODE_CONFIG.type);
+        FDESERIALIZE(NODE_CONFIG.config);
+        break;
+    }
+    case ARES_FRAME_NODE_CONFIG_POLL: {
+        FDESERIALIZE(NODE_CONFIG_POLL.id);
+        FDESERIALIZE(NODE_CONFIG_POLL.type);
+        break;
+    }
+    case ARES_FRAME_NODE_CONFIG_RESP: {
+        FDESERIALIZE(NODE_CONFIG_RESP.id);
+        FDESERIALIZE(NODE_CONFIG_RESP.type);
+        FDESERIALIZE(NODE_CONFIG_RESP.config);
+        break;
+    }
+    case ARES_FRAME_NODE_READY: {
+        FDESERIALIZE(NODE_READY.flags);
+        FDESERIALIZE(NODE_READY.id);
         break;
     }
     default: {
