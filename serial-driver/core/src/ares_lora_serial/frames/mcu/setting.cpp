@@ -19,10 +19,6 @@ std::size_t Setting::payload_size() {
     return set ? set_payload_size : get_payload_size;
 }
 
-void Setting::preprocess() {
-    // nop
-}
-
 void Setting::serialize(std::vector<uint8_t> &buffer) {
     ares::serialize(buffer, setting_id);
 
@@ -39,5 +35,4 @@ void Setting::deserialize(const uint8_t *payload, std::size_t len) {
     ares::deserialize(payload, setting_id, value);
 }
 
-bool Setting::new_frame() { return false; }
 } // namespace AresFrame

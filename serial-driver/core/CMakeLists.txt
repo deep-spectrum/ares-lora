@@ -22,12 +22,26 @@ include_directories(
         include
 )
 
+set(ARES_FRAME_SRC
+        # BLE
+
+        # Debug
+
+        # LoRa
+        src/ares_lora_serial/frames/lora/start.cpp
+
+        # MCU
+        src/ares_lora_serial/frames/mcu/setting.cpp
+
+        # Top level
+)
+
 set(PACKAGE_NAME ares_lora_serial_core)
 python_package(src/${PACKAGE_NAME} DESTINATION ${PACKAGE_NAME})
 python_module(_core src/core.cpp
         DESTINATION ${PACKAGE_NAME}
         DEFINITIONS VERSION_INFO=${PROJECT_VERSION})
-python_module(_ares_lora_serial src/ares_lora_serial/ares_lora_serial.cpp src/ares_lora_serial/ares_frame.cpp src/ares_lora_serial/frames/mcu/setting.cpp
+python_module(_ares_lora_serial src/ares_lora_serial/ares_lora_serial.cpp src/ares_lora_serial/ares_frame.cpp ${ARES_FRAME_SRC}
         DESTINATION ${PACKAGE_NAME}
         DEPENDENCIES serial ares_data_structures logging ares_work_q ares_datetime
         LIBS serial ares_data_structures logging ares_work_q ares_datetime

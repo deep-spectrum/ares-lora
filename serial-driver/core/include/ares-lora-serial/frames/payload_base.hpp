@@ -19,10 +19,15 @@ struct FramePayloadBase {
     virtual ~FramePayloadBase() = default;
 
     virtual std::size_t payload_size() = 0;
-    virtual void preprocess() = 0;
+    virtual void preprocess() {
+        // default behavior is no preprocessing necessary.
+    }
     virtual void serialize(std::vector<uint8_t> &buffer) = 0;
     virtual void deserialize(const uint8_t *buffer, std::size_t len) = 0;
-    virtual bool new_frame() = 0;
+    virtual bool new_frame() {
+        // default behavior is single frame is needed.
+        return false;
+    }
 };
 } // namespace AresFrame::Internal
 

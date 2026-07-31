@@ -32,13 +32,9 @@ struct Setting : Internal::FramePayloadBase {
 
     [[nodiscard]] std::size_t payload_size() override;
 
-    void preprocess() override;
-
     void serialize(std::vector<uint8_t> &buffer) override;
 
     void deserialize(const uint8_t *payload, std::size_t len) override;
-
-    bool new_frame() override;
 
   private:
     static constexpr std::size_t set_payload_size = 6;
