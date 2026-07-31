@@ -24,6 +24,7 @@ include_directories(
 
 set(ARES_FRAME_SRC
         # BLE
+        src/ares_lora_serial/frames/ble/ble_state.cpp
 
         # Debug
         src/ares_lora_serial/frames/debug/dbg.cpp
