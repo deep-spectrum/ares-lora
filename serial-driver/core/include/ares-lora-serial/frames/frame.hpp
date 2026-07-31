@@ -14,6 +14,10 @@
 #include <cstdint>
 #include <exception>
 #include <string>
+#include <sys/types.h>
+#include <tuple>
+#include <utility>
+#include <vector>
 
 namespace AresFrame {
 /**
@@ -82,6 +86,119 @@ enum AresFrameType : uint16_t {
     DRIVER_STOP, ///< Frame used to stop the core driver.
     UNKNOWN,     ///< Unknown frame
 };
+
+class Frame {
+  public:
+    struct Decoded {
+        AresFrameType type;
+        // todo: figure something out here. variant is fucking annoying
+    };
+
+    explicit Frame(AresFrameType type /* todo */);
+    explicit Frame(const std::vector<uint8_t> &buffer);
+    Frame();
+    Frame(const Frame &other);
+    ~Frame() = default;
+
+    /**
+     * Checks if there is a frame present in the given buffer.
+     * @param serial_data The serial data buffer to check.
+     * @param len The length of the serial data buffer.
+     * @param error_no_footer Return an error if there is no footer.
+     * @return std::tuple<header index, frame size, bytes left> if frame found.
+     * @return std::tuple<-1, -1, -1> on no frame found.
+     */
+    static std::tuple<ssize_t, ssize_t, ssize_t>
+    frame_present(const uint8_t *serial_data, size_t len,
+                  bool error_no_footer = true);
+
+    /**
+     * Checks if there is a frame present in the given buffer.
+     * @param bytearray The buffer to check.
+     * @param error_no_footer Return an error if there is no footer.
+     * @return std::tuple<header index, frame size, bytes left> if frame found.
+     * @return std::tuple<-1, -1, -1> on no frame found.
+     */
+    static std::tuple<ssize_t, ssize_t, ssize_t>
+    frame_present(const std::vector<uint8_t> &bytearray,
+                  bool error_no_footer = true);
+
+    /**
+     * Serialize the frame into a buffer. If a frame is split into chunks, then
+     * places the next frame into the buffer.
+     * @param bytearray The buffer to store the serialized frame in.
+     *
+     * @throws AresFrameError if frame type cannot be serialized (meant for
+     * reception only).
+     * @throws AresFrameError if log message is empty.
+     * @throws AresFrameError if log message is too long.
+     * @throws AresFrameError if frame payload length cannot be calculated.
+     */
+    void serialize(std::vector<uint8_t> &bytearray);
+
+    /**
+     * Parse a frame from the given buffer.
+     * @param serial_data The buffer to parse a frame from.
+     * @param start_index The start index of the frame.
+     * @param len The length of the buffer.
+     *
+     * @throws AresFrameError if frame type cannot be parsed (meant for
+     * transmission only).
+     */
+    void parse(const uint8_t *serial_data, size_t start_index, size_t len);
+
+    /**
+     * Parse a frame from the given buffer.
+     * @param bytearray The buffer to parse a frame from
+     * @param start_index The start index of the frame.
+     *
+     * @throws AresFrameError if frame type cannot be parsed (meant for
+     * transmission only).
+     */
+    void parse(const std::vector<uint8_t> &bytearray, size_t start_index);
+
+    /**
+     * Retrieve the parsed frame.
+     * @return The decoded or parsed frame.
+     *
+     * @note AresFrame::parse must be called first.
+     */
+    [[nodiscard]] Decoded get_parsed_frame() const;
+
+    /**
+     * Check if a new frame is available for serialization. Useful for messages
+     * split into multiple frames.
+     * @return `true` if a new frame is available for serialization. `false`
+     * otherwise.
+     */
+    [[nodiscard]] bool frame_available() const;
+
+    /**
+     * Retrieve the number of frames a message is split up into.
+     * @return The number of frames that can be serialized and sent.
+     *
+     * @note AresFrame::serialize must be called first.
+     */
+    [[nodiscard]] size_t total_frames() const;
+
+    /**
+     * Retrieve the frame type without decoding.
+     * @return The frame type.
+     */
+    [[nodiscard]] AresFrameType type() const;
+
+    // todo: get payload???
+
+  private:
+    enum FrameDirection { TX, RX, UNSPECIFIED };
+    bool _new_frame = true;
+
+    FrameDirection _direction = UNSPECIFIED;
+    AresFrameType _type = UNKNOWN;
+
+    // todo: How do I store the payload???
+};
+
 } // namespace AresFrame
 
 #endif // ARES_FRAME_HPP
