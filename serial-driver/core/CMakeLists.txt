@@ -40,6 +40,7 @@ set(ARES_FRAME_SRC
         src/ares_lora_serial/frames/mcu/led.cpp
         src/ares_lora_serial/frames/mcu/version.cpp
         src/ares_lora_serial/frames/mcu/ack.cpp
+        src/ares_lora_serial/frames/mcu/framing_error.cpp
 
         # Top level
 )
