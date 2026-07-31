@@ -8,8 +8,7 @@
  * @author Tom Schmitz \<tschmitz@andrew.cmu.edu\>
  */
 
-
 #ifndef ARES_READY_HPP
 #define ARES_READY_HPP
 
-#endif //ARES_READY_HPP
+#endif // ARES_READY_HPP

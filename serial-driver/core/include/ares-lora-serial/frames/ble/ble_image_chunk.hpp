@@ -8,8 +8,7 @@
  * @author Tom Schmitz \<tschmitz@andrew.cmu.edu\>
  */
 
-
 #ifndef ARES_BLE_IMAGE_CHUNK_HPP
 #define ARES_BLE_IMAGE_CHUNK_HPP
 
-#endif //ARES_BLE_IMAGE_CHUNK_HPP
+#endif // ARES_BLE_IMAGE_CHUNK_HPP

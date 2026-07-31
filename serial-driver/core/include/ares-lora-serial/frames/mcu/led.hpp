@@ -8,8 +8,7 @@
  * @author Tom Schmitz \<tschmitz@andrew.cmu.edu\>
  */
 
-
 #ifndef ARES_LED_HPP
 #define ARES_LED_HPP
 
-#endif //ARES_LED_HPP
+#endif // ARES_LED_HPP

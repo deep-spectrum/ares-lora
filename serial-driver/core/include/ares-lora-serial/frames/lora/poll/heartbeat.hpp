@@ -8,8 +8,7 @@
  * @author Tom Schmitz \<tschmitz@andrew.cmu.edu\>
  */
 
-
 #ifndef ARES_HEARTBEAT_HPP
 #define ARES_HEARTBEAT_HPP
 
-#endif //ARES_HEARTBEAT_HPP
+#endif // ARES_HEARTBEAT_HPP

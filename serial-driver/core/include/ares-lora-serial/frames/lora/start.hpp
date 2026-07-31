@@ -8,8 +8,7 @@
  * @author Tom Schmitz \<tschmitz@andrew.cmu.edu\>
  */
 
-
 #ifndef ARES_START_HPP
 #define ARES_START_HPP
 
-#endif //ARES_START_HPP
+#endif // ARES_START_HPP

@@ -8,8 +8,7 @@
  * @author Tom Schmitz \<tschmitz@andrew.cmu.edu\>
  */
 
-
 #ifndef ARES_LOG_HPP
 #define ARES_LOG_HPP
 
-#endif //ARES_LOG_HPP
+#endif // ARES_LOG_HPP
