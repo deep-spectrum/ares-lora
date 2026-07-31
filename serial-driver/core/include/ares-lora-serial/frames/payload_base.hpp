@@ -18,6 +18,8 @@
 
 namespace AresFrame {
 
+using std::size_t;
+
 class NotSupported : std::exception {
   public:
     explicit NotSupported(const char *msg) : _msg(msg) {}
@@ -34,7 +36,7 @@ namespace Internal {
 struct FramePayloadBase {
     virtual ~FramePayloadBase() = 0;
 
-    virtual std::size_t payload_size() {
+    virtual size_t payload_size() {
         throw NotSupported("Payload size is not supported in RX only frames.");
     }
 

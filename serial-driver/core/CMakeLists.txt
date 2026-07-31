@@ -30,6 +30,7 @@ set(ARES_FRAME_SRC
         # LoRa
         src/ares_lora_serial/frames/lora/start.cpp
         src/ares_lora_serial/frames/lora/poll/heartbeat.cpp
+        src/ares_lora_serial/frames/lora/poll/poll.cpp
 
         # MCU
         src/ares_lora_serial/frames/mcu/setting.cpp
