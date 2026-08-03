@@ -11,93 +11,80 @@
 #ifndef ARES_FRAME_HPP
 #define ARES_FRAME_HPP
 
+#include <ares-lora-serial/frames/ble/ble_chunks.hpp>
+#include <ares-lora-serial/frames/ble/ble_connected.hpp>
+#include <ares-lora-serial/frames/ble/ble_disconnect.hpp>
+#include <ares-lora-serial/frames/ble/ble_image_chunk.hpp>
+#include <ares-lora-serial/frames/ble/ble_state.hpp>
+#include <ares-lora-serial/frames/ble/ble_subscribed.hpp>
+#include <ares-lora-serial/frames/debug/dbg.hpp>
+#include <ares-lora-serial/frames/debug/packet_rx.hpp>
+#include <ares-lora-serial/frames/debug/packet_tx.hpp>
+#include <ares-lora-serial/frames/frame_types.hpp>
+#include <ares-lora-serial/frames/lora/abort.hpp>
+#include <ares-lora-serial/frames/lora/config/node_config.hpp>
+#include <ares-lora-serial/frames/lora/config/node_config_poll.hpp>
+#include <ares-lora-serial/frames/lora/config/node_config_response.hpp>
+#include <ares-lora-serial/frames/lora/log/log.hpp>
+#include <ares-lora-serial/frames/lora/log/log_ack.hpp>
+#include <ares-lora-serial/frames/lora/lora_ack.hpp>
+#include <ares-lora-serial/frames/lora/poll/heartbeat.hpp>
+#include <ares-lora-serial/frames/lora/poll/poll.hpp>
+#include <ares-lora-serial/frames/lora/ready.hpp>
+#include <ares-lora-serial/frames/lora/start.hpp>
+#include <ares-lora-serial/frames/mcu/ack.hpp>
+#include <ares-lora-serial/frames/mcu/framing_error.hpp>
+#include <ares-lora-serial/frames/mcu/led.hpp>
+#include <ares-lora-serial/frames/mcu/lora_config.hpp>
+#include <ares-lora-serial/frames/mcu/reboot.hpp>
+#include <ares-lora-serial/frames/mcu/setting.hpp>
+#include <ares-lora-serial/frames/mcu/version.hpp>
 #include <cstdint>
-#include <exception>
-#include <string>
+#include <functional>
+#include <map>
 #include <sys/types.h>
 #include <tuple>
 #include <utility>
+#include <variant>
 #include <vector>
 
 namespace AresFrame {
-/**
- * @class AresFrameError
- *
- * Exception class for AresFrame.
- */
-class AresFrameError : public std::exception {
-  public:
-    /**
-     * Constructor.
-     * @param msg The error message.
-     */
-    explicit AresFrameError(std::string msg) : msg_(std::move(msg)) {}
-
-    /**
-     * Retrieve the error message.
-     * @return The error message.
-     */
-    [[nodiscard]] const char *what() const noexcept override {
-        return msg_.c_str();
-    }
-
-  private:
-    std::string msg_;
-};
-
-/**
- * @enum AresFrameType
- *
- * Frame types for communication with the LoRa module.
- */
-enum AresFrameType : uint16_t {
-    SETTING = 0,        ///< Setting get/set (TX/RX)
-    START = 1,          ///< Start time (TX/RX)
-    LORA_CONFIG = 2,    ///< LoRa modem configuration (TX)
-    LED = 3,            ///< LED state get/set (TX/RX)
-    HEARTBEAT = 4,      ///< Send heartbeat (TX/RX)
-    POLL = 5,           ///< Poll a node for a heartbeat (TX/RX)
-    LOG = 6,            ///< Log message (TX/RX)
-    LOG_ACK = 7,        ///< Log acknowledge (RX)
-    VERSION = 8,        ///< Firmware version (TX/RX)
-    ACK = 9,            ///< Command acknowledge (RX)
-    FRAMING_ERROR = 10, ///< Framing error (RX)
-    DBG = 11,           ///< Debug message (RX)
-    PKT_RX = 12,        ///< Packet Received (RX)
-    PKT_TX = 13,        ///< Packet transmitted (RX)
-
-    BLE_STATE = 14,       ///< Set or retrieve the BLE state (TX/RX)
-    BLE_CONNECTED = 15,   ///< BLE connect state change (RX)
-    BLE_DISCONNECT = 16,  ///< Disconnect BLE (TX)
-    BLE_SUBSCRIBED = 17,  ///< BLE service subscription change (RX)
-    BLE_CHUNK = 18,       ///< BLE tell central how many chunks (TX)
-    BLE_IMAGE_CHUNK = 19, ///< BLE transfer image chunk (TX)
-
-    REBOOT = 20,           ///< Reboot (TX)
-    LORA_ACK = 21,         ///< LoRa packet Acknowledge (TX/RX)
-    ABORT = 22,            ///< Abort measurement (TX/RX)
-    NODE_CONFIG = 23,      ///< Configure receiver node (TX/RX)
-    NODE_CONFIG_POLL = 24, ///< Poll a receiver node's configs (TX/RX)
-    NODE_CONFIG_RESP = 25, ///< Poll response for configurations
-    ///< poll (TX/RX)
-    NODE_READY = 26, ///< Indication that the coordinator is ready to start
-    ///< reception (TX/RX)
-
-    DRIVER_STOP, ///< Frame used to stop the core driver.
-    UNKNOWN,     ///< Unknown frame
-};
-
 class Frame {
   public:
-    struct Decoded {
-        AresFrameType type;
-        // todo: figure something out here. variant is fucking annoying
-    };
+    /**
+     * @typedef TxTypes
+     *
+     * A variant representing all the transmission frame types.
+     */
+    using TxTypes =
+        std::variant<std::monostate, Setting, Start, LoraConfig, Led, Heartbeat,
+                     Poll, Log, Version, BleState, BleChunk, BleImage,
+                     BleDisconnect, Reboot, Abort, NodeConfig, NodeConfigPoll,
+                     NodeConfigResponse, NodeReady, LoraAck>;
 
-    explicit Frame(AresFrameType type /* todo */);
+    /**
+     * @typedef RxTypes
+     *
+     * A variant representing all the reception frame types.
+     */
+    using RxTypes =
+        std::variant<std::monostate, Setting, Start, Ack, FramingError, Led,
+                     Heartbeat, Poll, Log, Version, LogAck, Dbg, PktRx, PktTx,
+                     BleState, BleConnect, BleSubscribed, LoraAck, Abort,
+                     NodeConfig, NodeConfigPoll, NodeConfigResponse, NodeReady>;
+
+    /**
+     * @typedef ResponseTypes
+     *
+     * A variant representing all the response frame types.
+     */
+    using ResponseTypes = std::variant<std::monostate, Setting, Ack,
+                                       FramingError, Led, Version, BleState>;
+
+    explicit Frame(AresFrameType type, const TxTypes &tx_payload);
     explicit Frame(const std::vector<uint8_t> &buffer);
-    Frame();
-    Frame(const Frame &other);
+    Frame() = default;
+    Frame(const Frame &other) = default;
     ~Frame() = default;
 
     /**
@@ -163,7 +150,7 @@ class Frame {
      *
      * @note AresFrame::parse must be called first.
      */
-    [[nodiscard]] Decoded get_parsed_frame() const;
+    //[[nodiscard]] Decoded get_parsed_frame() const;
 
     /**
      * Check if a new frame is available for serialization. Useful for messages
@@ -187,7 +174,9 @@ class Frame {
      */
     [[nodiscard]] AresFrameType type() const;
 
-    // todo: get payload???
+    [[nodiscard]] RxTypes rx_payload() const;
+
+    [[nodiscard]] TxTypes tx_payload() const;
 
   private:
     enum FrameDirection { TX, RX, UNSPECIFIED };
@@ -195,8 +184,36 @@ class Frame {
 
     FrameDirection _direction = UNSPECIFIED;
     AresFrameType _type = UNKNOWN;
+    TxTypes _tx_payload;
+    RxTypes _rx_payload;
 
-    // todo: How do I store the payload???
+    void _preprocess();
+    uint16_t _payload_size();
+
+    const std::map<AresFrameType, std::function<RxTypes()>> _rx_map = {
+        {SETTING, []() { return Setting(); }},
+        {START, []() { return Start(); }},
+        {ACK, []() { return Ack(); }},
+        {FRAMING_ERROR, []() { return FramingError(); }},
+        {LED, []() { return Led(); }},
+        {HEARTBEAT, []() { return Heartbeat(); }},
+        {POLL, []() { return Poll(); }},
+        {LOG, []() { return Log(); }},
+        {VERSION, []() { return Version(); }},
+        {LOG_ACK, []() { return LogAck(); }},
+        {DBG, []() { return Dbg(); }},
+        {PKT_RX, []() { return PktRx(); }},
+        {PKT_TX, []() { return PktTx(); }},
+        {BLE_STATE, []() { return BleState(); }},
+        {BLE_CONNECTED, []() { return BleConnect(); }},
+        {BLE_SUBSCRIBED, []() { return BleSubscribed(); }},
+        {LORA_ACK, []() { return LoraAck(); }},
+        {ABORT, []() { return LoraAck(); }},
+        {NODE_CONFIG, []() { return NodeConfig(); }},
+        {NODE_CONFIG_POLL, []() { return NodeConfigPoll(); }},
+        {NODE_CONFIG_RESP, []() { return NodeConfigResponse(); }},
+        {NODE_READY, []() { return NodeReady(); }},
+    };
 };
 
 } // namespace AresFrame

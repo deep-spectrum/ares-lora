@@ -48,6 +48,7 @@ struct BleImage : Internal::FramePayloadBase {
     void serialize(std::vector<uint8_t> &buffer) override;
     void preprocess() override;
     bool new_frame() override;
+    [[nodiscard]] size_t num_frames() const override;
 
   private:
     std::vector<std::vector<uint8_t>> _img_split;

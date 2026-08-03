@@ -11,7 +11,7 @@
 #ifndef ARES_LORA_ACK_HPP
 #define ARES_LORA_ACK_HPP
 
-#include <ares-lora-serial/frames/frame.hpp>
+#include <ares-lora-serial/frames/frame_types.hpp>
 #include <ares-lora-serial/frames/payload_base.hpp>
 
 namespace AresFrame {

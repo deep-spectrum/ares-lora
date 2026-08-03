@@ -67,6 +67,7 @@ struct Log : Internal::FramePayloadBase {
     void serialize(std::vector<uint8_t> &buffer) override;
     void deserialize(const uint8_t *buffer, std::size_t len) override;
     bool new_frame() override;
+    [[nodiscard]] size_t num_frames() const override;
 
   private:
     std::vector<std::string> _msg_split;

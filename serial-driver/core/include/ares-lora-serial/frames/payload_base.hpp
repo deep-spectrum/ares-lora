@@ -59,6 +59,8 @@ struct FramePayloadBase {
         // default behavior is single frame is needed.
         return false;
     }
+
+    [[nodiscard]] virtual size_t num_frames() const { return 1; }
 };
 
 inline FramePayloadBase::~FramePayloadBase() = default;

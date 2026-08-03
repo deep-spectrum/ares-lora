@@ -51,4 +51,6 @@ void BleImage::preprocess() {
 }
 
 bool BleImage::new_frame() { return _img_split.size() > (_idx + 1); }
+
+size_t BleImage::num_frames() const { return _num_chunks; }
 } // namespace AresFrame
