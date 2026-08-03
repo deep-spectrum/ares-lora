@@ -19,8 +19,4 @@ void LoraConfig::serialize(std::vector<uint8_t> &buffer) {
                     coding_rate, tx_power, cad_mode, cad_num_symbols,
                     cad_det_peak, cad_det_min);
 }
-
-void LoraConfig::deserialize(const uint8_t *buffer, std::size_t len) {
-    // todo: This can only be transmitted
-}
 } // namespace AresFrame
