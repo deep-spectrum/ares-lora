@@ -61,6 +61,21 @@ Frame::Frame(const std::vector<uint8_t> &buffer) {
     throw AresFrameError("Not an Ares Frame");
 }
 
+Frame::Frame(const Frame &other) {
+    _new_frame = other._new_frame;
+    _type = other._type;
+    _tx_payload = other._tx_payload;
+    _rx_payload = other._rx_payload;
+}
+
+Frame &Frame::operator=(const Frame &other) {
+    _new_frame = other._new_frame;
+    _type = other._type;
+    _tx_payload = other._tx_payload;
+    _rx_payload = other._rx_payload;
+    return *this;
+}
+
 std::tuple<ssize_t, ssize_t, ssize_t>
 Frame::frame_present(const uint8_t *serial_data, size_t len,
                      bool error_no_footer) {

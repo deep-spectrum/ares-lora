@@ -83,8 +83,10 @@ class Frame {
     explicit Frame(AresFrameType type, const TxTypes &tx_payload);
     explicit Frame(const std::vector<uint8_t> &buffer);
     Frame() = default;
-    Frame(const Frame &other) = default;
+    Frame(const Frame &other);
     ~Frame() = default;
+
+    Frame &operator=(const Frame &other);
 
     /**
      * Checks if there is a frame present in the given buffer.

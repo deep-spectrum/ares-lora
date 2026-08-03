@@ -15,6 +15,11 @@
 
 namespace AresFrame {
 struct LogAck : Internal::FramePayloadBase {
+    explicit LogAck(uint8_t part, uint8_t num_parts, uint16_t id)
+        : part(part), num_parts(num_parts), id(id) {}
+
+    LogAck() = default;
+
     /**
      * The message part that was acknowledged.
      */

@@ -8,8 +8,8 @@
  * @author Tom Schmitz \<tschmitz@andrew.cmu.edu\>
  */
 
-#include <ares-lora-serial/ares_frame.hpp>
 #include <ares-lora-serial/ares_lora_serial.hpp>
+#include <ares-lora-serial/frames/frame.hpp>
 #include <ares/logging/log.hpp>
 #include <ares/pyutil.hpp>
 #include <ares/util.hpp>
@@ -129,11 +129,11 @@ AresLoraConfig::AresLoraConfig(const py::kwargs &kwargs) {
                 SP(datarate), SP(coding_rate), SP(tx_power));
 }
 
-AresFrame AresLoraConfig::generate_frame() const {
-    return AresFrame(AresFrame::LORA_CONFIG,
-                     AresFrame::LoraConfig{frequency, preamble_length,
-                                           bandwidth, datarate, coding_rate,
-                                           tx_power});
+AresFrame::Frame AresLoraConfig::generate_frame() const {
+    return AresFrame::Frame(
+        AresFrame::LORA_CONFIG,
+        AresFrame::LoraConfig{frequency, preamble_length, bandwidth, datarate,
+                              coding_rate, tx_power, 0, 0, 0, 0});
 }
 
 AresSerial::AresSerial(const AresSerialConfigs &configs)
@@ -165,14 +165,14 @@ void AresSerial::_send_frame(const std::vector<uint8_t> &tx) {
 }
 
 AresSerial::AresResponse
-AresSerial::_send_frame(AresFrame &frame,
+AresSerial::_send_frame(AresFrame::Frame &frame,
                         const std::chrono::milliseconds &timeout) {
     py::gil_scoped_release release;
     return _send_frame_released(frame, timeout);
 }
 
 AresSerial::AresResponse
-AresSerial::_send_frame_released(AresFrame &frame,
+AresSerial::_send_frame_released(AresFrame::Frame &frame,
                                  const std::chrono::milliseconds &timeout) {
     std::unique_lock lock_(_command_lock);
     std::vector<uint8_t> tx;
@@ -191,7 +191,7 @@ static void check_python_errors() {
     }
 }
 
-void AresSerial::_send_multi_frame(AresFrame &frame,
+void AresSerial::_send_multi_frame(AresFrame::Frame &frame,
                                    const std::chrono::milliseconds &timeout,
                                    std::vector<AresResponse> &responses) {
     do {
@@ -202,7 +202,7 @@ void AresSerial::_send_multi_frame(AresFrame &frame,
 }
 
 void AresSerial::_send_log_frame_directed(
-    AresFrame &frame, const std::chrono::milliseconds &ack_timeout,
+    AresFrame::Frame &frame, const std::chrono::milliseconds &ack_timeout,
     size_t max_attempts, std::vector<AresResponse> &responses,
     uint16_t target) {
     py::gil_scoped_release release;
@@ -286,19 +286,19 @@ AresSerial::AresResponse AresSerial::_wait_response_forever() {
 void AresSerial::_handle_bad_frame(const AresResponse &response) {
     std::stringstream ss;
     ss << "Internal error: Bad frame received (code: "
-       << std::get<AresFrame::FramingError>(response.payload) << ")";
+       << std::get<AresFrame::FramingError>(response.payload).type << ")";
     throw py::buffer_error(ss.str());
 }
 
 int AresSerial::setting_set(uint16_t id, uint32_t value) {
     _check_crash();
-    AresFrame frame(AresFrame::SETTING, AresFrame::Setting{true, id, value});
+    AresFrame::Frame frame(AresFrame::SETTING, AresFrame::Setting{id, value});
     AresResponse response = _send_frame(frame, _response_timeout);
 
     int ret = -1;
     switch (response.type) {
     case AresResponse::ACK: {
-        ret = std::get<AresFrame::AckErrorCode>(response.payload);
+        ret = std::get<AresFrame::Ack>(response.payload).code;
         break;
     }
     case AresResponse::BAD_FRAME: {
@@ -315,7 +315,7 @@ int AresSerial::setting_set(uint16_t id, uint32_t value) {
 
 py::tuple AresSerial::setting_get(uint16_t id) {
     _check_crash();
-    AresFrame frame(AresFrame::SETTING, AresFrame::Setting{false, id});
+    AresFrame::Frame frame(AresFrame::SETTING, AresFrame::Setting{id});
     AresResponse response = _send_frame(frame, _response_timeout);
 
     int ret = 0;
@@ -329,7 +329,7 @@ py::tuple AresSerial::setting_get(uint16_t id) {
         break;
     }
     case AresResponse::ACK: {
-        ret = std::get<AresFrame::AckErrorCode>(response.payload);
+        ret = std::get<AresFrame::Ack>(response.payload).code;
         break;
     }
     default: {
@@ -351,15 +351,15 @@ int AresSerial::send_start(int64_t sec, uint64_t usec, uint16_t id,
         _expected_ack_id = id;
     }
 
-    AresFrame frame(AresFrame::START,
-                    AresFrame::Start{sec, usec, id, 0, broadcast, 0});
+    AresFrame::Frame frame(AresFrame::START,
+                           AresFrame::Start{sec, usec, id, 0, broadcast, 0});
     AresResponse response = _send_frame(frame, _response_timeout);
 
     int ret = -1;
 
     switch (response.type) {
     case AresResponse::ACK: {
-        ret = std::get<AresFrame::AckErrorCode>(response.payload);
+        ret = std::get<AresFrame::Ack>(response.payload).code;
         break;
     }
     case AresResponse::BAD_FRAME: {
@@ -380,14 +380,14 @@ int AresSerial::send_start(int64_t sec, uint64_t usec, uint16_t id,
 
 int AresSerial::lora_config(const AresLoraConfig &config) {
     _check_crash();
-    AresFrame frame = config.generate_frame();
+    AresFrame::Frame frame = config.generate_frame();
     AresResponse response = _send_frame(frame, _response_timeout);
 
     int ret = -1;
 
     switch (response.type) {
     case AresResponse::ACK: {
-        ret = std::get<AresFrame::AckErrorCode>(response.payload);
+        ret = std::get<AresFrame::Ack>(response.payload).code;
         break;
     }
     case AresResponse::BAD_FRAME: {
@@ -413,10 +413,9 @@ std::chrono::milliseconds AresSerial::get_response_timeout() const {
 
 py::tuple AresSerial::led(uint8_t id, uint8_t state) {
     _check_crash();
-    AresFrame frame(
+    AresFrame::Frame frame(
         AresFrame::LED,
-        AresFrame::Led{.led = id,
-                       .state = static_cast<AresFrame::Led::LedState>(state)});
+        AresFrame::Led{id, static_cast<AresFrame::Led::LedState>(state)});
     AresResponse response = _send_frame(frame, _response_timeout);
 
     int ret = 0;
@@ -424,7 +423,7 @@ py::tuple AresSerial::led(uint8_t id, uint8_t state) {
 
     switch (response.type) {
     case AresResponse::ACK: {
-        ret = std::get<AresFrame::AckErrorCode>(response.payload);
+        ret = std::get<AresFrame::Ack>(response.payload).code;
         break;
     }
     case AresResponse::BAD_FRAME: {
@@ -446,7 +445,7 @@ py::tuple AresSerial::led(uint8_t id, uint8_t state) {
 py::tuple AresSerial::send_poll(uint16_t id,
                                 const std::chrono::seconds &timeout) {
     _check_crash();
-    AresFrame frame{AresFrame::POLL, AresFrame::Poll{id}};
+    AresFrame::Frame frame{AresFrame::POLL, AresFrame::Poll{id}};
 
     {
         std::unique_lock lock(_heartbeat_sem);
@@ -460,7 +459,7 @@ py::tuple AresSerial::send_poll(uint16_t id,
 
     switch (response.type) {
     case AresResponse::ACK: {
-        ret = std::get<AresFrame::AckErrorCode>(response.payload);
+        ret = std::get<AresFrame::Ack>(response.payload).code;
         break;
     }
     case AresResponse::BAD_FRAME: {
@@ -504,7 +503,7 @@ py::tuple AresSerial::send_log(const std::string &log_msg, bool broadcast,
         throw std::invalid_argument("Bad ID");
     }
 
-    AresFrame frame{AresFrame::LOG, payload};
+    AresFrame::Frame frame{AresFrame::LOG, payload};
     std::vector<AresResponse> responses;
 
     if (payload.broadcast) {
@@ -519,8 +518,7 @@ py::tuple AresSerial::send_log(const std::string &log_msg, bool broadcast,
     for (auto &response : responses) {
         switch (response.type) {
         case AresResponse::ACK: {
-            ret.emplace_back(
-                std::get<AresFrame::AckErrorCode>(response.payload));
+            ret.emplace_back(std::get<AresFrame::Ack>(response.payload).code);
             break;
         }
         case AresResponse::BAD_FRAME: {
@@ -539,7 +537,7 @@ py::tuple AresSerial::send_log(const std::string &log_msg, bool broadcast,
 py::tuple AresSerial::version() {
     _check_crash();
     LOG_DBG("Version command received");
-    AresFrame frame(AresFrame::VERSION, AresFrame::Version{});
+    AresFrame::Frame frame(AresFrame::VERSION, AresFrame::Version{});
     AresResponse response = _send_frame(frame, _response_timeout);
     AresFrame::Version version;
 
@@ -565,7 +563,7 @@ py::tuple AresSerial::version() {
 py::tuple AresSerial::ble_state(uint8_t value) {
     _check_crash();
     LOG_DBG("BLE state command received");
-    AresFrame frame(AresFrame::BLE_STATE, AresFrame::BleState(value));
+    AresFrame::Frame frame(AresFrame::BLE_STATE, AresFrame::BleState(value));
     AresResponse response = _send_frame(frame, _response_timeout);
 
     int ret = 0;
@@ -573,7 +571,7 @@ py::tuple AresSerial::ble_state(uint8_t value) {
 
     switch (response.type) {
     case AresResponse::ACK: {
-        ret = std::get<AresFrame::AckErrorCode>(response.payload);
+        ret = std::get<AresFrame::Ack>(response.payload).code;
         break;
     }
     case AresResponse::BAD_FRAME: {
@@ -595,14 +593,14 @@ py::tuple AresSerial::ble_state(uint8_t value) {
 int AresSerial::ble_disconnect() {
     _check_crash();
     LOG_DBG("BLE state command received");
-    AresFrame frame(AresFrame::BLE_DISCONNECT, std::monostate());
+    AresFrame::Frame frame(AresFrame::BLE_DISCONNECT, std::monostate());
     AresResponse response = _send_frame(frame, _response_timeout);
 
     int ret = -1;
 
     switch (response.type) {
     case AresResponse::ACK: {
-        ret = std::get<AresFrame::AckErrorCode>(response.payload);
+        ret = std::get<AresFrame::Ack>(response.payload).code;
         break;
     }
     case AresResponse::BAD_FRAME: {
@@ -636,14 +634,14 @@ py::tuple AresSerial::ble_send_image(const py::bytes &image) {
 
 int AresSerial::reboot(uint8_t delay) {
     LOG_DBG("Reboot command received.");
-    AresFrame frame{AresFrame::REBOOT, AresFrame::Reboot{delay}};
+    AresFrame::Frame frame{AresFrame::REBOOT, AresFrame::Reboot{delay}};
     AresResponse response = _send_frame(frame, _response_timeout);
 
     int ret = -1;
 
     switch (response.type) {
     case AresResponse::ACK: {
-        ret = std::get<AresFrame::AckErrorCode>(response.payload);
+        ret = std::get<AresFrame::Ack>(response.payload).code;
         break;
     }
     case AresResponse::BAD_FRAME: {
@@ -674,14 +672,14 @@ int AresSerial::abort(bool broadcast, uint16_t id,
         _expected_ack_id = id;
     }
 
-    AresFrame frame{AresFrame::ABORT, AresFrame::Abort{broadcast, id}};
+    AresFrame::Frame frame{AresFrame::ABORT, AresFrame::Abort{broadcast, id}};
     AresResponse response = _send_frame(frame, _response_timeout);
 
     int ret = -1;
 
     switch (response.type) {
     case AresResponse::ACK: {
-        ret = std::get<AresFrame::AckErrorCode>(response.payload);
+        ret = std::get<AresFrame::Ack>(response.payload).code;
         break;
     }
     case AresResponse::BAD_FRAME: {
@@ -711,7 +709,7 @@ py::dict AresSerial::node_config(uint16_t id,
         _expected_ack_id = id;
     }
 
-    std::vector<AresFrame> config_frames;
+    std::vector<AresFrame::Frame> config_frames;
     _parse_node_config_kwargs(id, config_frames, kwargs);
 
     return _send_node_config_frames(id, config_frames, timeout);
@@ -728,7 +726,7 @@ py::dict AresSerial::node_config_poll(uint16_t id,
         _expected_node_config_response_id = id;
     }
 
-    std::vector<AresFrame> config_poll_frames;
+    std::vector<AresFrame::Frame> config_poll_frames;
     _parse_node_config_poll_args(id, config_poll_frames, args);
 
     return _send_node_config_poll_frames(id, config_poll_frames, timeout);
@@ -744,14 +742,15 @@ int AresSerial::notify_run_ready(bool broadcast, uint16_t id,
         _expected_ack_id = id;
     }
 
-    AresFrame frame(AresFrame::NODE_READY, AresFrame::NodeReady{broadcast, id});
+    AresFrame::Frame frame(AresFrame::NODE_READY,
+                           AresFrame::NodeReady{broadcast, id});
     AresResponse response = _send_frame(frame, _response_timeout);
 
     int ret = -1;
 
     switch (response.type) {
     case AresResponse::ACK: {
-        ret = std::get<AresFrame::AckErrorCode>(response.payload);
+        ret = std::get<AresFrame::Ack>(response.payload).code;
         break;
     }
     case AresResponse::BAD_FRAME: {
@@ -875,8 +874,8 @@ void AresSerial::stop() {
     _tasks_running = false;
     _rx_task.join();
 
-    AresFrame::Decoded terminate_request{AresFrame::DRIVER_STOP,
-                                         std::monostate()};
+    AresFrame::Frame terminate_request{AresFrame::DRIVER_STOP,
+                                       std::monostate()};
     size_t retries = 0;
 
     do {
@@ -994,7 +993,8 @@ void AresSerial::_lora_msg_ack_handler(ares::Work *work) {
 
 void AresSerial::_send_lora_ack(uint16_t id,
                                 AresFrame::AresFrameType acked_message) {
-    AresFrame frame(AresFrame::LORA_ACK, AresFrame::LoraAck{id, acked_message});
+    AresFrame::Frame frame(AresFrame::LORA_ACK,
+                           AresFrame::LoraAck{id, acked_message});
 
     AresResponse response;
 
@@ -1009,7 +1009,7 @@ void AresSerial::_send_lora_ack(uint16_t id,
     switch (response.type) {
     case AresResponse::ACK: {
         LOG_DBG("Send LoRa ACK ACK'ed: %d",
-                std::get<AresFrame::AckErrorCode>(response.payload));
+                std::get<AresFrame::Ack>(response.payload).code);
         break;
     }
     case AresResponse::BAD_FRAME: {
@@ -1106,10 +1106,10 @@ void AresSerial::_wait_until_reboot_done(uint8_t delay) {
 void AresSerial::_process_frames_helper() {
     bool stopped = false;
     while (_tasks_running || !stopped) {
-        AresFrame::Decoded frame = _frame_q.get();
-        LOG_DBG("Received frame: %d", frame.type);
+        AresFrame::Frame frame = _frame_q.get();
+        LOG_DBG("Received frame: %d", frame.type());
 
-        switch (frame.type) {
+        switch (frame.type()) {
         case AresFrame::ACK:
         case AresFrame::FRAMING_ERROR:
         case AresFrame::SETTING:
@@ -1120,72 +1120,74 @@ void AresSerial::_process_frames_helper() {
             break;
         }
         case AresFrame::START: {
-            _start_event(std::get<AresFrame::Start>(frame.payload));
+            _start_event(std::get<AresFrame::Start>(frame.rx_payload()));
             break;
         }
         case AresFrame::HEARTBEAT: {
-            _heartbeat_event(std::get<AresFrame::Heartbeat>(frame.payload));
+            _heartbeat_event(
+                std::get<AresFrame::Heartbeat>(frame.rx_payload()));
             break;
         }
         case AresFrame::POLL: {
-            _poll_event(std::get<AresFrame::Poll>(frame.payload));
+            _poll_event(std::get<AresFrame::Poll>(frame.rx_payload()));
             break;
         }
         case AresFrame::LOG: {
-            _log_event(std::get<AresFrame::Log>(frame.payload));
+            _log_event(std::get<AresFrame::Log>(frame.rx_payload()));
             break;
         }
         case AresFrame::LOG_ACK: {
-            _log_ack_event(std::get<AresFrame::LogAck>(frame.payload));
+            _log_ack_event(std::get<AresFrame::LogAck>(frame.rx_payload()));
             break;
         }
         case AresFrame::DBG: {
-            _debug_event(std::get<AresFrame::Dbg>(frame.payload));
+            _debug_event(std::get<AresFrame::Dbg>(frame.rx_payload()));
             break;
         }
         case AresFrame::PKT_RX: {
-            _packet_rx_event(std::get<AresFrame::PktRx>(frame.payload));
+            _packet_rx_event(std::get<AresFrame::PktRx>(frame.rx_payload()));
             break;
         }
         case AresFrame::PKT_TX: {
-            _packet_tx_event(std::get<AresFrame::PktTx>(frame.payload));
+            _packet_tx_event(std::get<AresFrame::PktTx>(frame.rx_payload()));
             break;
         }
         case AresFrame::BLE_CONNECTED: {
-            _ble_connect_event(std::get<AresFrame::BleConnect>(frame.payload));
+            _ble_connect_event(
+                std::get<AresFrame::BleConnect>(frame.rx_payload()));
             break;
         }
         case AresFrame::BLE_SUBSCRIBED: {
             _ble_subscribe_event(
-                std::get<AresFrame::BleSubscribed>(frame.payload));
+                std::get<AresFrame::BleSubscribed>(frame.rx_payload()));
             break;
         }
         case AresFrame::LORA_ACK: {
-            _lora_ack_event(std::get<AresFrame::LoraAck>(frame.payload));
+            _lora_ack_event(std::get<AresFrame::LoraAck>(frame.rx_payload()));
             break;
         }
         case AresFrame::ABORT: {
-            _abort_event(std::get<AresFrame::Abort>(frame.payload));
+            _abort_event(std::get<AresFrame::Abort>(frame.rx_payload()));
             break;
         }
         case AresFrame::NODE_CONFIG: {
             _handle_node_config_event(
-                std::get<AresFrame::NodeConfig>(frame.payload));
+                std::get<AresFrame::NodeConfig>(frame.rx_payload()));
             break;
         }
         case AresFrame::NODE_CONFIG_POLL: {
             _handle_node_config_poll_event(
-                std::get<AresFrame::NodeConfigPoll>(frame.payload));
+                std::get<AresFrame::NodeConfigPoll>(frame.rx_payload()));
             break;
         }
         case AresFrame::NODE_CONFIG_RESP: {
             _handle_node_config_response_event(
-                std::get<AresFrame::NodeConfigResponse>(frame.payload));
+                std::get<AresFrame::NodeConfigResponse>(frame.rx_payload()));
             break;
         }
         case AresFrame::NODE_READY: {
             _handle_node_ready_event(
-                std::get<AresFrame::NodeReady>(frame.payload));
+                std::get<AresFrame::NodeReady>(frame.rx_payload()));
             break;
         }
         case AresFrame::DRIVER_STOP: {
@@ -1193,7 +1195,8 @@ void AresSerial::_process_frames_helper() {
             break;
         }
         default: {
-            LOG_ERR("Invalid frame received: %d", static_cast<int>(frame.type));
+            LOG_ERR("Invalid frame received: %d",
+                    static_cast<int>(frame.type()));
             break;
         }
         }
@@ -1216,16 +1219,17 @@ void AresSerial::_process_frames() {
 void AresSerial::_process_rx_buffer(std::vector<uint8_t> &buf) {
     while (true) {
         LOG_DBG("Processing %u bytes", buf.size());
-        auto [frame_start, frame_size, _] = AresFrame::frame_present(buf);
+        auto [frame_start, frame_size, _] =
+            AresFrame::Frame::frame_present(buf);
         if (frame_start < 0) {
             LOG_DBG("Frame not found");
             return;
         }
 
         LOG_DBG_HEXDUMP(buf, frame_size, "Frame found");
-        AresFrame frame;
+        AresFrame::Frame frame;
         frame.parse(buf, frame_start);
-        _frame_q.put(frame.get_parsed_frame());
+        _frame_q.put(frame);
         buf.erase(buf.begin(), buf.begin() + frame_start + frame_size);
     }
 }
@@ -1264,10 +1268,10 @@ void AresSerial::_read_serial() {
     }
 }
 
-void AresSerial::_publish_response(const AresFrame::Decoded &frame) {
+void AresSerial::_publish_response(const AresFrame::Frame &frame) {
     AresResponse response;
 
-    switch (frame.type) {
+    switch (frame.type()) {
     case AresFrame::ACK: {
         response.type = AresResponse::ACK;
         LOG_DBG("ACK");
@@ -1294,7 +1298,7 @@ void AresSerial::_publish_response(const AresFrame::Decoded &frame) {
                 assert(false);
             }
         },
-        frame.payload);
+        frame.rx_payload());
 
     _response_queue.put(response);
 }
@@ -1365,7 +1369,7 @@ void AresSerial::_heartbeat_handler(ares::Work *work) {
 
 // ReSharper disable once CppDFAUnreachableFunctionCall
 void AresSerial::_send_heartbeat(uint16_t id, bool ready) {
-    AresFrame frame{
+    AresFrame::Frame frame{
         AresFrame::HEARTBEAT,
         AresFrame::Heartbeat{ready, id},
     };
@@ -1382,7 +1386,7 @@ void AresSerial::_send_heartbeat(uint16_t id, bool ready) {
     switch (response.type) {
     case AresResponse::ACK: {
         LOG_DBG("Send heartbeat ACK'ed: %d",
-                std::get<AresFrame::AckErrorCode>(response.payload));
+                std::get<AresFrame::Ack>(response.payload).code);
         break;
     }
     case AresResponse::BAD_FRAME: {
@@ -1521,9 +1525,9 @@ void AresSerial::_abort_event(const AresFrame::Abort &event) {
     put_no_except(event, _abort_event_q, 100ms);
 }
 
-void AresSerial::_parse_node_config_kwargs(uint16_t id,
-                                           std::vector<AresFrame> &frames,
-                                           const py::kwargs &kwargs) {
+void AresSerial::_parse_node_config_kwargs(
+    uint16_t id, std::vector<AresFrame::Frame> &frames,
+    const py::kwargs &kwargs) {
     if (kwargs.contains("folder_dt") && !kwargs["folder_dt"].is_none()) {
         ares::DateTime dt(
             kwargs["folder_dt"].cast<std::chrono::system_clock::time_point>());
@@ -1535,59 +1539,59 @@ void AresSerial::_parse_node_config_kwargs(uint16_t id,
             .minute = static_cast<uint8_t>(dt.minute()),
             .second = static_cast<uint8_t>(dt.second()),
         };
-        AresFrame frame(AresFrame::NODE_CONFIG,
-                        AresFrame::NodeConfig{
-                            .id = id,
-                            .type = AresFrame::SAVE_FOLDER,
-                            .config = save_folder,
-                        });
+        AresFrame::Frame frame(AresFrame::NODE_CONFIG,
+                               AresFrame::NodeConfig{
+                                   id,
+                                   AresFrame::SAVE_FOLDER,
+                                   save_folder,
+                               });
         frames.emplace_back(frame);
     }
 
     if (kwargs.contains("bandwidth") && !kwargs["bandwidth"].is_none()) {
-        AresFrame frame(AresFrame::NODE_CONFIG,
-                        AresFrame::NodeConfig{
-                            .id = id,
-                            .type = AresFrame::BANDWIDTH,
-                            .config = kwargs["bandwidth"].cast<double>(),
-                        });
+        AresFrame::Frame frame(AresFrame::NODE_CONFIG,
+                               AresFrame::NodeConfig{
+                                   id,
+                                   AresFrame::BANDWIDTH,
+                                   kwargs["bandwidth"].cast<double>(),
+                               });
         frames.emplace_back(frame);
     }
 
     if (kwargs.contains("center_freq") && !kwargs["center_freq"].is_none()) {
-        AresFrame frame(AresFrame::NODE_CONFIG,
-                        AresFrame::NodeConfig{
-                            .id = id,
-                            .type = AresFrame::CENTER_FREQ,
-                            .config = kwargs["center_freq"].cast<double>(),
-                        });
+        AresFrame::Frame frame(AresFrame::NODE_CONFIG,
+                               AresFrame::NodeConfig{
+                                   id,
+                                   AresFrame::CENTER_FREQ,
+                                   kwargs["center_freq"].cast<double>(),
+                               });
         frames.emplace_back(frame);
     }
 
     if (kwargs.contains("ref_level") && !kwargs["ref_level"].is_none()) {
-        AresFrame frame(AresFrame::NODE_CONFIG,
-                        AresFrame::NodeConfig{
-                            .id = id,
-                            .type = AresFrame::REF_LEVEL,
-                            .config = kwargs["ref_level"].cast<double>(),
-                        });
+        AresFrame::Frame frame(AresFrame::NODE_CONFIG,
+                               AresFrame::NodeConfig{
+                                   id,
+                                   AresFrame::REF_LEVEL,
+                                   kwargs["ref_level"].cast<double>(),
+                               });
         frames.emplace_back(frame);
     }
 
     if (kwargs.contains("duration") && !kwargs["duration"].is_none()) {
-        AresFrame frame(AresFrame::NODE_CONFIG,
-                        AresFrame::NodeConfig{
-                            .id = id,
-                            .type = AresFrame::DURATION,
-                            .config = kwargs["duration"].cast<uint32_t>(),
-                        });
+        AresFrame::Frame frame(AresFrame::NODE_CONFIG,
+                               AresFrame::NodeConfig{
+                                   id,
+                                   AresFrame::DURATION,
+                                   kwargs["duration"].cast<uint32_t>(),
+                               });
         frames.emplace_back(frame);
     }
 }
 
 py::dict
 AresSerial::_send_node_config_frames(uint16_t id,
-                                     std::vector<AresFrame> &frames,
+                                     std::vector<AresFrame::Frame> &frames,
                                      const std::chrono::seconds &ack_timeout) {
     py::dict ret;
 
@@ -1598,7 +1602,7 @@ AresSerial::_send_node_config_frames(uint16_t id,
 
         switch (response.type) {
         case AresResponse::ACK: {
-            code = std::get<AresFrame::AckErrorCode>(response.payload);
+            code = std::get<AresFrame::Ack>(response.payload).code;
             break;
         }
         case AresResponse::BAD_FRAME: {
@@ -1762,9 +1766,8 @@ void AresSerial::_node_config_response_work_handler(ares::Work *work) {
 void AresSerial::_send_node_config_response(uint16_t id,
                                             AresFrame::NodeConfigType type,
                                             AresFrame::NodeConfigData data) {
-    AresFrame frame(
-        AresFrame::NODE_CONFIG_RESP,
-        AresFrame::NodeConfigResponse{.id = id, .type = type, .config = data});
+    AresFrame::Frame frame(AresFrame::NODE_CONFIG_RESP,
+                           AresFrame::NodeConfigResponse{id, type, data});
 
     AresResponse response;
 
@@ -1779,7 +1782,7 @@ void AresSerial::_send_node_config_response(uint16_t id,
     switch (response.type) {
     case AresResponse::ACK: {
         LOG_DBG("Send node config response ACK'ed: %d",
-                std::get<AresFrame::AckErrorCode>(response.payload));
+                std::get<AresFrame::Ack>(response.payload).code);
         break;
     }
     case AresResponse::BAD_FRAME: {
@@ -1835,9 +1838,8 @@ bool AresSerial::_wait_config_response(
     return timed_out;
 }
 
-void AresSerial::_parse_node_config_poll_args(uint16_t id,
-                                              std::vector<AresFrame> &frames,
-                                              const py::args &args) {
+void AresSerial::_parse_node_config_poll_args(
+    uint16_t id, std::vector<AresFrame::Frame> &frames, const py::args &args) {
     struct {
         bool save_folder = false;
         bool bandwidth = false;
@@ -1856,45 +1858,45 @@ void AresSerial::_parse_node_config_poll_args(uint16_t id,
 
         if (!parsed.save_folder && val == "folder_dt") {
             parsed.save_folder = true;
-            AresFrame frame(AresFrame::NODE_CONFIG_POLL,
-                            AresFrame::NodeConfigPoll{
-                                .id = id, .type = AresFrame::SAVE_FOLDER});
+            AresFrame::Frame frame(
+                AresFrame::NODE_CONFIG_POLL,
+                AresFrame::NodeConfigPoll{id, AresFrame::SAVE_FOLDER});
             frames.emplace_back(frame);
             continue;
         }
 
         if (!parsed.bandwidth && val == "bandwidth") {
             parsed.bandwidth = true;
-            AresFrame frame(AresFrame::NODE_CONFIG_POLL,
-                            AresFrame::NodeConfigPoll{
-                                .id = id, .type = AresFrame::BANDWIDTH});
+            AresFrame::Frame frame(
+                AresFrame::NODE_CONFIG_POLL,
+                AresFrame::NodeConfigPoll{id, AresFrame::BANDWIDTH});
             frames.emplace_back(frame);
             continue;
         }
 
         if (!parsed.center_freq && val == "center_freq") {
             parsed.center_freq = true;
-            AresFrame frame(AresFrame::NODE_CONFIG_POLL,
-                            AresFrame::NodeConfigPoll{
-                                .id = id, .type = AresFrame::CENTER_FREQ});
+            AresFrame::Frame frame(
+                AresFrame::NODE_CONFIG_POLL,
+                AresFrame::NodeConfigPoll{id, AresFrame::CENTER_FREQ});
             frames.emplace_back(frame);
             continue;
         }
 
         if (!parsed.duration && val == "duration") {
             parsed.ref_level = true;
-            AresFrame frame(AresFrame::NODE_CONFIG_POLL,
-                            AresFrame::NodeConfigPoll{
-                                .id = id, .type = AresFrame::DURATION});
+            AresFrame::Frame frame(
+                AresFrame::NODE_CONFIG_POLL,
+                AresFrame::NodeConfigPoll{id, AresFrame::DURATION});
             frames.emplace_back(frame);
             continue;
         }
 
         if (!parsed.ref_level && val == "ref_level") {
             parsed.ref_level = true;
-            AresFrame frame(AresFrame::NODE_CONFIG_POLL,
-                            AresFrame::NodeConfigPoll{
-                                .id = id, .type = AresFrame::REF_LEVEL});
+            AresFrame::Frame frame(
+                AresFrame::NODE_CONFIG_POLL,
+                AresFrame::NodeConfigPoll{id, AresFrame::REF_LEVEL});
             frames.emplace_back(frame);
             continue;
         }
@@ -1902,7 +1904,7 @@ void AresSerial::_parse_node_config_poll_args(uint16_t id,
 }
 
 py::dict AresSerial::_send_node_config_poll_frames(
-    uint16_t id, std::vector<AresFrame> &frames,
+    uint16_t id, std::vector<AresFrame::Frame> &frames,
     const std::chrono::seconds &ack_timeout) {
     py::dict ret;
 
@@ -1913,7 +1915,7 @@ py::dict AresSerial::_send_node_config_poll_frames(
 
         switch (response.type) {
         case AresResponse::ACK: {
-            code = std::get<AresFrame::AckErrorCode>(response.payload);
+            code = std::get<AresFrame::Ack>(response.payload).code;
             break;
         }
         case AresResponse::BAD_FRAME: {
@@ -2024,7 +2026,8 @@ void AresSerial::_ble_subscribe_event(const AresFrame::BleSubscribed &event) {
 int AresSerial::_ble_send_chunk(uint64_t num_chunks) {
     _check_crash();
     LOG_DBG("BLE chunk command received");
-    AresFrame frame(AresFrame::BLE_CHUNK, AresFrame::BleChunk{num_chunks});
+    AresFrame::Frame frame(AresFrame::BLE_CHUNK,
+                           AresFrame::BleChunk{num_chunks});
     LOG_DBG("Image fits into %lu chunks", num_chunks);
     AresResponse response = _send_frame(frame, _response_timeout);
 
@@ -2032,7 +2035,7 @@ int AresSerial::_ble_send_chunk(uint64_t num_chunks) {
 
     switch (response.type) {
     case AresResponse::ACK: {
-        ret = std::get<AresFrame::AckErrorCode>(response.payload);
+        ret = std::get<AresFrame::Ack>(response.payload).code;
         break;
     }
     case AresResponse::BAD_FRAME: {
@@ -2051,8 +2054,8 @@ py::tuple AresSerial::_ble_send_image(const std::vector<uint8_t> &image) {
     _check_crash();
     LOG_DBG("BLE image command received");
     LOG_DBG_HEXDUMP(image, image.size(), "Bytes to send");
-    AresFrame frame(AresFrame::BLE_IMAGE_CHUNK,
-                    AresFrame::BleImage(image, ble_info.mtu));
+    AresFrame::Frame frame(AresFrame::BLE_IMAGE_CHUNK,
+                           AresFrame::BleImage(image, ble_info.mtu));
     std::vector<AresResponse> responses;
 
     _send_multi_frame(frame, _response_timeout, responses);
@@ -2062,8 +2065,7 @@ py::tuple AresSerial::_ble_send_image(const std::vector<uint8_t> &image) {
     for (auto &response : responses) {
         switch (response.type) {
         case AresResponse::ACK: {
-            ret.emplace_back(
-                std::get<AresFrame::AckErrorCode>(response.payload));
+            ret.emplace_back(std::get<AresFrame::Ack>(response.payload).code);
             break;
         }
         case AresResponse::BAD_FRAME: {
