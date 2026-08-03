@@ -48,6 +48,10 @@
 #include <vector>
 
 namespace AresFrame {
+/**
+ * @class Frame
+ * Class for encoding and decoding Ares Frames.
+ */
 class Frame {
   public:
     /**
@@ -80,12 +84,40 @@ class Frame {
     using ResponseTypes = std::variant<std::monostate, Setting, Ack,
                                        FramingError, Led, Version, BleState>;
 
+    /**
+     * Construct a transmit from.
+     * @param type The frame type.
+     * @param tx_payload The structured payload of the frame.
+     */
     explicit Frame(AresFrameType type, const TxTypes &tx_payload);
+
+    /**
+     * Constructor for decoding a received frame.
+     * @param buffer The buffer to parse the frame from.
+     */
     explicit Frame(const std::vector<uint8_t> &buffer);
+
+    /**
+     * Constructor.
+     */
     Frame() = default;
+
+    /**
+     * Copy constructor.
+     * @param other Other instance to copy.
+     */
     Frame(const Frame &other);
+
+    /**
+     * Destructor.
+     */
     ~Frame() = default;
 
+    /**
+     * Copy assignment operator.
+     * @param other The other frame instance to copy.
+     * @return This frame.
+     */
     Frame &operator=(const Frame &other);
 
     /**
@@ -146,14 +178,6 @@ class Frame {
     void parse(const std::vector<uint8_t> &bytearray, size_t start_index);
 
     /**
-     * Retrieve the parsed frame.
-     * @return The decoded or parsed frame.
-     *
-     * @note AresFrame::parse must be called first.
-     */
-    //[[nodiscard]] Decoded get_parsed_frame() const;
-
-    /**
      * Check if a new frame is available for serialization. Useful for messages
      * split into multiple frames.
      * @return `true` if a new frame is available for serialization. `false`
@@ -175,8 +199,16 @@ class Frame {
      */
     [[nodiscard]] AresFrameType type() const;
 
+    /**
+     * Get the receive payload.
+     * @return The received frame payload in structured form.
+     */
     [[nodiscard]] RxTypes rx_payload() const;
 
+    /**
+     * Get the transmit payload.
+     * @return The transmit frame payload in structured form.
+     */
     [[nodiscard]] TxTypes tx_payload() const;
 
   private:

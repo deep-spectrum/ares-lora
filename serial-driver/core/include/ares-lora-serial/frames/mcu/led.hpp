@@ -14,6 +14,11 @@
 #include <ares-lora-serial/frames/payload_base.hpp>
 
 namespace AresFrame {
+/**
+ * @struct Led
+ *
+ * Data for AresFrame::LED frames.
+ */
 struct Led : Internal::FramePayloadBase {
     /**
      * @enum LedState
@@ -28,8 +33,16 @@ struct Led : Internal::FramePayloadBase {
         FETCH = 4, ///< Retrieve LED state from firmware.
     };
 
+    /**
+     * Constructor.
+     */
     Led() = default;
 
+    /**
+     * Constructor.
+     * @param led See Led::led.
+     * @param state See Led::state.
+     */
     explicit Led(uint8_t led, LedState state) : led(led), state(state) {}
 
     /**
@@ -42,8 +55,23 @@ struct Led : Internal::FramePayloadBase {
      */
     LedState state = FETCH;
 
+    /**
+     * Payload size.
+     * @return The payload size.
+     */
     std::size_t payload_size() override;
+
+    /**
+     * Encode into a buffer.
+     * @param buffer The buffer to place data into.
+     */
     void serialize(std::vector<uint8_t> &buffer) override;
+
+    /**
+     * Decode the payload from a serial buffer.
+     * @param buffer Pointer to buffer that contains encoded payload
+     * @param len The size of the payload.
+     */
     void deserialize(const uint8_t *buffer, std::size_t len) override;
 
   private:

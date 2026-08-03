@@ -14,15 +14,41 @@
 #include <ares-lora-serial/frames/payload_base.hpp>
 
 namespace AresFrame {
+/**
+ * @struct FramingError
+ * Data for AresFrame::FRAMING_ERROR frames.
+ */
 struct FramingError : Internal::FramePayloadBase {
+    /**
+     * @enum ErrorType
+     * The different framing errors.
+     */
     enum ErrorType : uint32_t {
+        /**
+         * Bad frame.
+         */
         BAD_FRAME = 0,
+        /**
+         * Bad frame type.
+         */
         BAD_TYPE = 1,
+
+        /**
+         * Frame type not implemented.
+         */
         NOT_IMPLEMENTED = 2,
     };
 
+    /**
+     * The framing error that occurred.
+     */
     ErrorType type = NOT_IMPLEMENTED;
 
+    /**
+     * Decode the payload from a serial buffer.
+     * @param buffer Pointer to buffer that contains encoded payload
+     * @param len The size of the payload.
+     */
     void deserialize(const uint8_t *buffer, std::size_t len) override;
 
   private:

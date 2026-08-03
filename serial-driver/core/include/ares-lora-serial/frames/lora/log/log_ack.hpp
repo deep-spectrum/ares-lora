@@ -14,10 +14,25 @@
 #include <ares-lora-serial/frames/payload_base.hpp>
 
 namespace AresFrame {
+
+/**
+ * @struct LogAck
+ *
+ * Data for AresFrame::LOG_ACK frames.
+ */
 struct LogAck : Internal::FramePayloadBase {
+    /**
+     * Constructor.
+     * @param part See LogAck::part
+     * @param num_parts See LogAck::num_parts
+     * @param id See LogAck::id
+     */
     explicit LogAck(uint8_t part, uint8_t num_parts, uint16_t id)
         : part(part), num_parts(num_parts), id(id) {}
 
+    /**
+     * Default constructor.
+     */
     LogAck() = default;
 
     /**
@@ -50,6 +65,11 @@ struct LogAck : Internal::FramePayloadBase {
                (id == other.id) && (log_id == other.log_id);
     }
 
+    /**
+     * Decode the payload from a serial buffer.
+     * @param buffer Pointer to buffer that contains encoded payload
+     * @param len The size of the payload.
+     */
     void deserialize(const uint8_t *buffer, std::size_t len) override;
 
   private:

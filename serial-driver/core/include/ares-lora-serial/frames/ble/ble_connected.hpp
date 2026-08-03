@@ -14,8 +14,13 @@
 #include <ares-lora-serial/frames/payload_base.hpp>
 
 namespace AresFrame {
-struct BleConnect : Internal::FramePayloadBase {
 
+/**
+ * @struct BleConnect
+ *
+ * Payload data for AresFrame::BLE_CONNECTED frames.
+ */
+struct BleConnect : Internal::FramePayloadBase {
     /**
      * Flag indicating if the BLE is connected or not.
      */
@@ -26,6 +31,11 @@ struct BleConnect : Internal::FramePayloadBase {
      */
     uint16_t chunk_size = 0;
 
+    /**
+     * Decode the payload from a serial buffer.
+     * @param buffer Pointer to buffer that contains encoded payload
+     * @param len The size of the payload.
+     */
     void deserialize(const uint8_t *buffer, std::size_t len) override;
 
   private:

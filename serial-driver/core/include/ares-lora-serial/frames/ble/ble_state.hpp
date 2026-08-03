@@ -14,6 +14,11 @@
 #include <ares-lora-serial/frames/payload_base.hpp>
 
 namespace AresFrame {
+/**
+ * @struct BleState
+ *
+ * Payload data for AresFrame::BLE_STATE frames.
+ */
 struct BleState : Internal::FramePayloadBase {
     /**
      * @enum State
@@ -37,6 +42,10 @@ struct BleState : Internal::FramePayloadBase {
      */
     explicit BleState(uint8_t value) { state = static_cast<State>(value); }
 
+    /**
+     * Constructor.
+     * @param value The state value.
+     */
     explicit BleState(State value) : state(value) {}
 
     /**
@@ -44,8 +53,23 @@ struct BleState : Internal::FramePayloadBase {
      */
     State state = REQUEST;
 
+    /**
+     * Payload size.
+     * @return The payload size.
+     */
     size_t payload_size() override;
+
+    /**
+     * Encode into a buffer.
+     * @param buffer The buffer to place data into.
+     */
     void serialize(std::vector<uint8_t> &buffer) override;
+
+    /**
+     * Decode the payload from a serial buffer.
+     * @param buffer Pointer to buffer that contains encoded payload
+     * @param len The size of the payload.
+     */
     void deserialize(const uint8_t *buffer, std::size_t len) override;
 
   private:

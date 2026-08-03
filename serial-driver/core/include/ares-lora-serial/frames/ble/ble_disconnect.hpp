@@ -14,9 +14,22 @@
 #include <ares-lora-serial/frames/payload_base.hpp>
 
 namespace AresFrame {
+/**
+ * @struct BleDisconnect
+ *
+ * Payload data for AresFrame::BLE_DISCONNECT frames.
+ */
 struct BleDisconnect : Internal::FramePayloadBase {
-
+    /**
+     * Payload size.
+     * @return The payload size.
+     */
     size_t payload_size() override;
+
+    /**
+     * Encode into a buffer.
+     * @param buffer The buffer to place data into.
+     */
     void serialize(std::vector<uint8_t> &buffer) override;
 
   private:

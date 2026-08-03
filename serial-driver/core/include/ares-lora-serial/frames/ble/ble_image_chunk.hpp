@@ -14,6 +14,11 @@
 #include <ares-lora-serial/frames/payload_base.hpp>
 
 namespace AresFrame {
+/**
+ * @struct BleImage
+ *
+ * Payload data for AresFrame::BLE_IMAGE_CHUNK frames.
+ */
 struct BleImage : Internal::FramePayloadBase {
     /**
      * Constructor.
@@ -44,10 +49,33 @@ struct BleImage : Internal::FramePayloadBase {
     static size_t num_chunks(const std::vector<uint8_t> &image,
                              uint16_t max_chunk_size);
 
+    /**
+     * Payload size.
+     * @return The payload size.
+     */
     size_t payload_size() override;
+
+    /**
+     * Encode into a buffer.
+     * @param buffer The buffer to place data into.
+     */
     void serialize(std::vector<uint8_t> &buffer) override;
+
+    /**
+     * Preprocess The payload.
+     */
     void preprocess() override;
+
+    /**
+     * Check if there is a new frame available after preprocessing.
+     * @return @p true if there is a new frame, @p false otherwise.
+     */
     bool new_frame() override;
+
+    /**
+     * Get the number of frames needed.
+     * @return Number of frames.
+     */
     [[nodiscard]] size_t num_frames() const override;
 
   private:

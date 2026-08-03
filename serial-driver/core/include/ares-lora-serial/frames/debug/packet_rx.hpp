@@ -14,6 +14,12 @@
 #include <ares-lora-serial/frames/payload_base.hpp>
 
 namespace AresFrame {
+
+/**
+ * @struct PktRx
+ *
+ * Data for AresFrame::PKT_RX frames.
+ */
 struct PktRx : Internal::FramePayloadBase {
     /**
      * Packet ID.
@@ -29,6 +35,11 @@ struct PktRx : Internal::FramePayloadBase {
      */
     uint8_t seq_cnt = 0;
 
+    /**
+     * Decode the payload from a serial buffer.
+     * @param buffer Pointer to buffer that contains encoded payload
+     * @param len The size of the payload.
+     */
     void deserialize(const uint8_t *buffer, std::size_t len) override;
 
   private:

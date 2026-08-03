@@ -14,6 +14,11 @@
 #include <ares-lora-serial/frames/payload_base.hpp>
 
 namespace AresFrame {
+/**
+ * @struct Version
+ *
+ * Data for AresFrame::VERSION frames.
+ */
 struct Version : Internal::FramePayloadBase {
     /**
      * The application version.
@@ -30,8 +35,23 @@ struct Version : Internal::FramePayloadBase {
      */
     uint32_t kernel = 0;
 
+    /**
+     * Payload size.
+     * @return The payload size.
+     */
     size_t payload_size() override;
+
+    /**
+     * Encode into a buffer.
+     * @param buffer The buffer to place data into.
+     */
     void serialize(std::vector<uint8_t> &buffer) override;
+
+    /**
+     * Decode the payload from a serial buffer.
+     * @param buffer Pointer to buffer that contains encoded payload
+     * @param len The size of the payload.
+     */
     void deserialize(const uint8_t *buffer, std::size_t len) override;
 
   private:

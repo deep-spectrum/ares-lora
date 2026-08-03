@@ -864,7 +864,15 @@ WARN_LOGFILE           =
 # spaces. See also FILE_PATTERNS and EXTENSION_MAPPING
 # Note: If this tag is empty the current directory is searched.
 
-INPUT                  = serial-driver/core/include/ares-lora-serial
+INPUT                  = serial-driver/core/include/ares-lora-serial \
+                         serial-driver/core/include/ares-lora-serial/frames/ble \
+                         serial-driver/core/include/ares-lora-serial/frames/debug \
+                         serial-driver/core/include/ares-lora-serial/frames/lora/config \
+                         serial-driver/core/include/ares-lora-serial/frames/lora/log \
+                         serial-driver/core/include/ares-lora-serial/frames/lora/poll \
+                         serial-driver/core/include/ares-lora-serial/frames/lora \
+                         serial-driver/core/include/ares-lora-serial/frames/mcu \
+                         serial-driver/core/include/ares-lora-serial/frames/
 
 # This tag can be used to specify the character encoding of the source files
 # that doxygen parses. Internally doxygen uses the UTF-8 encoding. Doxygen uses

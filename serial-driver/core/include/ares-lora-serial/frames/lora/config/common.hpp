@@ -13,7 +13,6 @@
 
 #include <cstdint>
 #include <variant>
-#include <vector>
 
 namespace AresFrame {
 /**
@@ -46,6 +45,9 @@ enum NodeConfigType : uint8_t {
      */
     REF_LEVEL,
 
+    /**
+     * Invalid configuration.
+     */
     INVALID,
 };
 
@@ -62,14 +64,34 @@ struct NodeConfigSaveFolder {
     uint8_t second = 0; ///< The second in the minute.
 };
 
+/**
+ * @typedef NodeConfigData
+ *
+ * A variant representing all of the configuration data types.
+ */
 using NodeConfigData =
     std::variant<std::monostate, NodeConfigSaveFolder, uint32_t, double>;
 
 namespace Internal {
+/**
+ * Max size of the config part of the payload.
+ */
 constexpr std::size_t NodeConfigDataSizeof = 8;
 
+/**
+ * Encode the save folder configuration.
+ * @param config The save folder configuration to encode.
+ * @param config_item The container to encode the save folder name into.
+ */
 void serialize_save_folder(const NodeConfigSaveFolder &config,
                            uint64_t &config_item);
+
+/**
+ * Decode the save folder configuration.
+ * @param config The save folder configuration container.
+ * @param config_item The container to decode the save folder configuration
+ * from.
+ */
 void deserialize_save_folder(NodeConfigSaveFolder &config,
                              uint64_t config_item);
 } // namespace Internal

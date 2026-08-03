@@ -14,7 +14,16 @@
 #include <ares-lora-serial/frames/payload_base.hpp>
 
 namespace AresFrame {
+/**
+ * @struct Reboot
+ *
+ * Payload data for AresFrame::REBOOT frames.
+ */
 struct Reboot : Internal::FramePayloadBase {
+    /**
+     * Constructor.
+     * @param delay See Reboot::delay.
+     */
     explicit Reboot(uint8_t delay) : delay(delay) {}
 
     /**
@@ -22,7 +31,16 @@ struct Reboot : Internal::FramePayloadBase {
      */
     uint8_t delay = 5;
 
+    /**
+     * Payload size.
+     * @return The payload size.
+     */
     size_t payload_size() override;
+
+    /**
+     * Encode into a buffer.
+     * @param buffer The buffer to place data into.
+     */
     void serialize(std::vector<uint8_t> &buffer) override;
 
   private:

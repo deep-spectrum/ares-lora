@@ -74,9 +74,9 @@ enum AresFrameType : uint16_t {
     NODE_CONFIG = 23,      ///< Configure receiver node (TX/RX)
     NODE_CONFIG_POLL = 24, ///< Poll a receiver node's configs (TX/RX)
     NODE_CONFIG_RESP = 25, ///< Poll response for configurations
-    ///< poll (TX/RX)
+                           ///< poll (TX/RX)
     NODE_READY = 26, ///< Indication that the coordinator is ready to start
-    ///< reception (TX/RX)
+                     ///< reception (TX/RX)
 
     DRIVER_STOP, ///< Frame used to stop the core driver.
     UNKNOWN,     ///< Unknown frame

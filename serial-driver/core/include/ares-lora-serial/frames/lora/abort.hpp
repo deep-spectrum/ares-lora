@@ -14,9 +14,21 @@
 #include <ares-lora-serial/frames/payload_base.hpp>
 
 namespace AresFrame {
+/**
+ * @struct Abort
+ * Payload data for AresFrame::ABORT frames.
+ */
 struct Abort : Internal::FramePayloadBase {
+    /**
+     * Constructor.
+     */
     Abort() = default;
 
+    /**
+     * Constructor.
+     * @param broadcast See Abort::broadcast.
+     * @param id See Abort::id.
+     */
     explicit Abort(bool broadcast, uint16_t id)
         : broadcast(broadcast), id(id) {}
 
@@ -32,8 +44,23 @@ struct Abort : Internal::FramePayloadBase {
      */
     uint16_t id = 0;
 
+    /**
+     * Payload size.
+     * @return The payload size.
+     */
     size_t payload_size() override;
+
+    /**
+     * Encode into a buffer.
+     * @param buffer The buffer to place data into.
+     */
     void serialize(std::vector<uint8_t> &buffer) override;
+
+    /**
+     * Decode the payload from a serial buffer.
+     * @param buffer Pointer to buffer that contains encoded payload
+     * @param len The size of the payload.
+     */
     void deserialize(const uint8_t *buffer, std::size_t len) override;
 
   private:

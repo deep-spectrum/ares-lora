@@ -15,9 +15,22 @@
 #include <ares-lora-serial/frames/payload_base.hpp>
 
 namespace AresFrame {
+/**
+ * @struct NodeConfig
+ * Payload data for AresFrame::NODE_CONFIG frames
+ */
 struct NodeConfig : Internal::FramePayloadBase {
+    /**
+     * Constructor.
+     */
     NodeConfig() = default;
 
+    /**
+     * Constructor.
+     * @param id_ see NodeConfig::id
+     * @param type_ see NodeConfig::type
+     * @param config_ see NodeConfig::config
+     */
     explicit NodeConfig(uint16_t id_, NodeConfigType type_,
                         NodeConfigData config_)
         : id(id_), type(type_), config(config_) {}
@@ -38,8 +51,23 @@ struct NodeConfig : Internal::FramePayloadBase {
      */
     NodeConfigData config = std::monostate();
 
+    /**
+     * Payload size.
+     * @return The payload size.
+     */
     size_t payload_size() override;
+
+    /**
+     * Encode into a buffer.
+     * @param buffer The buffer to place data into.
+     */
     void serialize(std::vector<uint8_t> &buffer) override;
+
+    /**
+     * Decode the payload from a serial buffer.
+     * @param buffer Pointer to buffer that contains encoded payload
+     * @param len The size of the payload.
+     */
     void deserialize(const uint8_t *buffer, std::size_t len) override;
 
   private:
