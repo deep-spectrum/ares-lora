@@ -771,7 +771,7 @@ class LoraSerial:
 
     @lora_serial_command
     def notify_run_ready(self, broadcast: bool = True, destination_id: int | None = None, timeout: float = 20.0,
-                         ack_timeout=5.0):
+                         ack_timeout: float=5.0):
         """Send a notification over LoRa to tell that the nodes should get ready to collect data.
 
         Args:
