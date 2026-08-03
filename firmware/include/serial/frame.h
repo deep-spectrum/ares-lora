@@ -35,7 +35,7 @@
 /**
  * Number of bytes needed for the type field.
  */
-#define ARES_FRAME_TYPE_OVERHEAD UINT32_C(1)
+#define ARES_FRAME_TYPE_OVERHEAD UINT32_C(2)
 
 /**
  * Number of bytes needed for the length field.
