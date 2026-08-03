@@ -37,6 +37,8 @@ struct BleState : Internal::FramePayloadBase {
      */
     explicit BleState(uint8_t value) { state = static_cast<State>(value); }
 
+    explicit BleState(State value) : state(value) {}
+
     /**
      * The BLE state frame data.
      */

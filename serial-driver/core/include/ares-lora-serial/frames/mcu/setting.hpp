@@ -15,6 +15,10 @@
 
 namespace AresFrame {
 struct Setting : Internal::FramePayloadBase {
+    Setting() = default;
+    explicit Setting(bool set, uint16_t setting_id, uint32_t value)
+        : set(set), setting_id(setting_id), value(value) {}
+
     /**
      * Flag indicating if the set or get frame should be used.
      */

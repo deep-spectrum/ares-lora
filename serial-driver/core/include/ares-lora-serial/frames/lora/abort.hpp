@@ -15,6 +15,11 @@
 
 namespace AresFrame {
 struct Abort : Internal::FramePayloadBase {
+    Abort() = default;
+
+    explicit Abort(bool broadcast, uint16_t id)
+        : broadcast(broadcast), id(id) {}
+
     /**
      * On transmission, indicate if the message should be broadcasted. On
      * reception, indicates if the message was broadcasted.

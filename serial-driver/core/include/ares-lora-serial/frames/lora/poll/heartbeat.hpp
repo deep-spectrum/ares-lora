@@ -15,6 +15,10 @@
 
 namespace AresFrame {
 struct Heartbeat : Internal::FramePayloadBase {
+    Heartbeat() = default;
+
+    explicit Heartbeat(bool ready, uint16_t id) : ready(ready), id(id) {}
+
     bool ready = false;
     uint16_t id = 0;
 

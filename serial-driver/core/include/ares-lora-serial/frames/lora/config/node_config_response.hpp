@@ -16,6 +16,11 @@
 
 namespace AresFrame {
 struct NodeConfigResponse : Internal::FramePayloadBase {
+    NodeConfigResponse() = default;
+
+    explicit NodeConfigResponse(uint16_t id, NodeConfigType type,
+                                NodeConfigData config)
+        : id(id), type(type), config(config) {}
 
     /**
      * On transmission, the node id to send the configuration to. On

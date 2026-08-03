@@ -14,6 +14,13 @@
 #include <ares-lora-serial/frames/payload_base.hpp>
 namespace AresFrame {
 struct Start : Internal::FramePayloadBase {
+    Start() = default;
+
+    explicit Start(int64_t sec, uint64_t usec, uint16_t id, uint16_t packet_id,
+                   bool broadcast, uint8_t seq_cnt)
+        : sec(sec), usec(usec), id(id), packet_id(packet_id),
+          broadcast(broadcast), seq_cnt(seq_cnt) {}
+
     int64_t sec = -1;
     uint64_t usec = 0;
     uint16_t id = 0;

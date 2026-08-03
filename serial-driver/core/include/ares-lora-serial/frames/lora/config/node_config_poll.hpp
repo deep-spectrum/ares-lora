@@ -16,6 +16,11 @@
 
 namespace AresFrame {
 struct NodeConfigPoll : Internal::FramePayloadBase {
+    NodeConfigPoll() = default;
+
+    explicit NodeConfigPoll(uint16_t id, NodeConfigType type)
+        : id(id), type(type) {}
+
     /**
      * On transmission, the node id to poll for a configuration. On
      * reception, the node id the poll request is coming from.

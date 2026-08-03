@@ -28,6 +28,10 @@ struct Led : Internal::FramePayloadBase {
         FETCH = 4, ///< Retrieve LED state from firmware.
     };
 
+    Led() = default;
+
+    explicit Led(uint8_t led, LedState state) : led(led), state(state) {}
+
     /**
      * The LED number/ID.
      */

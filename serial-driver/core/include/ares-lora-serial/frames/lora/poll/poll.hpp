@@ -15,6 +15,10 @@
 
 namespace AresFrame {
 struct Poll : Internal::FramePayloadBase {
+    Poll() = default;
+
+    explicit Poll(uint16_t id) : id(id) {}
+
     uint16_t id = 0;
 
     size_t payload_size() override;

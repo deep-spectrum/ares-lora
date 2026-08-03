@@ -16,6 +16,11 @@
 
 namespace AresFrame {
 struct LoraAck : Internal::FramePayloadBase {
+    LoraAck() = default;
+
+    explicit LoraAck(uint16_t id, AresFrameType type)
+        : id(id), message_type(type) {}
+
     /**
      * On transmission, the node id the ack message should be directed to.
      * On reception, the node id the ack message came from.

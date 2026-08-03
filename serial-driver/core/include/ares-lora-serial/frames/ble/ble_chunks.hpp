@@ -15,6 +15,8 @@
 
 namespace AresFrame {
 struct BleChunk : Internal::FramePayloadBase {
+    explicit BleChunk(uint64_t num_chunks_) : num_chunks(num_chunks_) {}
+
     /**
      * The number of chunks to transfer.
      */

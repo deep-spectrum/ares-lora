@@ -15,6 +15,8 @@
 
 namespace AresFrame {
 struct Reboot : Internal::FramePayloadBase {
+    explicit Reboot(uint8_t delay) : delay(delay) {}
+
     /**
      * The delay in seconds before the reboot occurs.
      */
