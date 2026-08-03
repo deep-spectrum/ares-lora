@@ -13,6 +13,7 @@
 
 #include <exception>
 #include <string>
+#include <cstdint>
 
 namespace AresFrame {
 /**
