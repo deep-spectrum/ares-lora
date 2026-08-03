@@ -437,6 +437,7 @@ class LoraSerial:
         """Send start time over LoRa
 
         Args:
+            ack_timeout: The time to wait for an acknowledgement from the target node.
             sec: The seconds part of the time to start.
             usec: The microseconds part of the time to start.
             timeout: The timeout of the transmission.
@@ -695,7 +696,8 @@ class LoraSerial:
         self._check_ret_code(ret)
 
     @lora_serial_command
-    def send_node_configs(self, destination_id: int, timeout: float = 20.0, ack_timeout: float = 5.0, **kwargs):
+    def send_node_configs(self, destination_id: int, timeout: float = 20.0, ack_timeout: float = 5.0,
+                          **kwargs: float | int | datetime):
         """Send node configurations over LoRa.
 
         Args:
@@ -728,7 +730,7 @@ class LoraSerial:
         self._check_ret_code(ret)
 
     @lora_serial_command
-    def poll_node_config(self, node_id: int, timeout: float = 20.0, ack_timeout: float = 5.0, *args) -> dict[
+    def poll_node_config(self, node_id: int, timeout: float = 20.0, ack_timeout: float = 5.0, *args: str) -> dict[
         str, float | int | datetime | None]:
         """Poll a node for its configurations.
 
