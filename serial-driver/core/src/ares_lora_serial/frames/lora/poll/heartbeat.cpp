@@ -8,6 +8,7 @@
  * @author Tom Schmitz \<tschmitz@andrew.cmu.edu\>
  */
 
+#include <ares-lora-serial/frames/frame_types.hpp>
 #include <ares-lora-serial/frames/lora/poll/heartbeat.hpp>
 #include <ares/serialization.hpp>
 
@@ -22,7 +23,11 @@ void Heartbeat::serialize(std::vector<uint8_t> &buffer) {
 }
 
 void Heartbeat::deserialize(const uint8_t *buffer, std::size_t len) {
-    FramePayloadBase::deserialize(buffer, len);
+
+    if (len != _payload_size) {
+        throw AresFrameError("Invalid payload size received");
+    }
+
     uint8_t flags;
 
     ares::deserialize(buffer, flags, id);

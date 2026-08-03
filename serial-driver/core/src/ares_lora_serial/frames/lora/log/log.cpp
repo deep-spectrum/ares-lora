@@ -8,6 +8,7 @@
  * @author Tom Schmitz \<tschmitz@andrew.cmu.edu\>
  */
 
+#include <ares-lora-serial/frames/frame_types.hpp>
 #include <ares-lora-serial/frames/lora/log/log.hpp>
 #include <ares/serialization.hpp>
 
@@ -22,14 +23,14 @@ void Log::preprocess() {
     }
 
     if (msg.empty()) {
-        // todo: throw error
+        throw AresFrameError("Empty log message");
     }
 
     size_t max_msg_size = _max_payload_size - _overhead;
     size_t num_substr = (msg.size() + (max_msg_size - 1)) / max_msg_size;
 
     if (num_substr > static_cast<size_t>(UINT8_MAX)) {
-        // todo
+        throw AresFrameError("Log message too large");
     }
 
     _msg_split.reserve(num_substr);

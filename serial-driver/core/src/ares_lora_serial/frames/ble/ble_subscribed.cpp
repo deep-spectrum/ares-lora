@@ -9,12 +9,13 @@
  */
 
 #include <ares-lora-serial/frames/ble/ble_subscribed.hpp>
+#include <ares-lora-serial/frames/frame_types.hpp>
 #include <ares/serialization.hpp>
 
 namespace AresFrame {
 void BleSubscribed::deserialize(const uint8_t *buffer, std::size_t len) {
     if (len != _payload_size) {
-        // todo
+        throw AresFrameError("Invalid payload size received");
     }
 
     uint8_t flags;

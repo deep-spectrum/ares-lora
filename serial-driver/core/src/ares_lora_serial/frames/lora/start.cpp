@@ -8,6 +8,7 @@
  * @author Tom Schmitz \<tschmitz@andrew.cmu.edu\>
  */
 
+#include <ares-lora-serial/frames/frame_types.hpp>
 #include <ares-lora-serial/frames/lora/start.hpp>
 #include <ares/serialization.hpp>
 
@@ -20,7 +21,7 @@ void Start::serialize(std::vector<uint8_t> &buffer) {
 
 void Start::deserialize(const uint8_t *buffer, std::size_t len) {
     if (len > _payload_size) {
-        // todo
+        throw AresFrameError("Invalid payload size received");
     }
 
     ares::deserialize(buffer, sec, usec, id, broadcast, seq_cnt, packet_id);

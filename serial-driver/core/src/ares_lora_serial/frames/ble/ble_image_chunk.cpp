@@ -9,6 +9,7 @@
  */
 
 #include <ares-lora-serial/frames/ble/ble_image_chunk.hpp>
+#include <ares-lora-serial/frames/frame_types.hpp>
 #include <ares/serialization.hpp>
 
 namespace AresFrame {
@@ -32,7 +33,7 @@ void BleImage::preprocess() {
     }
 
     if (image.empty()) {
-        // todo
+        throw AresFrameError("Empty image");
     }
 
     size_t chunks = num_chunks(image, _max_chunk_size);

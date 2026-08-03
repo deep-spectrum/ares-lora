@@ -9,12 +9,13 @@
  */
 
 #include <ares-lora-serial/frames/debug/packet_rx.hpp>
+#include <ares-lora-serial/frames/frame_types.hpp>
 #include <ares/serialization.hpp>
 
 namespace AresFrame {
 void PktRx::deserialize(const uint8_t *buffer, std::size_t len) {
     if (len != _payload_size) {
-        // todo
+        throw AresFrameError("Invalid payload size received");
     }
 
     ares::deserialize(buffer, seq_cnt, packet_id, src_id);

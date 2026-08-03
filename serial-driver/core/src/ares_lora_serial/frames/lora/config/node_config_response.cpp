@@ -8,6 +8,7 @@
  * @author Tom Schmitz \<tschmitz@andrew.cmu.edu\>
  */
 
+#include <ares-lora-serial/frames/frame_types.hpp>
 #include <ares-lora-serial/frames/lora/config/node_config_response.hpp>
 #include <ares/serialization.hpp>
 
@@ -35,7 +36,8 @@ void NodeConfigResponse::serialize(std::vector<uint8_t> &buffer) {
         break;
     }
     default: {
-        // todo
+        throw AresFrameError("Unknown configuration type");
+        break;
     }
     }
 
@@ -46,7 +48,7 @@ void NodeConfigResponse::deserialize(const uint8_t *buffer, std::size_t len) {
     uint64_t config_field;
 
     if (len != _payload_size) {
-        // todo
+        throw AresFrameError("Invalid payload size received");
     }
 
     ares::deserialize(buffer, id, type, config_field);
@@ -70,7 +72,8 @@ void NodeConfigResponse::deserialize(const uint8_t *buffer, std::size_t len) {
         config = ret;
     }
     default: {
-        // todo
+        throw AresFrameError("Unknown configuration type");
+        break;
     }
     }
 }

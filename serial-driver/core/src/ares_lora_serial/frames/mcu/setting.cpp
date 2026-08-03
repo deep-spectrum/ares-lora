@@ -8,6 +8,7 @@
  * @author Tom Schmitz \<tschmitz@andrew.cmu.edu\>
  */
 
+#include <ares-lora-serial/frames/frame_types.hpp>
 #include <ares-lora-serial/frames/mcu/setting.hpp>
 #include <ares/serialization.hpp>
 #include <cstdint>
@@ -29,7 +30,7 @@ void Setting::serialize(std::vector<uint8_t> &buffer) {
 
 void Setting::deserialize(const uint8_t *payload, std::size_t len) {
     if (len != set_payload_size) {
-        // todo: throw error
+        throw AresFrameError("Invalid payload size received");
     }
 
     ares::deserialize(payload, setting_id, value);

@@ -8,6 +8,7 @@
  * @author Tom Schmitz \<tschmitz@andrew.cmu.edu\>
  */
 
+#include <ares-lora-serial/frames/frame_types.hpp>
 #include <ares-lora-serial/frames/lora/ready.hpp>
 #include <ares/serialization.hpp>
 
@@ -22,7 +23,7 @@ void NodeReady::serialize(std::vector<uint8_t> &buffer) {
 
 void NodeReady::deserialize(const uint8_t *buffer, std::size_t len) {
     if (len != _payload_size) {
-        // todo
+        throw AresFrameError("Invalid payload size received");
     }
 
     uint8_t flags;

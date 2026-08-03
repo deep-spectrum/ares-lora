@@ -9,6 +9,7 @@
  */
 
 #include <ares-lora-serial/frames/ble/ble_state.hpp>
+#include <ares-lora-serial/frames/frame_types.hpp>
 #include <ares/serialization.hpp>
 
 namespace AresFrame {
@@ -20,7 +21,7 @@ void BleState::serialize(std::vector<uint8_t> &buffer) {
 
 void BleState::deserialize(const uint8_t *buffer, std::size_t len) {
     if (len != _payload_size) {
-        // todo
+        throw AresFrameError("Invalid payload size received");
     }
 
     ares::deserialize(buffer, state);
