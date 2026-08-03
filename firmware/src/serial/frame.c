@@ -178,7 +178,8 @@ static void serialize(uint8_t *buf, const struct ares_frame *frame,
     uint64_t payload_len = frame_len - ARES_FRAME_OVERHEAD;
     uint8_t *payload = &buf[ARES_FRAME_PAYLOAD_OFFSET];
     buf[ARES_FRAME_HEADER_OFFSET] = ARES_FRAME_HEADER;
-    buf[ARES_FRAME_TYPE_OFFSET] = (uint8_t)frame->type;
+    (void)memcpy(&buf[ARES_FRAME_TYPE_OFFSET], &frame->type,
+                 ARES_FRAME_TYPE_OVERHEAD);
     (void)memcpy(&buf[ARES_FRAME_LEN_OFFSET], &payload_len,
                  ARES_FRAME_LEN_OVERHEAD);
 
@@ -366,8 +367,9 @@ static void deserialize(struct ares_frame *frame, const uint8_t *buf) {
     __ASSERT_NO_MSG(buf != NULL);
     const uint8_t *payload = &buf[ARES_FRAME_PAYLOAD_OFFSET];
     uint64_t payload_len = retrieve_payload_length(buf);
-
-    frame->type = (enum ares_frame_type)buf[ARES_FRAME_TYPE_OFFSET];
+    uint16_t type;
+    (void)memcpy(&type, &buf[ARES_FRAME_TYPE_OFFSET], ARES_FRAME_TYPE_OVERHEAD);
+    frame->type = type;
 
     FDESERIALIZE_INIT();
     switch (frame->type) {

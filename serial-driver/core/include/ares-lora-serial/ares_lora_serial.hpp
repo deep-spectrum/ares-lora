@@ -11,7 +11,8 @@
 #ifndef ARES_ARES_LORA_SERIAL_HPP
 #define ARES_ARES_LORA_SERIAL_HPP
 
-#include <ares-lora-serial/ares_frame.hpp>
+//#include <ares-lora-serial/ares_frame.hpp>
+#include <ares-lora-serial/frames/frame.hpp>
 #include <ares/data-structures/queue.hpp>
 #include <ares/datetime/datetime.hpp>
 #include <ares/serial/serial.hpp>
@@ -159,7 +160,7 @@ struct AresLoraConfig {
      * Generate an AresFrame from the object.
      * @return The frame object generated.
      */
-    [[nodiscard]] AresFrame generate_frame() const;
+    [[nodiscard]] AresFrame::Frame generate_frame() const;
 };
 
 /**
@@ -515,16 +516,16 @@ class AresSerial {
         };
 
         ResponseType type;
-        AresFrame::ResponseTypes payload;
+        AresFrame::Frame::ResponseTypes payload;
     };
 
-    void _publish_response(const AresFrame::Decoded &frame);
+    void _publish_response(const AresFrame::Frame &frame);
     void _send_frame(const std::vector<uint8_t> &tx);
-    AresResponse _send_frame(AresFrame &frame,
+    AresResponse _send_frame(AresFrame::Frame &frame,
                              const std::chrono::milliseconds &timeout);
-    AresResponse _send_frame_released(AresFrame &frame,
+    AresResponse _send_frame_released(AresFrame::Frame &frame,
                                       const std::chrono::milliseconds &timeout);
-    void _send_multi_frame(AresFrame &frame,
+    void _send_multi_frame(AresFrame::Frame &frame,
                            const std::chrono::milliseconds &timeout,
                            std::vector<AresResponse> &responses);
     AresResponse _wait_response(const std::chrono::milliseconds &timeout);
@@ -535,7 +536,7 @@ class AresSerial {
     std::atomic_bool _tasks_running = false;
 
     ares::Task<void()> _rx_task;
-    ares::bounded_queue<AresFrame::Decoded, 10, true> _frame_q;
+    ares::bounded_queue<AresFrame::Frame, 10, true> _frame_q;
 
     ares::Task<void()> _processing_task;
     ares::bounded_queue<AresResponse> _response_queue;
@@ -593,7 +594,7 @@ class AresSerial {
     void _log_ack_event(const AresFrame::LogAck &ack);
     bool _log_ack_event_wait(const std::chrono::milliseconds &timeout,
                              size_t part, size_t num_parts, uint16_t id);
-    void _send_log_frame_directed(AresFrame &frame,
+    void _send_log_frame_directed(AresFrame::Frame &frame,
                                   const std::chrono::milliseconds &ack_timeout,
                                   size_t max_attempts,
                                   std::vector<AresResponse> &responses,
@@ -647,10 +648,10 @@ class AresSerial {
     NodeConfigs _node_configs;
 
     static void _parse_node_config_kwargs(uint16_t id,
-                                          std::vector<AresFrame> &frames,
+                                          std::vector<AresFrame::Frame> &frames,
                                           const py::kwargs &kwargs);
     py::dict _send_node_config_frames(uint16_t id,
-                                      std::vector<AresFrame> &frames,
+                                      std::vector<AresFrame::Frame> &frames,
                                       const std::chrono::seconds &ack_timeout);
     void _handle_node_config_event(const AresFrame::NodeConfig &config);
     void _get_node_configs_released(NodeConfigs &copy);
@@ -682,11 +683,13 @@ class AresSerial {
     bool _wait_config_response(uint16_t id, const std::chrono::seconds &timeout,
                                AresFrame::NodeConfigType expected_type,
                                AresFrame::NodeConfigResponse &response);
-    static void _parse_node_config_poll_args(uint16_t id,
-                                             std::vector<AresFrame> &frames,
-                                             const py::args &args);
+    static void
+    _parse_node_config_poll_args(uint16_t id,
+                                 std::vector<AresFrame::Frame> &frames,
+                                 const py::args &args);
     py::dict
-    _send_node_config_poll_frames(uint16_t id, std::vector<AresFrame> &frames,
+    _send_node_config_poll_frames(uint16_t id,
+                                  std::vector<AresFrame::Frame> &frames,
                                   const std::chrono::seconds &ack_timeout);
 
     void _handle_node_ready_event(const AresFrame::NodeReady &event);
