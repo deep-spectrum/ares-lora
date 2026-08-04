@@ -158,21 +158,11 @@ class LoraSerialConfig:
         response_timeout: The amount of time (in seconds) to wait for a response from the firmware.
         rx_period: How often (in seconds) the serial driver polls the serial receive buffer.
         serial_timeout: The serial RX timeout (in seconds).
-        start_callback: Event handler for start events. Signature: [seconds: int, nsecs: int] -> None
-        poll_callback: Event handler for poll events. Signature: [source_id: int] -> None
-        log_callback: Event handler for log events. Signature: [source_id: int, msg: str] -> None
-        abort_callback: Event handler for abortion events. Signature: [source_id: int, broadcasted: bool] -> None
-        run_ready_callback: Event handler for run ready notification events. Signature: [source_id: int, broadcasted: bool] -> None
     """
     port: str = ""
     response_timeout: float = 2.0
     rx_period: float = 0.1
     serial_timeout: float = 0.1
-    start_callback: Callable[[int, int], None] | None = None
-    poll_callback: Callable[[int], None] | None = None
-    log_callback: Callable[[int, str], None] | None = None
-    abort_callback: Callable[[int, bool], None] | None = None
-    run_ready_callback: Callable[[int, bool], None] | None = None
 
 
 @dataclass
@@ -245,11 +235,21 @@ class LoraSerial:
             serial_timeout=config.serial_timeout,
         )
 
-        self._start_cb = config.start_callback
-        self._poll_cb = config.poll_callback
-        self._log_cb = config.log_callback
-        self._abort_cb = config.abort_callback
-        self._run_ready_cb = config.run_ready_callback
+        self._start_hook_lock = threading.Lock()
+        self._start_hook: Callable[[int, int], None] | None = None
+
+        self._poll_hook_lock = threading.Lock()
+        self._poll_hook: Callable[[int], None] | None = None
+
+        self._log_hook_lock = threading.Lock()
+        self._log_hook: Callable[[int, str], None] | None = None
+
+        self._abortion_hook_lock = threading.Lock()
+        self._abortion_hook: Callable[[int, bool], None] | None = None
+
+        self._run_ready_hook_lock = threading.Lock()
+        self._run_ready_hook: Callable[[int, bool], None] | None = None
+
         self._dev = _AresSerial(configs)
         self._nodes: dict[int, int] = {}
         self._log_msg: dict[int, LogMessage] = {}
@@ -298,8 +298,9 @@ class LoraSerial:
             if self._should_event_be_dispatched(src, packet_id):
                 logger.info(f"Received start message (sec: {sec}, usec: {usec}, src: {src}, "
                             f"broadcast: {broadcast}, sequence count: {seq_cnt}, packet id: {packet_id})")
-                if self._start_cb is not None:
-                    self._start_cb(sec, usec)
+                with self._start_hook_lock:
+                    if self._start_hook is not None:
+                        self._start_hook(sec, usec)
 
     def _poll_event_handle(self):
         while True:
@@ -307,8 +308,9 @@ class LoraSerial:
                 src_id = self._dev.wait_poll_event()
             except AresThreadTerminate:
                 break
-            if self._poll_cb is not None:
-                self._poll_cb(src_id)
+            with self._poll_hook_lock:
+                if self._poll_hook is not None:
+                    self._poll_hook(src_id)
 
     def _log_event_handle(self):
         while True:
@@ -329,8 +331,10 @@ class LoraSerial:
                     not self._log_msg[src_id].transmitted):
                 logger.info(f"Received log message: {self._log_msg[src_id].msg}")
                 self._log_msg[src_id].transmitted = True
-                if self._log_cb is not None:
-                    self._log_cb(src_id, self._log_msg[src_id].msg)
+
+                with self._log_hook_lock:
+                    if self._log_hook is not None:
+                        self._log_hook(src_id, self._log_msg[src_id].msg)
 
     def _pkt_rx_event_handle(self):
         while True:
@@ -362,8 +366,9 @@ class LoraSerial:
             except AresThreadTerminate:
                 break
 
-            if self._abort_cb is not None:
-                self._abort_cb(source_id, broadcast)
+            with self._abortion_hook_lock:
+                if self._abortion_hook is not None:
+                    self._abortion_hook(source_id, broadcast)
 
     def _node_ready_event_handler(self):
         while True:
@@ -372,8 +377,9 @@ class LoraSerial:
             except AresThreadTerminate:
                 break
 
-            if self._run_ready_cb is not None:
-                self._run_ready_cb(source_id, broadcast)
+            with self._run_ready_hook_lock:
+                if self._run_ready_hook is not None:
+                    self._run_ready_hook(source_id, broadcast)
 
     def _ble_connect_event_handle(self):
         while True:
@@ -771,7 +777,7 @@ class LoraSerial:
 
     @lora_serial_command
     def notify_run_ready(self, broadcast: bool = True, destination_id: int | None = None, timeout: float = 20.0,
-                         ack_timeout: float=5.0):
+                         ack_timeout: float = 5.0):
         """Send a notification over LoRa to tell that the nodes should get ready to collect data.
 
         Args:
@@ -877,6 +883,86 @@ class LoraSerial:
             - `60`: OFF
         """
         self._dev.set_logging_level(level)
+
+    def register_start_hook(self, hook: Callable[[int, int], None] | None):
+        """Register a start event hook.
+
+        Args:
+            hook: The function to call when a start event occurs. `None` to unregister the hook.
+
+        Notes:
+            The hook signature is [start_time_sec, start_time_usec] -> None.
+
+        Warnings:
+            Registering or unregistering a hook performs a blocking action. It is highly recommended
+            that hooks should be kept short and fast and offload work to other threads.
+        """
+        with self._start_hook_lock:
+            self._start_hook = hook
+
+    def register_poll_hook(self, hook: Callable[[int], None] | None):
+        """Register a poll event hook.
+
+        Args:
+            hook: The function to call when a poll event occurs. `None` to unregister the hook.
+
+        Notes:
+            The hook signature is [source_id] -> None.
+
+        Warnings:
+            Registering or unregistering a hook performs a blocking action. It is highly recommended
+            that hooks should be kept short and fast and offload work to other threads.
+        """
+        with self._poll_hook_lock:
+            self._poll_hook = hook
+
+    def register_log_hook(self, hook: Callable[[int, str], None] | None):
+        """Register a log event hook.
+
+        Args:
+            hook: The function to call when a log event occurs. `None` to unregister the hook.
+
+        Notes:
+            The hook signature is [source_id, log_message] -> None.
+
+        Warnings:
+            Registering or unregistering a hook performs a blocking action. It is highly recommended
+            that hooks should be kept short and fast and offload work to other threads.
+        """
+        with self._log_hook_lock:
+            self._log_hook = hook
+
+    def register_abortion_hook(self, hook: Callable[[int, bool], None] | None):
+        """Register an abortion event hook.
+
+        Args:
+            hook: The function to call when an abortion event occurs. `None` to unregister the hook.
+
+        Notes:
+            The hook signature is [source_id, broadcast] -> None.
+
+        Warnings:
+            Registering or unregistering a hook performs a blocking action. It is highly recommended
+            that hooks should be kept short and fast and offload work to other threads.
+        """
+        with self._abortion_hook_lock:
+            self._abortion_hook = hook
+
+    def register_run_ready_hook(self, hook: Callable[[int, bool], None] | None):
+        """Register a run ready hook.
+
+        Args:
+            hook: The function to call when a run ready event occurs. `None` to unregister the hook.
+
+        Notes:
+            The hook signature is [source_id, broadcast] -> None.
+
+        Warnings:
+            Registering or unregistering a hook performs a blocking action. It is highly recommended
+            that hooks should be kept short and fast and offload work to other threads.
+        """
+        with self._run_ready_hook_lock:
+            self._run_ready_hook = hook
 
     def get_logging_level(self) -> int:
         """Retrieve the current logging level of the core logger.
