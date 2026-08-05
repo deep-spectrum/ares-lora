@@ -1940,6 +1940,10 @@ py::dict AresSerial::_send_node_config_poll_frames(
             } else {
                 auto rx_dt = std::get<AresFrame::NodeConfigSaveFolder>(
                     rx_response.config);
+                LOG_DBG("Rx'ed dt: {Year: %u, Month: %u, Day: %u, Hour: %u, "
+                        "Minute: %u, Second: %u}",
+                        rx_dt.year, rx_dt.month, rx_dt.day, rx_dt.hour,
+                        rx_dt.minute, rx_dt.second);
                 ares::DateTime dt(rx_dt.year, rx_dt.month, rx_dt.day,
                                   rx_dt.hour, rx_dt.minute, rx_dt.second);
                 ret["folder_dt"] = py::make_tuple(code, dt.time_point());
