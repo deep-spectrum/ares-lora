@@ -1532,6 +1532,7 @@ void AresSerial::_parse_node_config_kwargs(
         ares::DateTime dt(
             kwargs["folder_dt"].cast<std::chrono::system_clock::time_point>());
         AresFrame::NodeConfigSaveFolder save_folder{
+            .microsecond = dt.microsecond(),
             .year = static_cast<uint16_t>(dt.year()),
             .month = static_cast<uint8_t>(dt.month()),
             .day = static_cast<uint8_t>(dt.day()),
@@ -1945,7 +1946,7 @@ py::dict AresSerial::_send_node_config_poll_frames(
                         rx_dt.year, rx_dt.month, rx_dt.day, rx_dt.hour,
                         rx_dt.minute, rx_dt.second);
                 ares::DateTime dt(rx_dt.year, rx_dt.month, rx_dt.day,
-                                  rx_dt.hour, rx_dt.minute, rx_dt.second);
+                                  rx_dt.hour, rx_dt.minute, rx_dt.second, rx_dt.microsecond);
                 ret["folder_dt"] = py::make_tuple(code, dt.time_point());
             }
             break;

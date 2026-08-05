@@ -56,6 +56,7 @@ enum NodeConfigType : uint8_t {
  * The save folder configurations.
  */
 struct NodeConfigSaveFolder {
+    int32_t microsecond = 0; ///< The microsecond in the second.
     uint16_t year = 0;  ///< The calendar year.
     uint8_t month = 0;  ///< The calendar month.
     uint8_t day = 0;    ///< The calendar day.
