@@ -11,9 +11,9 @@
 #ifndef ARES_FRAME_TYPES_HPP
 #define ARES_FRAME_TYPES_HPP
 
+#include <cstdint>
 #include <exception>
 #include <string>
-#include <cstdint>
 
 namespace AresFrame {
 /**
