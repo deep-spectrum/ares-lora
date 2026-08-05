@@ -11,6 +11,7 @@
 #include <ares-lora-serial/frames/frame_types.hpp>
 #include <ares-lora-serial/frames/mcu/setting.hpp>
 #include <ares/serialization.hpp>
+#include <cassert>
 #include <cstdint>
 #include <cstring>
 #include <vector>
@@ -26,6 +27,8 @@ void Setting::serialize(std::vector<uint8_t> &buffer) {
     if (set) {
         ares::serialize(buffer, value);
     }
+
+    assert(buffer.size() == payload_size());
 }
 
 void Setting::deserialize(const uint8_t *payload, std::size_t len) {

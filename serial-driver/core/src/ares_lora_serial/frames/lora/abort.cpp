@@ -11,6 +11,7 @@
 #include <ares-lora-serial/frames/frame_types.hpp>
 #include <ares-lora-serial/frames/lora/abort.hpp>
 #include <ares/serialization.hpp>
+#include <cassert>
 
 namespace AresFrame {
 size_t Abort::payload_size() { return _payload_size; }
@@ -19,6 +20,7 @@ void Abort::serialize(std::vector<uint8_t> &buffer) {
     uint8_t flags = 0;
     ares::set_flags(flags, broadcast);
     ares::serialize(buffer, flags, id);
+    assert(buffer.size() == _payload_size);
 }
 
 void Abort::deserialize(const uint8_t *buffer, std::size_t len) {

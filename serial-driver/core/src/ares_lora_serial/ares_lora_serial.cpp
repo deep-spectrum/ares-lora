@@ -1663,8 +1663,9 @@ void AresSerial::_handle_node_config_event(
         auto sf = std::get<AresFrame::NodeConfigSaveFolder>(config.config);
         LOG_DBG("Received folder name: (%d, %d, %d, %d, %d, %d)", sf.year,
                 sf.month, sf.day, sf.hour, sf.minute, sf.second);
-        _node_configs.save_folder = ares::DateTime(
-            sf.year, sf.month, sf.day, sf.hour, sf.minute, sf.second, sf.microsecond);
+        _node_configs.save_folder =
+            ares::DateTime(sf.year, sf.month, sf.day, sf.hour, sf.minute,
+                           sf.second, sf.microsecond);
         break;
     }
     case AresFrame::BANDWIDTH: {
@@ -1948,7 +1949,8 @@ py::dict AresSerial::_send_node_config_poll_frames(
                         rx_dt.year, rx_dt.month, rx_dt.day, rx_dt.hour,
                         rx_dt.minute, rx_dt.second);
                 ares::DateTime dt(rx_dt.year, rx_dt.month, rx_dt.day,
-                                  rx_dt.hour, rx_dt.minute, rx_dt.second, rx_dt.microsecond);
+                                  rx_dt.hour, rx_dt.minute, rx_dt.second,
+                                  rx_dt.microsecond);
                 ret["folder_dt"] = py::make_tuple(code, dt.time_point());
             }
             break;

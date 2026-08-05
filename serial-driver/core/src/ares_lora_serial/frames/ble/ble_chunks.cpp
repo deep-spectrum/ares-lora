@@ -10,11 +10,13 @@
 
 #include <ares-lora-serial/frames/ble/ble_chunks.hpp>
 #include <ares/serialization.hpp>
+#include <cassert>
 
 namespace AresFrame {
 size_t BleChunk::payload_size() { return _payload_size; }
 
 void BleChunk::serialize(std::vector<uint8_t> &buffer) {
     ares::serialize(buffer, num_chunks);
+    assert(buffer.size() == _payload_size);
 }
 } // namespace AresFrame

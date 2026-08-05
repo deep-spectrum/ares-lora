@@ -11,6 +11,7 @@
 #include <ares-lora-serial/frames/frame_types.hpp>
 #include <ares-lora-serial/frames/mcu/version.hpp>
 #include <ares/serialization.hpp>
+#include <cassert>
 
 namespace AresFrame {
 size_t Version::payload_size() { return _payload_size; }
@@ -18,6 +19,7 @@ size_t Version::payload_size() { return _payload_size; }
 void Version::serialize(std::vector<uint8_t> &buffer) {
     ares::SerializeBuffer<uint32_t, 3> r1;
     ares::serialize(buffer, r1);
+    assert(buffer.size() == _payload_size);
 }
 
 void Version::deserialize(const uint8_t *buffer, std::size_t len) {

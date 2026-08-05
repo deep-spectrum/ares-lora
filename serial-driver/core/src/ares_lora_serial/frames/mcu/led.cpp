@@ -11,12 +11,14 @@
 #include <ares-lora-serial/frames/frame_types.hpp>
 #include <ares-lora-serial/frames/mcu/led.hpp>
 #include <ares/serialization.hpp>
+#include <cassert>
 
 namespace AresFrame {
 std::size_t Led::payload_size() { return _payload_size; }
 
 void Led::serialize(std::vector<uint8_t> &buffer) {
     ares::serialize(buffer, led, state);
+    assert(buffer.size() == _payload_size);
 }
 
 void Led::deserialize(const uint8_t *buffer, std::size_t len) {

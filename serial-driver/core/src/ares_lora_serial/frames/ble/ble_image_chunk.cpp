@@ -11,6 +11,7 @@
 #include <ares-lora-serial/frames/ble/ble_image_chunk.hpp>
 #include <ares-lora-serial/frames/frame_types.hpp>
 #include <ares/serialization.hpp>
+#include <cassert>
 
 namespace AresFrame {
 size_t BleImage::num_chunks(const std::vector<uint8_t> &image,
@@ -24,6 +25,7 @@ size_t BleImage::payload_size() { return _img_split[_idx].size(); }
 void BleImage::serialize(std::vector<uint8_t> &buffer) {
     buffer.insert(buffer.end(), _img_split[_idx].begin(),
                   _img_split[_idx].end());
+    assert(buffer.size() == payload_size());
 }
 
 void BleImage::preprocess() {
