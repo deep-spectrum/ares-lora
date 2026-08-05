@@ -4,7 +4,7 @@
  * @brief Ares frame library.
  *
  * | Field | Header | Length  | Type   | Payload       | Footer |
- * | Size  | 1 byte | 2 bytes | 1 byte | 0-65535 bytes | 1 byte |
+ * | Size  | 1 byte | 2 bytes | 2 byte | 0-65535 bytes | 1 byte |
  * | Value | ^      |         |        |               | @      |
  *
  * @date 3/19/26
