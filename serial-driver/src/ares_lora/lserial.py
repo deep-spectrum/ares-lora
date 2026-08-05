@@ -893,7 +893,7 @@ class LoraSerial:
         Notes:
             The hook signature is [start_time_sec, start_time_usec] -> None.
 
-        Warnings:
+        Warning:
             Registering or unregistering a hook performs a blocking action. It is highly recommended
             that hooks should be kept short and fast and offload work to other threads.
         """
@@ -909,7 +909,7 @@ class LoraSerial:
         Notes:
             The hook signature is [source_id] -> None.
 
-        Warnings:
+        Warning:
             Registering or unregistering a hook performs a blocking action. It is highly recommended
             that hooks should be kept short and fast and offload work to other threads.
         """
@@ -925,7 +925,7 @@ class LoraSerial:
         Notes:
             The hook signature is [source_id, log_message] -> None.
 
-        Warnings:
+        Warning:
             Registering or unregistering a hook performs a blocking action. It is highly recommended
             that hooks should be kept short and fast and offload work to other threads.
         """
@@ -941,7 +941,7 @@ class LoraSerial:
         Notes:
             The hook signature is [source_id, broadcast] -> None.
 
-        Warnings:
+        Warning:
             Registering or unregistering a hook performs a blocking action. It is highly recommended
             that hooks should be kept short and fast and offload work to other threads.
         """
@@ -957,7 +957,7 @@ class LoraSerial:
         Notes:
             The hook signature is [source_id, broadcast] -> None.
 
-        Warnings:
+        Warning:
             Registering or unregistering a hook performs a blocking action. It is highly recommended
             that hooks should be kept short and fast and offload work to other threads.
         """

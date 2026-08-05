@@ -1208,10 +1208,10 @@ void AresSerial::_process_frames() {
     while (_tasks_running) {
         try {
             _process_frames_helper();
-        } catch (...) {
+        } catch (const std::exception &exc) {
             _exception = std::current_exception();
             _tasks_running = false;
-            LOG_ERR("Driver crashed in processing thread");
+            LOG_ERR("Driver crashed in processing thread: %s", exc.what());
         }
     }
 }
@@ -1259,11 +1259,11 @@ void AresSerial::_read_serial() {
     while (_tasks_running) {
         try {
             _read_serial_helper();
-        } catch (...) {
+        } catch (const std::exception &exc) {
             _exception = std::current_exception();
             _serial.close();
             _tasks_running = false;
-            LOG_ERR("Driver crashed in read serial task");
+            LOG_ERR("Driver crashed in read serial task: %s", exc.what());
         }
     }
 }
@@ -1940,6 +1940,10 @@ py::dict AresSerial::_send_node_config_poll_frames(
             } else {
                 auto rx_dt = std::get<AresFrame::NodeConfigSaveFolder>(
                     rx_response.config);
+                LOG_DBG("Rx'ed dt: {Year: %u, Month: %u, Day: %u, Hour: %u, "
+                        "Minute: %u, Second: %u}",
+                        rx_dt.year, rx_dt.month, rx_dt.day, rx_dt.hour,
+                        rx_dt.minute, rx_dt.second);
                 ares::DateTime dt(rx_dt.year, rx_dt.month, rx_dt.day,
                                   rx_dt.hour, rx_dt.minute, rx_dt.second);
                 ret["folder_dt"] = py::make_tuple(code, dt.time_point());
