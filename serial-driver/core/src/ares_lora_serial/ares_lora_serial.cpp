@@ -1208,10 +1208,10 @@ void AresSerial::_process_frames() {
     while (_tasks_running) {
         try {
             _process_frames_helper();
-        } catch (...) {
+        } catch (const std::exception &exc) {
             _exception = std::current_exception();
             _tasks_running = false;
-            LOG_ERR("Driver crashed in processing thread");
+            LOG_ERR("Driver crashed in processing thread: %s", exc.what());
         }
     }
 }
@@ -1259,11 +1259,11 @@ void AresSerial::_read_serial() {
     while (_tasks_running) {
         try {
             _read_serial_helper();
-        } catch (...) {
+        } catch (const std::exception &exc) {
             _exception = std::current_exception();
             _serial.close();
             _tasks_running = false;
-            LOG_ERR("Driver crashed in read serial task");
+            LOG_ERR("Driver crashed in read serial task: %s", exc.what());
         }
     }
 }
