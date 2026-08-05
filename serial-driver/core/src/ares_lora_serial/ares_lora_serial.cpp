@@ -1664,7 +1664,7 @@ void AresSerial::_handle_node_config_event(
         LOG_DBG("Received folder name: (%d, %d, %d, %d, %d, %d)", sf.year,
                 sf.month, sf.day, sf.hour, sf.minute, sf.second);
         _node_configs.save_folder = ares::DateTime(
-            sf.year, sf.month, sf.day, sf.hour, sf.minute, sf.second);
+            sf.year, sf.month, sf.day, sf.hour, sf.minute, sf.second, sf.microsecond);
         break;
     }
     case AresFrame::BANDWIDTH: {
@@ -1718,6 +1718,7 @@ void AresSerial::_handle_node_config_poll_event(
     switch (event.type) {
     case AresFrame::SAVE_FOLDER: {
         _node_response_work.config = AresFrame::NodeConfigSaveFolder{
+            .microsecond = _node_configs.save_folder.microsecond(),
             .year = static_cast<uint16_t>(_node_configs.save_folder.year()),
             .month = static_cast<uint8_t>(_node_configs.save_folder.month()),
             .day = static_cast<uint8_t>(_node_configs.save_folder.day()),
@@ -1856,6 +1857,7 @@ void AresSerial::_parse_node_config_poll_args(
         }
 
         const auto val = arg.cast<std::string>();
+        LOG_DBG("Polling handler parsed: %s", val.c_str());
 
         if (!parsed.save_folder && val == "folder_dt") {
             parsed.save_folder = true;
