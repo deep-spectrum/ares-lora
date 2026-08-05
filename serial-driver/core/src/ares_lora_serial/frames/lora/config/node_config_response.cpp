@@ -70,6 +70,7 @@ void NodeConfigResponse::deserialize(const uint8_t *buffer, std::size_t len) {
         double ret;
         (void)std::memcpy(&ret, &config_field, sizeof(ret));
         config = ret;
+        break;
     }
     default: {
         throw AresFrameError("Unknown configuration type");
