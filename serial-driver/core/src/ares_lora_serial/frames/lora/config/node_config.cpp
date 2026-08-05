@@ -16,7 +16,7 @@ namespace AresFrame {
 size_t NodeConfig::payload_size() { return _payload_size; }
 
 void NodeConfig::serialize(std::vector<uint8_t> &buffer) {
-    uint64_t config_field;
+    uint64_t config_field = 0;
 
     switch (type) {
     case SAVE_FOLDER: {
@@ -45,7 +45,7 @@ void NodeConfig::serialize(std::vector<uint8_t> &buffer) {
 }
 
 void NodeConfig::deserialize(const uint8_t *buffer, std::size_t len) {
-    uint64_t config_field;
+    uint64_t config_field = 0;
 
     if (len != _payload_size) {
         throw AresFrameError("Invalid payload size received");
