@@ -54,6 +54,13 @@ AresSerial::~AresSerial() {
     _serial.close();
 }
 
+void AresSerial::_check_crash() {
+    if (_exception) {
+        stop_driver();
+        std::rethrow_exception(_exception);
+    }
+}
+
 void AresSerial::_process_rx_buffer(std::vector<uint8_t> &buf) {
     while (true) {
         LOG_DBG("Processing %u bytes", buf.size());
