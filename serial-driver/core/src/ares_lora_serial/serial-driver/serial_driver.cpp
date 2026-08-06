@@ -104,3 +104,27 @@ void AresSerial::_read_serial() {
         }
     }
 }
+
+void AresSerial::_process_frames_helper() {
+    bool stopped = false;
+    while (_tasks_running || !stopped) {
+        AresFrame::Frame frame = _frame_q.get();
+        LOG_DBG("Received frame %d", frame.type());
+
+        // todo: Do something with the frame.
+    }
+}
+
+void AresSerial::_process_frames() {
+    LOG_DBG("Starting processing task");
+    while (_tasks_running) {
+        try {
+            _process_frames_helper();
+        } catch (const std::exception &exc) {
+            _exception = std::current_exception();
+            _tasks_running = false;
+            LOG_ERR("Processing task crashed. Stopping driver. Reason: %s",
+                    exc.what());
+        }
+    }
+}
