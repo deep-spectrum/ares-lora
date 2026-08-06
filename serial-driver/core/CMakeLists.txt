@@ -63,12 +63,20 @@ set(ARES_FRAME_SRC
         src/ares_lora_serial/frames/frame.cpp
 )
 
+set(ARES_SERIAL_DRIVER_SRC
+        # Bindings
+        src/ares_lora_serial/serial-driver/bindings.cpp
+
+        # Top level
+        src/ares_lora_serial/serial-driver/serial_driver.cpp
+)
+
 set(PACKAGE_NAME ares_lora_serial_core)
 python_package(src/${PACKAGE_NAME} DESTINATION ${PACKAGE_NAME})
 python_module(_core src/core.cpp
         DESTINATION ${PACKAGE_NAME}
         DEFINITIONS VERSION_INFO=${PROJECT_VERSION})
-python_module(_ares_lora_serial src/ares_lora_serial/ares_lora_serial.cpp ${ARES_FRAME_SRC}
+python_module(_ares_lora_serial ${ARES_SERIAL_DRIVER_SRC} ${ARES_FRAME_SRC}
         DESTINATION ${PACKAGE_NAME}
         DEPENDENCIES serial ares_data_structures logging ares_work_q ares_datetime
         LIBS serial ares_data_structures logging ares_work_q ares_datetime

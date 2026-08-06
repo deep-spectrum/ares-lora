@@ -1,0 +1,183 @@
+/**
+ * @file serial_driver.hpp
+ *
+ * @brief
+ *
+ * @date 8/6/26
+ *
+ * @author Tom Schmitz \<tschmitz@andrew.cmu.edu\>
+ */
+
+#ifndef ARES_SERIAL_DRIVER_HPP
+#define ARES_SERIAL_DRIVER_HPP
+
+#include <ares-lora-serial/frames/frame.hpp>
+#include <ares/data-structures/queue.hpp>
+#include <ares/serial/serial.hpp>
+#include <ares/synchronization/semaphore.hpp>
+#include <ares/work-q/task.hpp>
+#include <ares/work-q/work_q.hpp>
+#include <atomic>
+#include <chrono>
+#include <exception>
+#include <functional>
+#include <future>
+#include <mutex>
+#include <pybind11/pybind11.h>
+#include <string>
+#include <utility>
+
+namespace py = pybind11;
+using namespace std::chrono_literals;
+
+class AresThreadTerminate : public std::exception {
+  public:
+    AresThreadTerminate() = default;
+
+    [[nodiscard]] const char *what() const noexcept override {
+        return "Thread terminate signal";
+    }
+};
+
+struct AresLoraConfig {
+    AresLoraConfig() = default;
+
+    /**
+     * Construct from Python kwargs.
+     * @param kwargs Python keyword arguments.
+     */
+    explicit AresLoraConfig(const py::kwargs &kwargs);
+
+    /**
+     * Frequency in Hz to use for transceiving
+     */
+    uint32_t frequency = 0;
+
+    /**
+     * Length of the preamble.
+     */
+    uint16_t preamble_length = 0;
+
+    /**
+     * The bandwidth to use for transceiving.
+     */
+    uint8_t bandwidth = 0;
+
+    /**
+     * The data-rate to use for transceiving.
+     */
+    uint8_t datarate = 0;
+
+    /**
+     * The coding rate to use for transceiving.
+     */
+    uint8_t coding_rate = 0;
+
+    /**
+     * TX-power in dBm to use for transmission.
+     */
+    int8_t tx_power = 0;
+
+    /**
+     * Generate an AresFrame from the object.
+     * @return The frame object generated.
+     */
+    [[nodiscard]] AresFrame::Frame generate_frame() const;
+};
+
+class AresSerial {
+  public:
+    explicit AresSerial(const std::string &port, const py::kwargs &kwargs);
+
+    ~AresSerial();
+
+    // mcu
+    py::tuple setting(const py::kwargs &kwargs);
+    int lora_config(const AresLoraConfig &config, const py::kwargs &kwargs);
+    py::tuple led(const py::kwargs &kwargs);
+    py::tuple version();
+    int reboot();
+
+    // lora
+    int start(const py::kwargs &kwargs);
+    py::tuple poll(const py::kwargs &kwargs);
+    py::tuple log(const py::kwargs &kwargs);
+    int abort(const py::kwargs &kwargs);
+    py::dict node_config(const py::kwargs &kwargs);
+    py::dict node_config_poll(const py::kwargs &kwargs);
+    int notify_run_ready(const py::kwargs &kwargs);
+
+    // ble
+    py::tuple ble_state(uint8_t value);
+    int ble_disconnect();
+    py::tuple ble_send_image(const py::bytes &image);
+
+    // getters/setters
+    void set_ready(bool new_state);
+    [[nodiscard]] bool get_ready() const;
+
+    // Driver logging
+    void register_logger_callbacks(
+        const std::function<void(const std::string &)> &dbg,
+        const std::function<void(const std::string &)> &info,
+        const std::function<void(const std::string &)> &warn,
+        const std::function<void(const std::string &)> &error,
+        const std::function<void(const std::string &)> &crit,
+        const std::function<long()> &get_level,
+        const std::function<void(long)> &set_level);
+    void set_logging_level(uint32_t level);
+    long get_log_level();
+
+    // Event waiting
+    py::tuple wait_start_event();
+    py::tuple wait_log_event();
+    py::tuple wait_packet_rx_event();
+    py::tuple wait_packet_tx_event();
+    bool wait_ble_connection_event();
+    py::tuple wait_ble_subscribe_event();
+    py::tuple wait_abortion_event();
+    py::tuple wait_run_ready_event();
+
+    // driver utilities
+    void start_driver();
+    void stop_driver();
+    py::dict get_node_config();
+    void cancel_events();
+
+  private:
+    Serial::Serial _serial;
+    ares::WorkQ _work_q;
+    std::mutex _command_lock;
+    std::exception_ptr _exception;
+
+    void _check_crash();
+
+    struct CommandResponse {
+        enum ResponseType {
+            COMMAND_SPECIFIC,
+            ACK,
+            BAD_FRAME,
+        };
+
+        ResponseType type;
+        AresFrame::Frame::ResponseTypes payload;
+    };
+
+    std::atomic_bool _tasks_running = false;
+
+    ares::Task<void()> _rx_task;
+    ares::bounded_queue<AresFrame::Frame, 10, true> _frame_q;
+    std::chrono::milliseconds _rx_period = 100ms;
+    void _process_rx_buffer(std::vector<uint8_t> &buf);
+    void _read_serial_helper();
+    void _read_serial();
+
+    ares::Task<void()> _processing_task;
+    ares::bounded_queue<CommandResponse> _response_queue;
+    void _process_frames_helper();
+    void _process_frames();
+
+    std::recursive_mutex _serial_lock;
+};
+
+#endif // ARES_SERIAL_DRIVER_HPP
