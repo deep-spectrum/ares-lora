@@ -9,7 +9,10 @@
  */
 
 #include <ares-lora-serial/serial-driver/serial_driver.hpp>
+#include <ares/logging/log.hpp>
 #include <ares/pyutil.hpp>
+
+LOG_MODULE_REGISTER(serial_logger);
 
 AresLoraConfig::AresLoraConfig(const py::kwargs &kwargs) {
     ares::from_kwargs(kwargs, SP(frequency), SP(preamble_length), SP(bandwidth),
@@ -49,4 +52,55 @@ AresSerial::AresSerial(const std::string &port, const py::kwargs &kwargs)
 AresSerial::~AresSerial() {
     stop_driver();
     _serial.close();
+}
+
+void AresSerial::_process_rx_buffer(std::vector<uint8_t> &buf) {
+    while (true) {
+        LOG_DBG("Processing %u bytes", buf.size());
+        auto [frame_start, frame_size, _] =
+            AresFrame::Frame::frame_present(buf);
+        if (frame_start < 0) {
+            return;
+        }
+
+        LOG_DBG_HEXDUMP(buf, frame_size, "Frame found");
+        AresFrame::Frame frame;
+        frame.parse(buf, frame_start);
+        _frame_q.put(frame);
+        buf.erase(buf.begin(), buf.begin() + frame_start + frame_size);
+    }
+}
+
+void AresSerial::_read_serial_helper() {
+    std::vector<uint8_t> rx;
+    std::unique_lock lock(_serial_lock, std::defer_lock);
+
+    LOG_DBG("Starting RX task");
+
+    while (_tasks_running) {
+        lock.lock();
+        if (_serial.in_waiting() > 0) {
+            std::vector<uint8_t> buf;
+            _serial.read_all(buf);
+            rx.insert(rx.end(), buf.begin(), buf.end());
+            lock.unlock();
+            _process_rx_buffer(rx);
+        } else {
+            lock.unlock();
+            std::this_thread::sleep_for(_rx_period);
+        }
+    }
+}
+
+void AresSerial::_read_serial() {
+    while (_tasks_running) {
+        try {
+            _read_serial_helper();
+        } catch (const std::exception &exc) {
+            _exception = std::current_exception();
+            _serial.close();
+            _tasks_running = false;
+            LOG_ERR("RX task crashed. Stopping driver. Reason: %s", exc.what());
+        }
+    }
 }
