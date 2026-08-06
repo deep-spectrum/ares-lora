@@ -11,11 +11,13 @@
 #include <ares-lora-serial/frames/ble/ble_disconnect.hpp>
 #include <ares/serialization.hpp>
 #include <ares/util.h>
+#include <cassert>
 
 namespace AresFrame {
 size_t BleDisconnect::payload_size() { return _payload_size; }
 
 void BleDisconnect::serialize(std::vector<uint8_t> &buffer) {
     ARG_UNUSED(buffer);
+    assert(buffer.size() == _payload_size);
 }
 } // namespace AresFrame

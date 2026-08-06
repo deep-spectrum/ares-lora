@@ -11,6 +11,7 @@
 #include <ares-lora-serial/frames/frame_types.hpp>
 #include <ares-lora-serial/frames/lora/log/log.hpp>
 #include <ares/serialization.hpp>
+#include <cassert>
 
 namespace AresFrame {
 size_t Log::payload_size() { return _overhead + _msg_split[_idx].length(); }
@@ -52,6 +53,7 @@ void Log::serialize(std::vector<uint8_t> &buffer) {
     ares::serialize(buffer, broadcast, id, tx_cnt, _part, _num_parts, log_id);
     buffer.insert(buffer.end(), _msg_split[_idx].begin(),
                   _msg_split[_idx].end());
+    assert(buffer.size() == payload_size());
 }
 
 void Log::deserialize(const uint8_t *buffer, std::size_t len) {

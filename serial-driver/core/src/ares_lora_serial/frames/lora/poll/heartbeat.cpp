@@ -11,6 +11,7 @@
 #include <ares-lora-serial/frames/frame_types.hpp>
 #include <ares-lora-serial/frames/lora/poll/heartbeat.hpp>
 #include <ares/serialization.hpp>
+#include <cassert>
 
 namespace AresFrame {
 std::size_t Heartbeat::payload_size() { return _payload_size; }
@@ -20,6 +21,7 @@ void Heartbeat::serialize(std::vector<uint8_t> &buffer) {
     ares::set_flags(flags, ready);
 
     ares::serialize(buffer, flags, id);
+    assert(buffer.size() == _payload_size);
 }
 
 void Heartbeat::deserialize(const uint8_t *buffer, std::size_t len) {

@@ -1532,6 +1532,7 @@ void AresSerial::_parse_node_config_kwargs(
         ares::DateTime dt(
             kwargs["folder_dt"].cast<std::chrono::system_clock::time_point>());
         AresFrame::NodeConfigSaveFolder save_folder{
+            .microsecond = dt.microsecond(),
             .year = static_cast<uint16_t>(dt.year()),
             .month = static_cast<uint8_t>(dt.month()),
             .day = static_cast<uint8_t>(dt.day()),
@@ -1662,8 +1663,9 @@ void AresSerial::_handle_node_config_event(
         auto sf = std::get<AresFrame::NodeConfigSaveFolder>(config.config);
         LOG_DBG("Received folder name: (%d, %d, %d, %d, %d, %d)", sf.year,
                 sf.month, sf.day, sf.hour, sf.minute, sf.second);
-        _node_configs.save_folder = ares::DateTime(
-            sf.year, sf.month, sf.day, sf.hour, sf.minute, sf.second);
+        _node_configs.save_folder =
+            ares::DateTime(sf.year, sf.month, sf.day, sf.hour, sf.minute,
+                           sf.second, sf.microsecond);
         break;
     }
     case AresFrame::BANDWIDTH: {
@@ -1717,6 +1719,7 @@ void AresSerial::_handle_node_config_poll_event(
     switch (event.type) {
     case AresFrame::SAVE_FOLDER: {
         _node_response_work.config = AresFrame::NodeConfigSaveFolder{
+            .microsecond = _node_configs.save_folder.microsecond(),
             .year = static_cast<uint16_t>(_node_configs.save_folder.year()),
             .month = static_cast<uint8_t>(_node_configs.save_folder.month()),
             .day = static_cast<uint8_t>(_node_configs.save_folder.day()),
@@ -1855,6 +1858,7 @@ void AresSerial::_parse_node_config_poll_args(
         }
 
         const auto val = arg.cast<std::string>();
+        LOG_DBG("Polling handler parsed: %s", val.c_str());
 
         if (!parsed.save_folder && val == "folder_dt") {
             parsed.save_folder = true;
@@ -1945,7 +1949,8 @@ py::dict AresSerial::_send_node_config_poll_frames(
                         rx_dt.year, rx_dt.month, rx_dt.day, rx_dt.hour,
                         rx_dt.minute, rx_dt.second);
                 ares::DateTime dt(rx_dt.year, rx_dt.month, rx_dt.day,
-                                  rx_dt.hour, rx_dt.minute, rx_dt.second);
+                                  rx_dt.hour, rx_dt.minute, rx_dt.second,
+                                  rx_dt.microsecond);
                 ret["folder_dt"] = py::make_tuple(code, dt.time_point());
             }
             break;

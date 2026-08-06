@@ -11,6 +11,7 @@
 #include <ares-lora-serial/frames/frame_types.hpp>
 #include <ares-lora-serial/frames/lora/config/node_config.hpp>
 #include <ares/serialization.hpp>
+#include <cassert>
 
 namespace AresFrame {
 size_t NodeConfig::payload_size() { return _payload_size; }
@@ -42,6 +43,7 @@ void NodeConfig::serialize(std::vector<uint8_t> &buffer) {
     }
 
     ares::serialize(buffer, id, type, config_field);
+    assert(buffer.size() == _payload_size);
 }
 
 void NodeConfig::deserialize(const uint8_t *buffer, std::size_t len) {

@@ -89,7 +89,7 @@ struct Start : Internal::FramePayloadBase {
     void deserialize(const uint8_t *buffer, std::size_t len) override;
 
   private:
-    static constexpr std::size_t _payload_size = 20;
+    static constexpr std::size_t _payload_size = 22;
 };
 } // namespace AresFrame
 

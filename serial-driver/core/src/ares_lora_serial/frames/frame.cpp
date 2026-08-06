@@ -124,17 +124,20 @@ void Frame::serialize(std::vector<uint8_t> &bytearray) {
     bytearray.clear();
     _preprocess();
     uint16_t payload_size = _payload_size();
+    std::vector<uint8_t> payload_v;
 
     ares::serialize(bytearray, header, payload_size, _type);
 
     std::visit(
-        [&bytearray](auto &payload) {
+        [&payload_v](auto &payload) {
             if constexpr (!std::is_same_v<std::decay_t<decltype(payload)>,
                                           std::monostate>) {
-                payload.serialize(bytearray);
+                payload.serialize(payload_v);
             }
         },
         _tx_payload);
+
+    bytearray.insert(bytearray.end(), payload_v.begin(), payload_v.end());
 
     ares::serialize(bytearray, footer);
 }
