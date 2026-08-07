@@ -62,6 +62,64 @@ AresSerial::~AresSerial() {
     _serial.close();
 }
 
+void AresSerial::set_ready(bool new_state) { _ready = new_state; }
+
+bool AresSerial::get_ready() const { return _ready; }
+
+void AresSerial::register_logger_callbacks(
+    const std::function<void(const std::string &)> &dbg,
+    const std::function<void(const std::string &)> &info,
+    const std::function<void(const std::string &)> &warn,
+    const std::function<void(const std::string &)> &error,
+    const std::function<void(const std::string &)> &crit,
+    const std::function<long()> &get_level,
+    const std::function<void(long)> &set_level) {
+    _check_crash();
+
+    LOG_MODULE_REGISTER_CALLBACKS(dbg, info, warn, error, crit, set_level,
+                                  get_level);
+}
+
+void AresSerial::set_logging_level(uint32_t level) {
+    _check_crash();
+
+    switch (level) {
+    case 10: {
+        SET_LOG_LEVEL(LOG_LEVEL_DBG);
+        break;
+    }
+    case 20: {
+        SET_LOG_LEVEL(LOG_LEVEL_INFO);
+        break;
+    }
+    case 30: {
+        SET_LOG_LEVEL(LOG_LEVEL_WARN);
+        break;
+    }
+    case 40: {
+        SET_LOG_LEVEL(LOG_LEVEL_ERROR);
+        break;
+    }
+    case 50: {
+        SET_LOG_LEVEL(LOG_LEVEL_CRITICAL);
+        break;
+    }
+    case 60: {
+        SET_LOG_LEVEL(LOG_LEVEL_OFF);
+        break;
+    }
+    default: {
+        throw std::invalid_argument("Invalid logging level");
+        break;
+    }
+    }
+}
+
+long AresSerial::get_log_level() {
+    _check_crash();
+    return LOG_MODULE_CURRENT_LEVEL;
+}
+
 void AresSerial::_check_crash() {
     if (_exception) {
         stop_driver();

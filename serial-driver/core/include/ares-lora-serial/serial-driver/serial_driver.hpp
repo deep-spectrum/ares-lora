@@ -173,6 +173,7 @@ class AresSerial {
     ares::WorkQ _work_q;
     std::mutex _command_lock;
     std::exception_ptr _exception;
+    bool _ready = false;
 
     void _check_crash();
 
