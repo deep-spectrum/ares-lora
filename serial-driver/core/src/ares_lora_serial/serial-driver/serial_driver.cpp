@@ -14,6 +14,14 @@
 
 LOG_MODULE_REGISTER(serial_logger);
 
+static void check_python_errors() {
+    py::gil_scoped_acquire acquire;
+
+    if (PyErr_CheckSignals() != 0) {
+        throw py::error_already_set();
+    }
+}
+
 AresLoraConfig::AresLoraConfig(const py::kwargs &kwargs) {
     ares::from_kwargs(kwargs, SP(frequency), SP(preamble_length), SP(bandwidth),
                       SP(datarate), SP(coding_rate), SP(tx_power));
@@ -134,4 +142,65 @@ void AresSerial::_process_frames() {
                     exc.what());
         }
     }
+}
+
+void AresSerial::_send_frame(AresFrame::Frame &frame,
+                             const std::chrono::milliseconds &timeout,
+                             std::vector<FrameResponse> &responses) {
+    py::gil_scoped_release release;
+    _send_frame_released(frame, timeout, responses);
+}
+
+void AresSerial::_send_frame_released(AresFrame::Frame &frame,
+                                      const std::chrono::milliseconds &timeout,
+                                      std::vector<FrameResponse> &responses) {
+    std::unique_lock lock(_command_lock, std::defer_lock);
+    std::vector<uint8_t> buf;
+
+    do {
+        lock.lock();
+        frame.serialize(buf);
+        _response_queue.clear();
+        _send_frame_released(buf);
+        responses.emplace_back(_wait_response(timeout));
+        lock.unlock();
+        check_python_errors();
+    } while (frame.frame_available());
+}
+
+void AresSerial::_send_frame_released(const std::vector<uint8_t> &buf) {
+    LOG_DBG_HEXDUMP(buf, buf.size(), "Sending frame");
+    std::unique_lock lock(_serial_lock);
+    _serial.write(buf);
+}
+
+AresSerial::FrameResponse
+AresSerial::_wait_response(const std::chrono::milliseconds &timeout) {
+    if (timeout == ares::forever) {
+        return _wait_response_forever();
+    }
+
+    return _wait_response_timeout(timeout);
+}
+
+AresSerial::FrameResponse
+AresSerial::_wait_response_timeout(const std::chrono::milliseconds &timeout) {
+    FrameResponse response;
+
+    try {
+        response = _response_queue.get(timeout);
+    } catch (const ares::queue_exception &exc) {
+        if (exc.reason() == ares::queue_exception::QUEUE_TIMEOUT) {
+            throw AresTimeoutError(exc.what());
+        }
+        throw;
+    }
+
+    return response;
+}
+
+AresSerial::FrameResponse AresSerial::_wait_response_forever() {
+    // TODO: This will block Python exceptions. Add a lambda to queue.get to
+    // check some condition.
+    return _response_queue.get();
 }

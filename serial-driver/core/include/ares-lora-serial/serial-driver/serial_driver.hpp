@@ -30,6 +30,30 @@
 namespace py = pybind11;
 using namespace std::chrono_literals;
 
+/**
+ * @class AresTimeoutError
+ * Timeout exception class for the Ares serial driver core library.
+ */
+class AresTimeoutError : public std::exception {
+  public:
+    /**
+     * Constructor.
+     * @param msg The error message.
+     */
+    explicit AresTimeoutError(std::string msg) : _msg(std::move(msg)) {}
+
+    /**
+     * Retrieve the error message.
+     * @return The error message.
+     */
+    [[nodiscard]] const char *what() const noexcept override {
+        return _msg.c_str();
+    }
+
+  private:
+    std::string _msg;
+};
+
 class AresThreadTerminate : public std::exception {
   public:
     AresThreadTerminate() = default;
@@ -152,7 +176,7 @@ class AresSerial {
 
     void _check_crash();
 
-    struct CommandResponse {
+    struct FrameResponse {
         enum ResponseType {
             COMMAND_SPECIFIC,
             ACK,
@@ -163,6 +187,7 @@ class AresSerial {
         AresFrame::Frame::ResponseTypes payload;
     };
 
+    std::recursive_mutex _serial_lock;
     std::atomic_bool _tasks_running = false;
 
     ares::Task<void()> _rx_task;
@@ -173,11 +198,21 @@ class AresSerial {
     void _read_serial();
 
     ares::Task<void()> _processing_task;
-    ares::bounded_queue<CommandResponse> _response_queue;
+    ares::bounded_queue<FrameResponse> _response_queue;
     void _process_frames_helper();
     void _process_frames();
 
-    std::recursive_mutex _serial_lock;
+    void _send_frame(AresFrame::Frame &frame,
+                     const std::chrono::milliseconds &timeout,
+                     std::vector<FrameResponse> &responses);
+    void _send_frame_released(AresFrame::Frame &frame,
+                              const std::chrono::milliseconds &timeout,
+                              std::vector<FrameResponse> &responses);
+    void _send_frame_released(const std::vector<uint8_t> &buf);
+    FrameResponse _wait_response(const std::chrono::milliseconds &timeout);
+    FrameResponse
+    _wait_response_timeout(const std::chrono::milliseconds &timeout);
+    FrameResponse _wait_response_forever();
 };
 
 #endif // ARES_SERIAL_DRIVER_HPP
