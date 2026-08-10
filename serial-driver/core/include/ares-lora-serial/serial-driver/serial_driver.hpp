@@ -234,6 +234,7 @@ class AresSerial {
     ares::bounded_queue<std::unique_ptr<AresFrame::Abort>, 3> _abortion_event_q;
     ares::bounded_queue<std::unique_ptr<AresFrame::NodeReady>, 3>
         _run_ready_event_q;
+    bool _stop_event_queues();
 };
 
 #endif // ARES_SERIAL_DRIVER_HPP

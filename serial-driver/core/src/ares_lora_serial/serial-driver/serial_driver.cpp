@@ -282,6 +282,11 @@ void AresSerial::stop_driver() {
     _frame_q.clear();
 }
 
+void AresSerial::cancel_events() {
+    LOG_DBG("cancelling event queues");
+    _stop_event_queues();
+}
+
 void AresSerial::_check_crash() {
     if (_exception) {
         stop_driver();
@@ -482,4 +487,30 @@ void AresSerial::_send_lora_responses() {
                 exc.what());
         }
     }
+}
+
+template <typename T, size_t size, bool overwrite>
+static bool queue_nullptr(
+    ares::bounded_queue<std::unique_ptr<T>, size, overwrite> &q) noexcept {
+    bool exit_requested = true;
+
+    try {
+        q.put_nonblocking(static_cast<std::unique_ptr<T>>(nullptr));
+    } catch (const ares::queue_exception &) {
+        exit_requested = false;
+    }
+
+    return exit_requested;
+}
+
+bool AresSerial::_stop_event_queues() {
+    bool success = queue_nullptr(_start_event_q);
+    success = queue_nullptr(_log_event_q) && success;
+    success = queue_nullptr(_pkt_rx_event_q) && success;
+    success = queue_nullptr(_pkt_tx_event_q) && success;
+    success = queue_nullptr(_ble_connect_event_q) && success;
+    success = queue_nullptr(_ble_subscribed_event_q) && success;
+    success = queue_nullptr(_abortion_event_q) && success;
+    success = queue_nullptr(_run_ready_event_q) && success;
+    return success;
 }
