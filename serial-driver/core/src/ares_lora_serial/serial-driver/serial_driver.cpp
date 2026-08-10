@@ -36,7 +36,8 @@ AresFrame::Frame AresLoraConfig::generate_frame() const {
 
 AresSerial::AresSerial(const std::string &port, const py::kwargs &kwargs)
     : _rx_task([this] { _read_serial(); }),
-      _processing_task([this] { _process_frames(); }) {
+      _processing_task([this] { _process_frames(); }),
+      _lora_response_task([this] { _send_lora_responses(); }) {
     SerialInternal::SerialAttributes attr;
 
     std::chrono::milliseconds serial_timeout = 100ms;
@@ -261,4 +262,59 @@ AresSerial::FrameResponse AresSerial::_wait_response_forever() {
     // TODO: This will block Python exceptions. Add a lambda to queue.get to
     // check some condition.
     return _response_queue.get();
+}
+
+void AresSerial::_lora_responses_check_fw_responses(
+    const std::vector<FrameResponse> &responses,
+    const AresFrame::Frame &sent_frame) {
+
+    for (const auto &response : responses) {
+        switch (response.type) {
+        case FrameResponse::ACK: {
+            LOG_DBG("Firmware responded to frame %d with ACK code %d",
+                    sent_frame.type(),
+                    std::get<AresFrame::Ack>(response.payload).code);
+            break;
+        }
+        case FrameResponse::BAD_FRAME: {
+            LOG_ERR("Bad frame response received in a LoRa response");
+            break;
+        }
+        default: {
+            LOG_ERR("LoRa response messages must respond back with an ACK "
+                    "message or a bad frame message");
+            break;
+        }
+        }
+    }
+}
+
+void AresSerial::_send_lora_responses_helper() {
+    while (_tasks_running) {
+        std::vector<FrameResponse> responses;
+        auto frame = _lora_response_q.get();
+
+        try {
+            _send_frame_released(frame, _send_lora_response_timeout, responses);
+        } catch (const std::exception &exc) {
+            LOG_ERR("_send_frame_released(): %s", exc.what());
+        }
+
+        _lora_responses_check_fw_responses(responses, frame);
+    }
+}
+
+void AresSerial::_send_lora_responses() {
+    LOG_DBG("Starting response task");
+    while (_tasks_running) {
+        try {
+            _send_lora_responses_helper();
+        } catch (const std::exception &exc) {
+            _exception = std::current_exception();
+            _tasks_running = false;
+            LOG_ERR(
+                "Send LoRa response task crashed. Stopping driver. Reason: %s",
+                exc.what());
+        }
+    }
 }

@@ -16,7 +16,6 @@
 #include <ares/serial/serial.hpp>
 #include <ares/synchronization/semaphore.hpp>
 #include <ares/work-q/task.hpp>
-#include <ares/work-q/work_q.hpp>
 #include <atomic>
 #include <chrono>
 #include <exception>
@@ -170,7 +169,6 @@ class AresSerial {
 
   private:
     Serial::Serial _serial;
-    ares::WorkQ _work_q;
     std::mutex _command_lock;
     std::exception_ptr _exception;
     bool _ready = false;
@@ -214,6 +212,15 @@ class AresSerial {
     FrameResponse
     _wait_response_timeout(const std::chrono::milliseconds &timeout);
     FrameResponse _wait_response_forever();
+
+    ares::Task<void()> _lora_response_task;
+    ares::bounded_queue<AresFrame::Frame, 10> _lora_response_q;
+    std::chrono::milliseconds _send_lora_response_timeout = 10s;
+    static void _lora_responses_check_fw_responses(
+        const std::vector<FrameResponse> &responses,
+        const AresFrame::Frame &sent_frame);
+    void _send_lora_responses_helper();
+    void _send_lora_responses();
 };
 
 #endif // ARES_SERIAL_DRIVER_HPP
