@@ -185,6 +185,103 @@ py::tuple AresSerial::wait_run_ready_event() {
     return py::make_tuple(event.id, event.broadcast);
 }
 
+void AresSerial::start_driver() {
+    if (_tasks_running) {
+        throw std::runtime_error("Already running");
+    }
+
+    LOG_INF("Starting driver");
+
+    LOG_DBG("Clearing event queues");
+    _start_event_q.clear();
+    _log_event_q.clear();
+    _pkt_rx_event_q.clear();
+    _pkt_tx_event_q.clear();
+    _ble_connect_event_q.clear();
+    _ble_subscribed_event_q.clear();
+    _abortion_event_q.clear();
+    _run_ready_event_q.clear();
+
+    LOG_DBG("Clearing message queues");
+    _frame_q.clear();
+    _response_queue.clear();
+    _lora_response_q.clear();
+
+    _exception = nullptr;
+    if (_serial.is_closed()) {
+        LOG_DBG("Port was closed. Attempting to open it.");
+        _serial.open();
+    }
+
+    LOG_DBG("Starting LoRa Response Task");
+    _tasks_running = true;
+    _lora_response_task.set_essential(true);
+    _lora_response_task.start();
+
+    LOG_DBG("Starting processing task");
+    _processing_task.set_essential(true);
+    _processing_task.start();
+
+    LOG_DBG("Starting RX Task");
+    _rx_task.set_essential(true);
+    _rx_task.start();
+}
+
+template <typename Signature, typename QueueType, size_t size, bool overwrite>
+static bool
+stop_driver_task(ares::Task<Signature> &task,
+                 ares::bounded_queue<QueueType, size, overwrite> &queue,
+                 QueueType &terminate_val, size_t max_attempts) {
+    size_t retries = 0;
+
+    queue.clear();
+    do {
+        queue.put(terminate_val);
+        if (task.join(100ms) == 0) {
+            break;
+        }
+        retries++;
+    } while (retries < max_attempts);
+
+    return retries >= max_attempts;
+}
+
+void AresSerial::stop_driver() {
+    constexpr size_t max_attempts = 10;
+    if (!_tasks_running || !_exception) {
+        return;
+    }
+
+    LOG_INF("Stopping driver");
+    _tasks_running = false;
+    _rx_task.join();
+
+    AresFrame::Frame terminate_request{AresFrame::DRIVER_STOP,
+                                       std::monostate()};
+    bool failed_proc_task_shutdown = stop_driver_task(
+        _processing_task, _frame_q, terminate_request, max_attempts);
+    bool failed_lora_resp_task_shutdown = stop_driver_task(
+        _lora_response_task, _lora_response_q, terminate_request, max_attempts);
+
+    if (failed_proc_task_shutdown || failed_lora_resp_task_shutdown) {
+        std::stringstream ss;
+        if (failed_proc_task_shutdown) {
+            ss << "Failed to shut down processing task";
+        }
+        if (failed_proc_task_shutdown && failed_lora_resp_task_shutdown) {
+            ss << " and ";
+        }
+        if (failed_lora_resp_task_shutdown) {
+            ss << "Failed to shut down lora response task";
+        }
+        throw std::runtime_error(ss.str());
+    }
+
+    _response_queue.clear();
+    _lora_response_q.clear();
+    _frame_q.clear();
+}
+
 void AresSerial::_check_crash() {
     if (_exception) {
         stop_driver();
@@ -357,6 +454,10 @@ void AresSerial::_send_lora_responses_helper() {
     while (_tasks_running) {
         std::vector<FrameResponse> responses;
         auto frame = _lora_response_q.get();
+
+        if (frame.type() == AresFrame::DRIVER_STOP) {
+            continue;
+        }
 
         try {
             _send_frame_released(frame, _send_lora_response_timeout, responses);
