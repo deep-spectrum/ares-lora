@@ -11,6 +11,12 @@
 #include <ares-lora-serial/frames/frame_types.hpp>
 #include <ares-lora-serial/frames/lora/log/log_ack.hpp>
 #include <ares/serialization.hpp>
+#include <cassert>
+
+void AresFrame::LogAck::serialize(std::vector<uint8_t> &buffer) {
+    ares::serialize(buffer, part, num_parts, id, log_id);
+    assert(buffer.size() == _payload_size);
+}
 
 void AresFrame::LogAck::deserialize(const uint8_t *buffer, std::size_t len) {
     if (len != _payload_size) {

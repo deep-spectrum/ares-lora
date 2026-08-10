@@ -66,6 +66,12 @@ struct LogAck : Internal::FramePayloadBase {
     }
 
     /**
+     * Encode into a buffer.
+     * @param buffer The buffer to place data into.
+     */
+    void serialize(std::vector<uint8_t> &buffer) override;
+
+    /**
      * Decode the payload from a serial buffer.
      * @param buffer Pointer to buffer that contains encoded payload
      * @param len The size of the payload.
