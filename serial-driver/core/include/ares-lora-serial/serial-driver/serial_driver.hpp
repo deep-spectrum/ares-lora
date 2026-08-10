@@ -155,7 +155,7 @@ class AresSerial {
     py::tuple wait_start_event();
     py::tuple wait_log_event();
     py::tuple wait_packet_rx_event();
-    py::tuple wait_packet_tx_event();
+    uint32_t wait_packet_tx_event();
     bool wait_ble_connection_event();
     py::tuple wait_ble_subscribe_event();
     py::tuple wait_abortion_event();
@@ -221,6 +221,19 @@ class AresSerial {
         const AresFrame::Frame &sent_frame);
     void _send_lora_responses_helper();
     void _send_lora_responses();
+
+    // event queues
+    ares::bounded_queue<std::unique_ptr<AresFrame::Start>, 5> _start_event_q;
+    ares::bounded_queue<std::unique_ptr<AresFrame::Log>, 100> _log_event_q;
+    ares::bounded_queue<std::unique_ptr<AresFrame::PktRx>, 500> _pkt_rx_event_q;
+    ares::bounded_queue<std::unique_ptr<AresFrame::PktTx>, 3> _pkt_tx_event_q;
+    ares::bounded_queue<std::unique_ptr<AresFrame::BleConnect>, 2>
+        _ble_connect_event_q;
+    ares::bounded_queue<std::unique_ptr<AresFrame::BleSubscribed>, 10>
+        _ble_subscribed_event_q;
+    ares::bounded_queue<std::unique_ptr<AresFrame::Abort>, 3> _abortion_event_q;
+    ares::bounded_queue<std::unique_ptr<AresFrame::NodeReady>, 3>
+        _run_ready_event_q;
 };
 
 #endif // ARES_SERIAL_DRIVER_HPP
