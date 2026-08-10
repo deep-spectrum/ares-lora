@@ -580,7 +580,8 @@ void AresSerial::EventDispatcher::operator()(
 void AresSerial::EventDispatcher::operator()(
     const AresFrame::Heartbeat &event) const {
     LOG_INF("Heartbeat received from %d", event.id);
-    // todo: figure out what queue to use
+    AresFrame::Frame::AckTypes ack_event = event;
+    put_no_except(ack_event, self._ack_queue, 100ms);
 }
 
 void AresSerial::EventDispatcher::operator()(
@@ -605,7 +606,8 @@ void AresSerial::EventDispatcher::operator()(
     const AresFrame::LogAck &event) const {
     LOG_INF("Log ACK event received (part %d of %d, %d)", event.part,
             event.num_parts, event.id);
-    // todo: log acks queue?
+    AresFrame::Frame::AckTypes ack_event = event;
+    put_no_except(ack_event, self._ack_queue, 100ms);
 }
 
 void AresSerial::EventDispatcher::operator()(
@@ -747,7 +749,8 @@ void AresSerial::EventDispatcher::operator()(
     const AresFrame::NodeConfigResponse &event) const {
     LOG_INF("Node config response received from %d (type %d)", event.id,
             event.type);
-    // todo???
+    AresFrame::Frame::AckTypes ack_event = event;
+    put_no_except(ack_event, self._ack_queue, 100ms);
 }
 
 void AresSerial::EventDispatcher::operator()(

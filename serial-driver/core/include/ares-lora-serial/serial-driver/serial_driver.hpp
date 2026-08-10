@@ -242,6 +242,8 @@ class AresSerial {
     ares::bounded_queue<std::unique_ptr<AresFrame::Abort>, 3> _abortion_event_q;
     ares::bounded_queue<std::unique_ptr<AresFrame::NodeReady>, 3>
         _run_ready_event_q;
+    ares::bounded_queue<std::unique_ptr<AresFrame::Frame::AckTypes>, 10>
+        _ack_queue;
     bool _stop_event_queues();
 
     struct EventDispatcher {

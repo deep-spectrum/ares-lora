@@ -85,6 +85,14 @@ class Frame {
                                        FramingError, Led, Version, BleState>;
 
     /**
+     * @typedef AckTypes
+     *
+     * A variant of the different acknowledgement frame types.
+     */
+    using AckTypes = std::variant<std::monostate, LoraAck, LogAck, Heartbeat,
+                                  NodeConfigResponse>;
+
+    /**
      * Construct a transmit from.
      * @param type The frame type.
      * @param tx_payload The structured payload of the frame.
