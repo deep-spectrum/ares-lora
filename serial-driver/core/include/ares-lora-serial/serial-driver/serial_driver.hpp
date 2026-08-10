@@ -13,6 +13,7 @@
 
 #include <ares-lora-serial/frames/frame.hpp>
 #include <ares/data-structures/queue.hpp>
+#include <ares/datetime/datetime.hpp>
 #include <ares/serial/serial.hpp>
 #include <ares/synchronization/semaphore.hpp>
 #include <ares/work-q/task.hpp>
@@ -168,6 +169,7 @@ class AresSerial {
     void cancel_events();
 
   private:
+    // High level stuff
     Serial::Serial _serial;
     std::mutex _command_lock;
     std::exception_ptr _exception;
@@ -175,6 +177,7 @@ class AresSerial {
 
     void _check_crash();
 
+    // Frame stuff
     struct FrameResponse {
         enum ResponseType {
             COMMAND_SPECIFIC,
@@ -186,9 +189,11 @@ class AresSerial {
         AresFrame::Frame::ResponseTypes payload;
     };
 
+    // Task related stuff
     std::recursive_mutex _serial_lock;
     std::atomic_bool _tasks_running = false;
 
+    // Receive task stuff
     ares::Task<void()> _rx_task;
     ares::bounded_queue<AresFrame::Frame, 10, true> _frame_q;
     std::chrono::milliseconds _rx_period = 100ms;
@@ -196,11 +201,13 @@ class AresSerial {
     void _read_serial_helper();
     void _read_serial();
 
+    // Processing task stuff
     ares::Task<void()> _processing_task;
     ares::bounded_queue<FrameResponse> _response_queue;
     void _process_frames_helper();
     void _process_frames();
 
+    // Send frame stuff
     void _send_frame(AresFrame::Frame &frame,
                      const std::chrono::milliseconds &timeout,
                      std::vector<FrameResponse> &responses);
@@ -213,6 +220,7 @@ class AresSerial {
     _wait_response_timeout(const std::chrono::milliseconds &timeout);
     FrameResponse _wait_response_forever();
 
+    // Lora response task stuff
     ares::Task<void()> _lora_response_task;
     ares::bounded_queue<AresFrame::Frame, 10> _lora_response_q;
     std::chrono::milliseconds _send_lora_response_timeout = 10s;
@@ -235,6 +243,20 @@ class AresSerial {
     ares::bounded_queue<std::unique_ptr<AresFrame::NodeReady>, 3>
         _run_ready_event_q;
     bool _stop_event_queues();
+
+    // Node configuration stuff
+    struct NodeConfigs {
+        NodeConfigs() = default;
+
+        ares::DateTime save_folder;
+        double bandwidth = 0;
+        double center_freq = 0;
+        double ref_level = 0;
+        uint32_t duration = 0;
+
+        ares::semaphore<> sem{};
+    };
+    NodeConfigs _node_configs;
 };
 
 #endif // ARES_SERIAL_DRIVER_HPP

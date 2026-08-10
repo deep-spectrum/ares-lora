@@ -12,6 +12,12 @@
 #include <ares/logging/log.hpp>
 #include <ares/pyutil.hpp>
 
+constexpr const char *folder_dt = "folder_dt";
+constexpr const char *bw = "bandwidth";
+constexpr const char *center_f = "center_freq";
+constexpr const char *duration = "duration";
+constexpr const char *ref_level = "ref_level";
+
 LOG_MODULE_REGISTER(serial_logger);
 
 static void check_python_errors() {
@@ -280,6 +286,28 @@ void AresSerial::stop_driver() {
     _response_queue.clear();
     _lora_response_q.clear();
     _frame_q.clear();
+}
+
+py::dict AresSerial::get_node_config() {
+    NodeConfigs copy;
+    {
+        py::gil_scoped_release release;
+        std::unique_lock lock(_node_configs.sem);
+        copy.bandwidth = _node_configs.bandwidth;
+        copy.center_freq = _node_configs.center_freq;
+        copy.duration = _node_configs.duration;
+        copy.ref_level = _node_configs.ref_level;
+        copy.save_folder = _node_configs.save_folder;
+    }
+
+    py::dict ret;
+    ret[folder_dt] = copy.save_folder.time_point();
+    ret[bw] = copy.bandwidth;
+    ret[center_f] = copy.center_freq;
+    ret[duration] = copy.duration;
+    ret[ref_level] = copy.ref_level;
+
+    return ret;
 }
 
 void AresSerial::cancel_events() {
