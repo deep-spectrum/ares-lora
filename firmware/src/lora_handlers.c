@@ -98,39 +98,6 @@ static void handle_heartbeat(const struct ares_lora *lora,
     ares_serial_write_frame(serial, &frame);
 }
 
-static void ack_log(const struct ares_lora *lora,
-                    const struct ares_packet *packet) {
-    struct ares_packet ack = {
-        .type = ARES_PKT_TYPE_DIRECT,
-        .pan_id = modem_id.pan_id,
-        .destination_id = packet->source_id,
-        .source_id = modem_id.id,
-        .payload =
-            {
-                .type = ARES_PKT_PAYLOAD_LOG_ACK,
-                .payload.LOG_ACK =
-                    {
-                        .part = packet->payload.payload.LOG.part,
-                        .num_parts = packet->payload.payload.LOG.num_parts,
-                    },
-            },
-    };
-
-    DIRECTED_PACKET_REQUIRED(packet);
-
-    ares_lora_set_packet_id(lora, &ack);
-    ares_lora_write_packet(lora, &ack);
-
-#if IS_ENABLED(CONFIG_ARES_LORA_NOTIF_RX_PACKETS)
-    const struct ares_serial *serial = ares_serial_backend_uart_get_ptr();
-    struct ares_frame frame = {
-        .type = ARES_FRAME_PKT_TX,
-        .payload.PKT_TX = 1,
-    };
-    ares_serial_write_frame(serial, &frame);
-#endif
-}
-
 static void handle_log(const struct ares_lora *lora,
                        const struct ares_packet *packet) {
     const struct ares_serial *serial = ares_serial_backend_uart_get_ptr();
@@ -156,8 +123,6 @@ static void handle_log(const struct ares_lora *lora,
         frame.payload.DBG = ret;
         ares_serial_write_frame(serial, &frame);
     }
-
-    ack_log(lora, packet);
 }
 
 static void handle_log_ack(const struct ares_lora *lora,

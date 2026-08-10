@@ -419,6 +419,13 @@ static void deserialize(struct ares_frame *frame, const uint8_t *buf) {
         FDESERIALIZE_BUF(LOG.msg, const char *, LOG.msg_len);
         break;
     }
+    case ARES_FRAME_LOG_ACK: {
+        FDESERIALIZE(LOG_ACK.part);
+        FDESERIALIZE(LOG_ACK.num_parts);
+        FDESERIALIZE(LOG_ACK.id);
+        FDESERIALIZE(LOG_ACK.log_id);
+        break;
+    }
     case ARES_FRAME_VERSION: {
         // nop: This is a request so it doesn't make sense to look at the
         // payload
