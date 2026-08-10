@@ -13,6 +13,7 @@
 
 #include <ares-lora-serial/frames/lora/config/common.hpp>
 #include <ares-lora-serial/frames/payload_base.hpp>
+#include <utility>
 
 namespace AresFrame {
 /**
@@ -33,7 +34,7 @@ struct NodeConfig : Internal::FramePayloadBase {
      */
     explicit NodeConfig(uint16_t id_, NodeConfigType type_,
                         NodeConfigData config_)
-        : id(id_), type(type_), config(config_) {}
+        : id(id_), type(type_), config(std::move(config_)) {}
 
     /**
      * On transmission, the node id to send the configuration to. On

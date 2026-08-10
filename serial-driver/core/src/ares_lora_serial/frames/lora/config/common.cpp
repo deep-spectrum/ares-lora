@@ -12,25 +12,29 @@
 #include <ares/serialization.hpp>
 
 namespace AresFrame::Internal {
-void serialize_save_folder(const NodeConfigSaveFolder &config,
+void serialize_save_folder(const ares::DateTime &config,
                            uint64_t &config_item) {
-    ares::set_bitfield(config_item, 0, 20, config.microsecond);
-    ares::set_bitfield(config_item, 20, 6, config.second);
-    ares::set_bitfield(config_item, 26, 6, config.minute);
-    ares::set_bitfield(config_item, 32, 5, config.hour);
-    ares::set_bitfield(config_item, 37, 5, config.day);
-    ares::set_bitfield(config_item, 42, 4, config.month);
-    ares::set_bitfield(config_item, 46, 18, config.year);
+    ares::set_bitfield(config_item, 0, 20, config.microsecond());
+    ares::set_bitfield(config_item, 20, 6, config.second());
+    ares::set_bitfield(config_item, 26, 6, config.minute());
+    ares::set_bitfield(config_item, 32, 5, config.hour());
+    ares::set_bitfield(config_item, 37, 5, config.day());
+    ares::set_bitfield(config_item, 42, 4, config.month());
+    ares::set_bitfield(config_item, 46, 18, config.year());
 }
 
-void deserialize_save_folder(NodeConfigSaveFolder &config,
-                             uint64_t config_item) {
-    ares::get_bitfield(config_item, 0, 20, config.microsecond);
-    ares::get_bitfield(config_item, 20, 6, config.second);
-    ares::get_bitfield(config_item, 26, 6, config.minute);
-    ares::get_bitfield(config_item, 32, 5, config.hour);
-    ares::get_bitfield(config_item, 37, 5, config.day);
-    ares::get_bitfield(config_item, 42, 4, config.month);
-    ares::get_bitfield(config_item, 46, 18, config.year);
+void deserialize_save_folder(ares::DateTime &config, uint64_t config_item) {
+    int year = 0, month = 0, day = 0, hour = 0, minute = 0, second = 0,
+        microsecond = 0;
+    ares::get_bitfield(config_item, 0, 20, microsecond);
+    ares::get_bitfield(config_item, 20, 6, second);
+    ares::get_bitfield(config_item, 26, 6, minute);
+    ares::get_bitfield(config_item, 32, 5, hour);
+    ares::get_bitfield(config_item, 37, 5, day);
+    ares::get_bitfield(config_item, 42, 4, month);
+    ares::get_bitfield(config_item, 46, 18, year);
+
+    config =
+        ares::DateTime(year, month, day, hour, minute, second, microsecond);
 }
 } // namespace AresFrame::Internal

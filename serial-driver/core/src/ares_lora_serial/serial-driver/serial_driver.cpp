@@ -375,11 +375,18 @@ void AresSerial::_read_serial() {
 
 void AresSerial::_process_frames_helper() {
     bool stopped = false;
+    EventDispatcher dispatcher{*this};
+
     while (_tasks_running || !stopped) {
         AresFrame::Frame frame = _frame_q.get();
         LOG_DBG("Received frame %d", frame.type());
 
-        // todo: Do something with the frame.
+        if (frame.type() == AresFrame::DRIVER_STOP) {
+            stopped = _stop_event_queues();
+            continue;
+        }
+
+        std::visit(dispatcher, frame.rx_payload());
     }
 }
 
@@ -395,43 +402,6 @@ void AresSerial::_process_frames() {
                     exc.what());
         }
     }
-}
-
-void AresSerial::_process_response(const AresFrame::Frame &frame) {
-    FrameResponse response;
-
-    switch (frame.type()) {
-    case AresFrame::ACK: {
-        response.type = FrameResponse::ACK;
-        LOG_DBG("ACK");
-        break;
-    }
-    case AresFrame::FRAMING_ERROR: {
-        response.type = FrameResponse::BAD_FRAME;
-        LOG_DBG("FRAMING ERROR");
-        break;
-    }
-    default: {
-        response.type = FrameResponse::COMMAND_SPECIFIC;
-        LOG_DBG("COMMAND SPECIFIC RESPONSE");
-        break;
-    }
-    }
-
-    std::visit(
-        [&response](auto &&arg) {
-            using T = std::decay_t<decltype(arg)>;
-            if constexpr (std::is_constructible_v<decltype(response.payload),
-                                                  T>) {
-                response.payload = arg;
-            } else {
-                LOG_CRIT("Received a frame that cannot be returned as a frame "
-                         "response.");
-            }
-        },
-        frame.rx_payload());
-
-    _response_queue.put(response);
 }
 
 void AresSerial::_send_frame(AresFrame::Frame &frame,
@@ -578,4 +548,219 @@ bool AresSerial::_stop_event_queues() {
     success = queue_nullptr(_abortion_event_q) && success;
     success = queue_nullptr(_run_ready_event_q) && success;
     return success;
+}
+
+template <typename T, size_t size, bool overwrite>
+void put_no_except(const T &event,
+                   ares::bounded_queue<std::unique_ptr<T>, size, overwrite> &q,
+                   const std::chrono::milliseconds &timeout) {
+    try {
+        q.put(std::make_unique<T>(event), timeout);
+    } catch (ares::queue_exception &) {
+        // nop
+    }
+}
+
+void AresSerial::EventDispatcher::operator()(
+    const AresFrame::Start &event) const {
+    LOG_INF("Start event received: (%ld, %lu, %u, %d, %d, %u)", event.sec,
+            event.usec, event.id, event.broadcast, event.seq_cnt,
+            event.packet_id);
+
+    if (!event.broadcast) {
+        AresFrame::Frame response(
+            AresFrame::LORA_ACK,
+            AresFrame::LoraAck{event.id, AresFrame::START});
+        self._lora_response_q.put(response);
+    }
+
+    put_no_except(event, self._start_event_q, 100ms);
+}
+
+void AresSerial::EventDispatcher::operator()(
+    const AresFrame::Heartbeat &event) const {
+    LOG_INF("Heartbeat received from %d", event.id);
+    // todo: figure out what queue to use
+}
+
+void AresSerial::EventDispatcher::operator()(
+    const AresFrame::Poll &event) const {
+    LOG_INF("Poll event received");
+    AresFrame::Frame frame(AresFrame::HEARTBEAT,
+                           AresFrame::Heartbeat{self._ready, event.id});
+    self._lora_response_q.put(frame);
+}
+
+void AresSerial::EventDispatcher::operator()(
+    const AresFrame::Log &event) const {
+    LOG_INF("Log event received from %d", event.id);
+    LOG_DBG("Part %d of %d", event.part, event.num_parts);
+    LOG_DBG("Log message: %s", event.msg.c_str());
+    LOG_DBG("Log ID: %d", event.log_id);
+
+    put_no_except(event, self._log_event_q, 100ms);
+}
+
+void AresSerial::EventDispatcher::operator()(
+    const AresFrame::LogAck &event) const {
+    LOG_INF("Log ACK event received (part %d of %d, %d)", event.part,
+            event.num_parts, event.id);
+    // todo: log acks queue?
+}
+
+void AresSerial::EventDispatcher::operator()(
+    const AresFrame::Dbg &event) const {
+    if (event.code != 0) {
+        LOG_ERR("Received debug event: %d", event.code);
+    }
+}
+
+void AresSerial::EventDispatcher::operator()(
+    const AresFrame::PktRx &event) const {
+    LOG_DBG("Received packet (%u, %u, %u)", event.seq_cnt, event.packet_id,
+            event.src_id);
+    put_no_except(event, self._pkt_rx_event_q, 100ms);
+}
+
+void AresSerial::EventDispatcher::operator()(
+    const AresFrame::PktTx &event) const {
+    LOG_DBG("Transmitted %u times", event.count);
+    put_no_except(event, self._pkt_tx_event_q, 100ms);
+}
+
+void AresSerial::EventDispatcher::operator()(
+    const AresFrame::BleConnect &event) const {
+    LOG_DBG("Received BLE connect event (Connected: %d, MTU: %d)",
+            event.connected, event.chunk_size);
+    self._ble_info.connected = event.connected;
+    self._ble_info.mtu_size = event.chunk_size;
+    put_no_except(event, self._ble_connect_event_q, 100ms);
+}
+
+void AresSerial::EventDispatcher::operator()(
+    const AresFrame::BleSubscribed &event) const {
+    LOG_DBG("Received BLE subscription event (chunk: %d, image: %d)",
+            event.chunk, event.image);
+    self._ble_info.subscriptions.chunk = event.chunk;
+    self._ble_info.subscriptions.image = event.image;
+    put_no_except(event, self._ble_subscribed_event_q, 100ms);
+}
+
+void AresSerial::EventDispatcher::operator()(
+    const AresFrame::Abort &event) const {
+    LOG_INF("Abort event received (source id: %d, broadcast: %d)", event.id,
+            event.broadcast);
+
+    if (!event.broadcast) {
+        AresFrame::Frame frame(AresFrame::LORA_ACK,
+                               AresFrame::LoraAck{event.id, AresFrame::ABORT});
+        self._lora_response_q.put(frame);
+    }
+
+    put_no_except(event, self._abortion_event_q, 100ms);
+}
+
+void AresSerial::EventDispatcher::operator()(
+    const AresFrame::NodeConfig &event) const {
+    LOG_INF("Received node config message from %d (type: %d)", event.id,
+            static_cast<int>(event.type));
+
+    AresFrame::Frame frame(
+        AresFrame::LORA_ACK,
+        AresFrame::LoraAck{event.id, AresFrame::NODE_CONFIG});
+    self._lora_response_q.put(frame);
+
+    std::unique_lock lock(self._node_configs.sem);
+    switch (event.type) {
+    case AresFrame::SAVE_FOLDER: {
+        self._node_configs.save_folder = std::get<ares::DateTime>(event.config);
+        break;
+    }
+    case AresFrame::BANDWIDTH: {
+        self._node_configs.bandwidth = std::get<double>(event.config);
+        ;
+        break;
+    }
+    case AresFrame::CENTER_FREQ: {
+        self._node_configs.center_freq = std::get<double>(event.config);
+        break;
+    }
+    case AresFrame::REF_LEVEL: {
+        self._node_configs.ref_level = std::get<double>(event.config);
+        break;
+    }
+    case AresFrame::DURATION: {
+        self._node_configs.duration = std::get<uint32_t>(event.config);
+        break;
+    }
+    default: {
+        LOG_ERR("Received invalid node configuration");
+        break;
+    }
+    }
+}
+
+void AresSerial::EventDispatcher::operator()(
+    const AresFrame::NodeConfigPoll &event) const {
+    LOG_INF("Received node config poll request from %d (type: %d)", event.id,
+            event.type);
+
+    AresFrame::NodeConfigData config;
+    std::unique_lock lock(self._node_configs.sem);
+
+    switch (event.type) {
+    case AresFrame::SAVE_FOLDER: {
+        config = self._node_configs.save_folder;
+        break;
+    }
+    case AresFrame::BANDWIDTH: {
+        config = self._node_configs.bandwidth;
+        break;
+    }
+    case AresFrame::CENTER_FREQ: {
+        config = self._node_configs.center_freq;
+        break;
+    }
+    case AresFrame::REF_LEVEL: {
+        config = self._node_configs.ref_level;
+        break;
+    }
+    case AresFrame::DURATION: {
+        config = self._node_configs.duration;
+        break;
+    }
+    default: {
+        LOG_ERR("Invalid configuration polled for");
+        return;
+    }
+    }
+
+    lock.unlock();
+
+    AresFrame::Frame frame(
+        AresFrame::NODE_CONFIG_RESP,
+        AresFrame::NodeConfigResponse{event.id, event.type, config});
+    self._lora_response_q.put(frame);
+}
+
+void AresSerial::EventDispatcher::operator()(
+    const AresFrame::NodeConfigResponse &event) const {
+    LOG_INF("Node config response received from %d (type %d)", event.id,
+            event.type);
+    // todo???
+}
+
+void AresSerial::EventDispatcher::operator()(
+    const AresFrame::NodeReady &event) const {
+    LOG_INF("Received node ready event from %d (broadcast: %d)", event.id,
+            event.broadcast);
+
+    if (!event.broadcast) {
+        AresFrame::Frame frame(
+            AresFrame::LORA_ACK,
+            AresFrame::LoraAck{event.id, AresFrame::NODE_READY});
+        self._lora_response_q.put(frame);
+    }
+
+    put_no_except(event, self._run_ready_event_q, 100ms);
 }

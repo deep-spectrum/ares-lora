@@ -206,7 +206,6 @@ class AresSerial {
     ares::bounded_queue<FrameResponse> _response_queue;
     void _process_frames_helper();
     void _process_frames();
-    void _process_response(const AresFrame::Frame &frame);
 
     // Send frame stuff
     void _send_frame(AresFrame::Frame &frame,
@@ -245,6 +244,41 @@ class AresSerial {
         _run_ready_event_q;
     bool _stop_event_queues();
 
+    struct EventDispatcher {
+        AresSerial &self;
+
+        void operator()(const AresFrame::Start &event) const;
+        void operator()(const AresFrame::Heartbeat &event) const;
+        void operator()(const AresFrame::Poll &event) const;
+        void operator()(const AresFrame::Log &event) const;
+        void operator()(const AresFrame::LogAck &event) const;
+        void operator()(const AresFrame::Dbg &event) const;
+        void operator()(const AresFrame::PktRx &event) const;
+        void operator()(const AresFrame::PktTx &event) const;
+        void operator()(const AresFrame::BleConnect &event) const;
+        void operator()(const AresFrame::BleSubscribed &event) const;
+        void operator()(const AresFrame::Abort &event) const;
+        void operator()(const AresFrame::NodeConfig &event) const;
+        void operator()(const AresFrame::NodeConfigPoll &event) const;
+        void operator()(const AresFrame::NodeConfigResponse &event) const;
+        void operator()(const AresFrame::NodeReady &event) const;
+
+        template <typename T> void operator()(const T &event) {
+            FrameResponse response;
+            if constexpr (std::is_same_v<T, AresFrame::Ack>) {
+                response.type = FrameResponse::ACK;
+            } else if constexpr (std::is_same_v<T, AresFrame::FramingError>) {
+                response.type = FrameResponse::BAD_FRAME;
+            } else {
+                response.type = FrameResponse::COMMAND_SPECIFIC;
+            }
+
+            static_assert(
+                std::is_constructible_v<decltype(response.payload), T>);
+            response.payload = event;
+        }
+    };
+
     // Node configuration stuff
     struct NodeConfigs {
         NodeConfigs() = default;
@@ -258,6 +292,17 @@ class AresSerial {
         ares::semaphore<> sem{};
     };
     NodeConfigs _node_configs;
+
+    // BLE Stuff
+    struct BleInfo {
+        struct {
+            bool chunk = false;
+            bool image = false;
+        } subscriptions;
+        bool connected = false;
+        size_t mtu_size = 0;
+    };
+    BleInfo _ble_info;
 };
 
 #endif // ARES_SERIAL_DRIVER_HPP
