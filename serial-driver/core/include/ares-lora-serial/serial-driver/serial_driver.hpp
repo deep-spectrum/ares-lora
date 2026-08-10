@@ -189,7 +189,7 @@ class AresSerial {
         AresFrame::Frame::ResponseTypes payload;
     };
 
-    // Task related stuff
+    // Overall Task related stuff
     std::recursive_mutex _serial_lock;
     std::atomic_bool _tasks_running = false;
 
@@ -206,6 +206,7 @@ class AresSerial {
     ares::bounded_queue<FrameResponse> _response_queue;
     void _process_frames_helper();
     void _process_frames();
+    void _process_response(const AresFrame::Frame &frame);
 
     // Send frame stuff
     void _send_frame(AresFrame::Frame &frame,

@@ -397,6 +397,43 @@ void AresSerial::_process_frames() {
     }
 }
 
+void AresSerial::_process_response(const AresFrame::Frame &frame) {
+    FrameResponse response;
+
+    switch (frame.type()) {
+    case AresFrame::ACK: {
+        response.type = FrameResponse::ACK;
+        LOG_DBG("ACK");
+        break;
+    }
+    case AresFrame::FRAMING_ERROR: {
+        response.type = FrameResponse::BAD_FRAME;
+        LOG_DBG("FRAMING ERROR");
+        break;
+    }
+    default: {
+        response.type = FrameResponse::COMMAND_SPECIFIC;
+        LOG_DBG("COMMAND SPECIFIC RESPONSE");
+        break;
+    }
+    }
+
+    std::visit(
+        [&response](auto &&arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_constructible_v<decltype(response.payload),
+                                                  T>) {
+                response.payload = arg;
+            } else {
+                LOG_CRIT("Received a frame that cannot be returned as a frame "
+                         "response.");
+            }
+        },
+        frame.rx_payload());
+
+    _response_queue.put(response);
+}
+
 void AresSerial::_send_frame(AresFrame::Frame &frame,
                              const std::chrono::milliseconds &timeout,
                              std::vector<FrameResponse> &responses) {
