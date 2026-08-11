@@ -168,6 +168,8 @@ class AresSerial {
     py::dict get_node_config();
     void cancel_events();
 
+    friend class FrameDispatcher;
+
   private:
     // High level stuff
     Serial::Serial _serial;

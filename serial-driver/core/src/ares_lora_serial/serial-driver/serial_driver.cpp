@@ -8,6 +8,7 @@
  * @author Tom Schmitz \<tschmitz@andrew.cmu.edu\>
  */
 
+#include <ares-lora-serial/serial-driver/frame_dispatcher.hpp>
 #include <ares-lora-serial/serial-driver/serial_driver.hpp>
 #include <ares/logging/log.hpp>
 #include <ares/pyutil.hpp>
