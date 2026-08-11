@@ -11,6 +11,7 @@
 #ifndef ARES_ACK_HPP
 #define ARES_ACK_HPP
 
+#include <ares-lora-serial/frames/frame_types.hpp>
 #include <ares-lora-serial/frames/payload_base.hpp>
 
 namespace AresFrame {
@@ -19,6 +20,8 @@ namespace AresFrame {
  * Payload data for AresFrame::ACK frames.
  */
 struct Ack : Internal::FramePayloadBase {
+    static constexpr AresFrameType frame_type = ACK;
+
     /**
      * The acknowledgement error code.
      */

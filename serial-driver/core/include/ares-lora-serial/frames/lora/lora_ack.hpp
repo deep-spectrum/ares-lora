@@ -20,6 +20,8 @@ namespace AresFrame {
  * Payload data for AresFrame::LORA_ACK frames.
  */
 struct LoraAck : Internal::FramePayloadBase {
+    static constexpr AresFrameType frame_type = LORA_ACK;
+
     /**
      * Constructor.
      */

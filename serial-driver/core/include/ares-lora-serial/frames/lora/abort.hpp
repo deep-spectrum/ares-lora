@@ -11,6 +11,7 @@
 #ifndef ARES_ABORT_HPP
 #define ARES_ABORT_HPP
 
+#include <ares-lora-serial/frames/frame_types.hpp>
 #include <ares-lora-serial/frames/payload_base.hpp>
 
 namespace AresFrame {
@@ -19,6 +20,8 @@ namespace AresFrame {
  * Payload data for AresFrame::ABORT frames.
  */
 struct Abort : Internal::FramePayloadBase {
+    static constexpr AresFrameType frame_type = ABORT;
+
     /**
      * Constructor.
      */

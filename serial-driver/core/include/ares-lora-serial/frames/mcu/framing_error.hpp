@@ -11,6 +11,7 @@
 #ifndef ARES_FRAMING_ERROR_HPP
 #define ARES_FRAMING_ERROR_HPP
 
+#include <ares-lora-serial/frames/frame_types.hpp>
 #include <ares-lora-serial/frames/payload_base.hpp>
 
 namespace AresFrame {
@@ -19,6 +20,8 @@ namespace AresFrame {
  * Data for AresFrame::FRAMING_ERROR frames.
  */
 struct FramingError : Internal::FramePayloadBase {
+    static constexpr AresFrameType frame_type = FRAMING_ERROR;
+
     /**
      * @enum ErrorType
      * The different framing errors.

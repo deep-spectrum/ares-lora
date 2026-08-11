@@ -11,6 +11,7 @@
 #ifndef ARES_LOG_ACK_HPP
 #define ARES_LOG_ACK_HPP
 
+#include <ares-lora-serial/frames/frame_types.hpp>
 #include <ares-lora-serial/frames/payload_base.hpp>
 
 namespace AresFrame {
@@ -21,6 +22,8 @@ namespace AresFrame {
  * Data for AresFrame::LOG_ACK frames.
  */
 struct LogAck : Internal::FramePayloadBase {
+    static constexpr AresFrameType frame_type = LOG_ACK;
+
     /**
      * Constructor.
      * @param part See LogAck::part

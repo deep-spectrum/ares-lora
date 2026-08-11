@@ -11,6 +11,7 @@
 #ifndef ARES_NODE_CONFIG_RESPONSE_HPP
 #define ARES_NODE_CONFIG_RESPONSE_HPP
 
+#include <ares-lora-serial/frames/frame_types.hpp>
 #include <ares-lora-serial/frames/lora/config/common.hpp>
 #include <ares-lora-serial/frames/payload_base.hpp>
 #include <utility>
@@ -21,6 +22,8 @@ namespace AresFrame {
  * Payload data for AresFrame::NODE_CONFIG_RESPONSE frames.
  */
 struct NodeConfigResponse : Internal::FramePayloadBase {
+    static constexpr AresFrameType frame_type = NODE_CONFIG_RESP;
+
     /**
      * Constructor.
      */

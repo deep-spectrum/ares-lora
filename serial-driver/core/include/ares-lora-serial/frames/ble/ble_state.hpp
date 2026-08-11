@@ -11,6 +11,7 @@
 #ifndef ARES_BLE_STATE_HPP
 #define ARES_BLE_STATE_HPP
 
+#include <ares-lora-serial/frames/frame_types.hpp>
 #include <ares-lora-serial/frames/payload_base.hpp>
 
 namespace AresFrame {
@@ -20,6 +21,8 @@ namespace AresFrame {
  * Payload data for AresFrame::BLE_STATE frames.
  */
 struct BleState : Internal::FramePayloadBase {
+    static constexpr AresFrameType frame_type = BLE_STATE;
+
     /**
      * @enum State
      *

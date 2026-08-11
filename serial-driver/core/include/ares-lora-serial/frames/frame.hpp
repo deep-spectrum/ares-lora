@@ -94,10 +94,9 @@ class Frame {
 
     /**
      * Construct a transmit from.
-     * @param type The frame type.
      * @param tx_payload The structured payload of the frame.
      */
-    explicit Frame(AresFrameType type, const TxTypes &tx_payload);
+    explicit Frame(const TxTypes &tx_payload);
 
     /**
      * Constructor for decoding a received frame.

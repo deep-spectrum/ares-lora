@@ -11,6 +11,7 @@
 #ifndef ARES_LORA_CONFIG_HPP
 #define ARES_LORA_CONFIG_HPP
 
+#include <ares-lora-serial/frames/frame_types.hpp>
 #include <ares-lora-serial/frames/payload_base.hpp>
 
 namespace AresFrame {
@@ -21,6 +22,8 @@ namespace AresFrame {
  */
 
 struct LoraConfig : Internal::FramePayloadBase {
+    static constexpr AresFrameType frame_type = LORA_CONFIG;
+
     /**
      * Constructor.
      */

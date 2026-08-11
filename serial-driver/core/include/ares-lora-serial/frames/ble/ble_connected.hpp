@@ -11,6 +11,7 @@
 #ifndef ARES_BLE_CONNECTED_HPP
 #define ARES_BLE_CONNECTED_HPP
 
+#include <ares-lora-serial/frames/frame_types.hpp>
 #include <ares-lora-serial/frames/payload_base.hpp>
 
 namespace AresFrame {
@@ -21,6 +22,8 @@ namespace AresFrame {
  * Payload data for AresFrame::BLE_CONNECTED frames.
  */
 struct BleConnect : Internal::FramePayloadBase {
+    static constexpr AresFrameType frame_type = BLE_CONNECTED;
+
     /**
      * Flag indicating if the BLE is connected or not.
      */

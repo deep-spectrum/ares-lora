@@ -11,7 +11,9 @@
 #ifndef ARES_START_HPP
 #define ARES_START_HPP
 
+#include <ares-lora-serial/frames/frame_types.hpp>
 #include <ares-lora-serial/frames/payload_base.hpp>
+
 namespace AresFrame {
 /**
  * @struct Start
@@ -19,6 +21,8 @@ namespace AresFrame {
  * Data for AresFrame::START frames.
  */
 struct Start : Internal::FramePayloadBase {
+    static constexpr AresFrameType frame_type = START;
+
     /**
      * Constructor.
      */
