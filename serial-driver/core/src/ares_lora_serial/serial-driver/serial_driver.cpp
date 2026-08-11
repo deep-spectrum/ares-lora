@@ -36,7 +36,6 @@ AresLoraConfig::AresLoraConfig(const py::kwargs &kwargs) {
 
 AresFrame::Frame AresLoraConfig::generate_frame() const {
     return AresFrame::Frame(
-        AresFrame::LORA_CONFIG,
         AresFrame::LoraConfig(frequency, preamble_length, bandwidth, datarate,
                               coding_rate, tx_power, 0, 0, 0, 0));
 }
@@ -263,8 +262,7 @@ void AresSerial::stop_driver() {
     _tasks_running = false;
     _rx_task.join();
 
-    AresFrame::Frame terminate_request{AresFrame::DRIVER_STOP,
-                                       std::monostate()};
+    AresFrame::Frame terminate_request{std::monostate()};
     bool failed_proc_task_shutdown = stop_driver_task(
         _processing_task, _frame_q, terminate_request, max_attempts);
     bool failed_lora_resp_task_shutdown = stop_driver_task(
@@ -570,7 +568,6 @@ void AresSerial::EventDispatcher::operator()(
 
     if (!event.broadcast) {
         AresFrame::Frame response(
-            AresFrame::LORA_ACK,
             AresFrame::LoraAck{event.id, AresFrame::START});
         self._lora_response_q.put(response);
     }
@@ -588,8 +585,7 @@ void AresSerial::EventDispatcher::operator()(
 void AresSerial::EventDispatcher::operator()(
     const AresFrame::Poll &event) const {
     LOG_INF("Poll event received");
-    AresFrame::Frame frame(AresFrame::HEARTBEAT,
-                           AresFrame::Heartbeat{self._ready, event.id});
+    AresFrame::Frame frame(AresFrame::Heartbeat{self._ready, event.id});
     self._lora_response_q.put(frame);
 }
 
@@ -655,8 +651,7 @@ void AresSerial::EventDispatcher::operator()(
             event.broadcast);
 
     if (!event.broadcast) {
-        AresFrame::Frame frame(AresFrame::LORA_ACK,
-                               AresFrame::LoraAck{event.id, AresFrame::ABORT});
+        AresFrame::Frame frame(AresFrame::LoraAck{event.id, AresFrame::ABORT});
         self._lora_response_q.put(frame);
     }
 
@@ -669,7 +664,6 @@ void AresSerial::EventDispatcher::operator()(
             static_cast<int>(event.type));
 
     AresFrame::Frame frame(
-        AresFrame::LORA_ACK,
         AresFrame::LoraAck{event.id, AresFrame::NODE_CONFIG});
     self._lora_response_q.put(frame);
 
@@ -741,7 +735,6 @@ void AresSerial::EventDispatcher::operator()(
     lock.unlock();
 
     AresFrame::Frame frame(
-        AresFrame::NODE_CONFIG_RESP,
         AresFrame::NodeConfigResponse{event.id, event.type, config});
     self._lora_response_q.put(frame);
 }
@@ -761,7 +754,6 @@ void AresSerial::EventDispatcher::operator()(
 
     if (!event.broadcast) {
         AresFrame::Frame frame(
-            AresFrame::LORA_ACK,
             AresFrame::LoraAck{event.id, AresFrame::NODE_READY});
         self._lora_response_q.put(frame);
     }
