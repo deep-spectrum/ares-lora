@@ -237,7 +237,7 @@ template <typename Signature, typename QueueType, size_t size, bool overwrite>
 static bool
 stop_driver_task(ares::Task<Signature> &task,
                  ares::bounded_queue<QueueType, size, overwrite> &queue,
-                 QueueType &terminate_val, size_t max_attempts) {
+                 const QueueType &terminate_val, size_t max_attempts) {
     size_t retries = 0;
 
     queue.clear();
@@ -265,8 +265,9 @@ void AresSerial::stop_driver() {
     AresFrame::Frame terminate_request{std::monostate()};
     bool failed_proc_task_shutdown = stop_driver_task(
         _processing_task, _frame_q, terminate_request, max_attempts);
-    bool failed_lora_resp_task_shutdown = stop_driver_task(
-        _lora_response_task, _lora_response_q, terminate_request, max_attempts);
+    bool failed_lora_resp_task_shutdown =
+        stop_driver_task(_lora_response_task, _lora_response_q,
+                         terminate_request.tx_payload(), max_attempts);
 
     if (failed_proc_task_shutdown || failed_lora_resp_task_shutdown) {
         std::stringstream ss;
@@ -403,77 +404,15 @@ void AresSerial::_process_frames() {
     }
 }
 
-void AresSerial::_send_frame(AresFrame::Frame &frame,
-                             const std::chrono::milliseconds &timeout,
-                             std::vector<FrameResponse> &responses) {
-    py::gil_scoped_release release;
-    _send_frame_released(frame, timeout, responses);
-}
-
-void AresSerial::_send_frame_released(AresFrame::Frame &frame,
-                                      const std::chrono::milliseconds &timeout,
-                                      std::vector<FrameResponse> &responses) {
-    std::unique_lock lock(_command_lock, std::defer_lock);
-    std::vector<uint8_t> buf;
-
-    do {
-        lock.lock();
-        frame.serialize(buf);
-        _response_queue.clear();
-        _send_frame_released(buf);
-        responses.emplace_back(_wait_response(timeout));
-        lock.unlock();
-        check_python_errors();
-    } while (frame.frame_available());
-}
-
-void AresSerial::_send_frame_released(const std::vector<uint8_t> &buf) {
-    LOG_DBG_HEXDUMP(buf, buf.size(), "Sending frame");
-    std::unique_lock lock(_serial_lock);
-    _serial.write(buf);
-}
-
-AresSerial::FrameResponse
-AresSerial::_wait_response(const std::chrono::milliseconds &timeout) {
-    if (timeout == ares::forever) {
-        return _wait_response_forever();
-    }
-
-    return _wait_response_timeout(timeout);
-}
-
-AresSerial::FrameResponse
-AresSerial::_wait_response_timeout(const std::chrono::milliseconds &timeout) {
-    FrameResponse response;
-
-    try {
-        response = _response_queue.get(timeout);
-    } catch (const ares::queue_exception &exc) {
-        if (exc.reason() == ares::queue_exception::QUEUE_TIMEOUT) {
-            throw AresTimeoutError(exc.what());
-        }
-        throw;
-    }
-
-    return response;
-}
-
-AresSerial::FrameResponse AresSerial::_wait_response_forever() {
-    // TODO: This will block Python exceptions. Add a lambda to queue.get to
-    // check some condition.
-    return _response_queue.get();
-}
-
 void AresSerial::_lora_responses_check_fw_responses(
     const std::vector<FrameResponse> &responses,
-    const AresFrame::Frame &sent_frame) {
+    const AresFrame::AresFrameType &sent_type) {
 
     for (const auto &response : responses) {
         switch (response.type) {
         case FrameResponse::ACK: {
             LOG_DBG("Firmware responded to frame %d with ACK code %d",
-                    sent_frame.type(),
-                    std::get<AresFrame::Ack>(response.payload).code);
+                    sent_type, std::get<AresFrame::Ack>(response.payload).code);
             break;
         }
         case FrameResponse::BAD_FRAME: {
@@ -492,19 +431,22 @@ void AresSerial::_lora_responses_check_fw_responses(
 void AresSerial::_send_lora_responses_helper() {
     while (_tasks_running) {
         std::vector<FrameResponse> responses;
-        auto frame = _lora_response_q.get();
+        auto payload = _lora_response_q.get();
 
-        if (frame.type() == AresFrame::DRIVER_STOP) {
+        if (std::holds_alternative<std::monostate>(payload)) {
             continue;
         }
 
+        FrameDispatcher dispatcher(*this, _send_lora_response_timeout);
+
         try {
-            _send_frame_released(frame, _send_lora_response_timeout, responses);
+            dispatcher.send_frame(payload, responses);
         } catch (const std::exception &exc) {
             LOG_ERR("_send_frame_released(): %s", exc.what());
         }
 
-        _lora_responses_check_fw_responses(responses, frame);
+        _lora_responses_check_fw_responses(responses,
+                                           dispatcher.type_dispatched());
     }
 }
 
@@ -567,9 +509,8 @@ void AresSerial::EventDispatcher::operator()(
             event.packet_id);
 
     if (!event.broadcast) {
-        AresFrame::Frame response(
+        self._lora_response_q.put(
             AresFrame::LoraAck{event.id, AresFrame::START});
-        self._lora_response_q.put(response);
     }
 
     put_no_except(event, self._start_event_q, 100ms);
@@ -585,8 +526,7 @@ void AresSerial::EventDispatcher::operator()(
 void AresSerial::EventDispatcher::operator()(
     const AresFrame::Poll &event) const {
     LOG_INF("Poll event received");
-    AresFrame::Frame frame(AresFrame::Heartbeat{self._ready, event.id});
-    self._lora_response_q.put(frame);
+    self._lora_response_q.put(AresFrame::Heartbeat{self._ready, event.id});
 }
 
 void AresSerial::EventDispatcher::operator()(
@@ -651,8 +591,8 @@ void AresSerial::EventDispatcher::operator()(
             event.broadcast);
 
     if (!event.broadcast) {
-        AresFrame::Frame frame(AresFrame::LoraAck{event.id, AresFrame::ABORT});
-        self._lora_response_q.put(frame);
+        self._lora_response_q.put(
+            AresFrame::LoraAck{event.id, AresFrame::ABORT});
     }
 
     put_no_except(event, self._abortion_event_q, 100ms);
@@ -663,9 +603,8 @@ void AresSerial::EventDispatcher::operator()(
     LOG_INF("Received node config message from %d (type: %d)", event.id,
             static_cast<int>(event.type));
 
-    AresFrame::Frame frame(
+    self._lora_response_q.put(
         AresFrame::LoraAck{event.id, AresFrame::NODE_CONFIG});
-    self._lora_response_q.put(frame);
 
     std::unique_lock lock(self._node_configs.sem);
     switch (event.type) {
@@ -734,9 +673,8 @@ void AresSerial::EventDispatcher::operator()(
 
     lock.unlock();
 
-    AresFrame::Frame frame(
+    self._lora_response_q.put(
         AresFrame::NodeConfigResponse{event.id, event.type, config});
-    self._lora_response_q.put(frame);
 }
 
 void AresSerial::EventDispatcher::operator()(
@@ -753,9 +691,8 @@ void AresSerial::EventDispatcher::operator()(
             event.broadcast);
 
     if (!event.broadcast) {
-        AresFrame::Frame frame(
+        self._lora_response_q.put(
             AresFrame::LoraAck{event.id, AresFrame::NODE_READY});
-        self._lora_response_q.put(frame);
     }
 
     put_no_except(event, self._run_ready_event_q, 100ms);

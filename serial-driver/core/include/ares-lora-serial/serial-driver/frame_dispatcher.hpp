@@ -21,12 +21,20 @@ namespace py = pybind11;
 class FrameDispatcher {
   public:
     FrameDispatcher(AresSerial &serial, const py::kwargs &kwargs)
-        : _serial(serial), _kwargs(kwargs) {
+        : _serial(serial) {
         ares::from_kwargs(kwargs, SP(response_timeout), SP(ack_timeout),
                           SP(retries), SP(broadcast), SP(destination));
     }
+    FrameDispatcher(AresSerial &serial,
+                    std::chrono::milliseconds response_timeout)
+        : _serial(serial), response_timeout(response_timeout),
+          lora_fields_already_set(true) {}
 
     py::dict send_frame(AresFrame::Frame::TxTypes &payload);
+    void send_frame(AresFrame::Frame::TxTypes &payload,
+                    std::vector<AresSerial::FrameResponse> &responses);
+
+    [[nodiscard]] AresFrame::AresFrameType type_dispatched() const;
 
   private:
     AresSerial &_serial;
@@ -35,13 +43,12 @@ class FrameDispatcher {
     uint32_t retries = 0;
     bool broadcast = false;
     uint16_t destination = 0;
+    const bool lora_fields_already_set = false;
 
     bool is_lora_payload = false;
-    AresFrame::AresFrameType type_dispatched = AresFrame::UNKNOWN;
+    AresFrame::AresFrameType _type_dispatched = AresFrame::UNKNOWN;
     bool broadcast_supported = false;
     bool lora_response_supported = false;
-
-    const py::kwargs &_kwargs;
 
     void _send_frame(AresFrame::Frame &frame,
                      const std::chrono::milliseconds &timeout,

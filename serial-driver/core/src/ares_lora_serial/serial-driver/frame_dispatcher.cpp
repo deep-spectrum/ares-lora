@@ -100,7 +100,6 @@ py::dict FrameDispatcher::send_frame(AresFrame::Frame::TxTypes &payload) {
     lora_response_supported = frame_has_response_type(payload);
 
     AresFrame::Frame frame(payload);
-    type_dispatched = frame.type();
     std::vector<AresSerial::FrameResponse> responses;
 
     _send_frame(frame, response_timeout, responses);
@@ -109,6 +108,18 @@ py::dict FrameDispatcher::send_frame(AresFrame::Frame::TxTypes &payload) {
 
     // todo
     return ret;
+}
+
+void FrameDispatcher::send_frame(
+    AresFrame::Frame::TxTypes &payload,
+    std::vector<AresSerial::FrameResponse> &responses) {
+    AresFrame::Frame frame(payload);
+    _type_dispatched = frame.type();
+    _send_frame(frame, response_timeout, responses);
+}
+
+AresFrame::AresFrameType FrameDispatcher::type_dispatched() const {
+    return _type_dispatched;
 }
 
 void FrameDispatcher::_send_frame(

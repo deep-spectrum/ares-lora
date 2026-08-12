@@ -209,26 +209,13 @@ class AresSerial {
     void _process_frames_helper();
     void _process_frames();
 
-    // Send frame stuff
-    void _send_frame(AresFrame::Frame &frame,
-                     const std::chrono::milliseconds &timeout,
-                     std::vector<FrameResponse> &responses);
-    void _send_frame_released(AresFrame::Frame &frame,
-                              const std::chrono::milliseconds &timeout,
-                              std::vector<FrameResponse> &responses);
-    void _send_frame_released(const std::vector<uint8_t> &buf);
-    FrameResponse _wait_response(const std::chrono::milliseconds &timeout);
-    FrameResponse
-    _wait_response_timeout(const std::chrono::milliseconds &timeout);
-    FrameResponse _wait_response_forever();
-
     // Lora response task stuff
     ares::Task<void()> _lora_response_task;
-    ares::bounded_queue<AresFrame::Frame, 10> _lora_response_q;
+    ares::bounded_queue<AresFrame::Frame::TxTypes, 10> _lora_response_q;
     std::chrono::milliseconds _send_lora_response_timeout = 10s;
     static void _lora_responses_check_fw_responses(
         const std::vector<FrameResponse> &responses,
-        const AresFrame::Frame &sent_frame);
+        const AresFrame::AresFrameType &sent_type);
     void _send_lora_responses_helper();
     void _send_lora_responses();
 
