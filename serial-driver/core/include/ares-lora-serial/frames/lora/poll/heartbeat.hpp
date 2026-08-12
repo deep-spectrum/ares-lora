@@ -66,6 +66,13 @@ struct Heartbeat : Internal::FramePayloadBase, Internal::LoraBase {
      */
     void deserialize(const uint8_t *buffer, std::size_t len) override;
 
+    /**
+     * Equivalence operator.
+     * @param[in] rhs The other object to compare against.
+     * @return `true` if all applicable fields are equal, `false` otherwise.
+     */
+    bool operator==(const Heartbeat &rhs) const;
+
   private:
     static constexpr std::size_t _payload_size = 3;
 };

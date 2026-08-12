@@ -35,4 +35,6 @@ void Heartbeat::deserialize(const uint8_t *buffer, std::size_t len) {
     ares::deserialize(buffer, flags, id);
     ares::get_flags(flags, ready);
 }
+
+bool Heartbeat::operator==(const Heartbeat &rhs) const { return id == rhs.id; }
 } // namespace AresFrame

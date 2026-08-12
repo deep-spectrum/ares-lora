@@ -80,4 +80,8 @@ void NodeConfigResponse::deserialize(const uint8_t *buffer, std::size_t len) {
     }
     }
 }
+
+bool NodeConfigResponse::operator==(const NodeConfigResponse &rhs) const {
+    return type == rhs.type && id == rhs.id;
+}
 } // namespace AresFrame
