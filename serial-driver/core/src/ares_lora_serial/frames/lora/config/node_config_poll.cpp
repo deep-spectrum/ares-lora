@@ -28,4 +28,8 @@ void NodeConfigPoll::deserialize(const uint8_t *buffer, std::size_t len) {
 
     ares::deserialize(buffer, id, type);
 }
+
+NodeConfigPoll::response_type NodeConfigPoll::expected_response() const {
+    return response_type{id, type, std::monostate()};
+}
 } // namespace AresFrame

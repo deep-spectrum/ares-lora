@@ -32,4 +32,8 @@ void NodeReady::deserialize(const uint8_t *buffer, std::size_t len) {
     ares::deserialize(buffer, flags, id);
     ares::get_flags(flags, broadcast);
 }
+
+NodeReady::response_type NodeReady::expected_response() const {
+    return response_type{id, frame_type};
+}
 } // namespace AresFrame

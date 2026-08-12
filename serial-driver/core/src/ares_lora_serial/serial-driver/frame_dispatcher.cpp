@@ -40,7 +40,8 @@ template <typename T, typename = void>
 struct has_response_type : std::false_type {};
 
 template <typename T>
-struct has_response_type<T, std::void_t<typename T::response_type>> : std::true_type {};
+struct has_response_type<T, std::void_t<typename T::response_type>>
+    : std::true_type {};
 
 template <typename T>
 inline constexpr bool has_response_type_v = has_response_type<T>::value;
@@ -82,12 +83,14 @@ static bool is_lora_frame(AresFrame::Frame::TxTypes &payload) {
 }
 
 static bool frame_has_response_type(AresFrame::Frame::TxTypes &payload) {
-    return std::visit([](const auto &obj) {
-        if constexpr (has_response_type_v<decltype(obj)>) {
-            return true;
-        }
-        return false;
-    }, payload);
+    return std::visit(
+        [](const auto &obj) {
+            if constexpr (has_response_type_v<decltype(obj)>) {
+                return true;
+            }
+            return false;
+        },
+        payload);
 }
 
 py::dict FrameDispatcher::send_frame(AresFrame::Frame::TxTypes &payload) {

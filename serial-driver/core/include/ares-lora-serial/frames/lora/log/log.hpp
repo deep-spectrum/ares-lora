@@ -122,6 +122,12 @@ struct Log : Internal::FramePayloadBase, Internal::LoraBase {
      */
     [[nodiscard]] size_t num_frames() const override;
 
+    /**
+     * Retrieve the expected response message.
+     * @return The expected response message.
+     */
+    [[nodiscard]] response_type expected_response() const;
+
   private:
     std::vector<std::string> _msg_split;
     size_t _idx = 0;

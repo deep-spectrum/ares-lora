@@ -95,6 +95,12 @@ struct Start : Internal::FramePayloadBase, Internal::LoraBase {
      */
     void deserialize(const uint8_t *buffer, std::size_t len) override;
 
+    /**
+     * Retrieve the expected response message.
+     * @return The expected response message.
+     */
+    [[nodiscard]] response_type expected_response() const;
+
   private:
     static constexpr std::size_t _payload_size = 22;
 };

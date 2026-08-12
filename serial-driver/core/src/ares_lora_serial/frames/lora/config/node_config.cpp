@@ -80,4 +80,8 @@ void NodeConfig::deserialize(const uint8_t *buffer, std::size_t len) {
     }
     }
 }
+
+NodeConfig::response_type NodeConfig::expected_response() const {
+    return response_type{id, frame_type};
+}
 } // namespace AresFrame
