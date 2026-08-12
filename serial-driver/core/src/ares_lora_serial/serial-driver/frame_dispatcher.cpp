@@ -72,7 +72,7 @@ static bool set_lora_broadcast(AresFrame::Frame::TxTypes &payload,
 
 static bool is_lora_frame(AresFrame::Frame::TxTypes &payload) {
     return std::visit(
-        [](const auto &obj) {
+        []([[maybe_unused]] const auto &obj) {
             if constexpr (std::is_base_of_v<AresFrame::Internal::LoraBase,
                                             std::decay_t<decltype(obj)>>) {
                 return true;
@@ -84,7 +84,7 @@ static bool is_lora_frame(AresFrame::Frame::TxTypes &payload) {
 
 static bool frame_has_response_type(AresFrame::Frame::TxTypes &payload) {
     return std::visit(
-        [](const auto &obj) {
+        []([[maybe_unused]] const auto &obj) {
             if constexpr (has_response_type_v<decltype(obj)>) {
                 return true;
             }
@@ -99,14 +99,14 @@ py::dict FrameDispatcher::send_frame(AresFrame::Frame::TxTypes &payload) {
     is_lora_payload = is_lora_frame(payload);
     lora_response_supported = frame_has_response_type(payload);
 
-    AresFrame::Frame frame(payload);
     std::vector<AresSerial::FrameResponse> responses;
 
-    _send_frame(frame, response_timeout, responses);
+    send_frame(payload, responses);
+    // todo: how the fuck do I handle lora responses?
 
     py::dict ret;
 
-    // todo
+    // todo: How do I process responses?
     return ret;
 }
 
@@ -134,11 +134,26 @@ void FrameDispatcher::_send_frame_released(
     std::vector<AresSerial::FrameResponse> &responses) const {
     std::unique_lock lock(_serial._command_lock, std::defer_lock);
     std::vector<uint8_t> buf;
+    size_t acked_frames = 0;
 
     do {
-        lock.lock();
         frame.serialize(buf);
-        _serial._response_queue.clear();
+
+        bool acked = false;
+
+        for (size_t attempt = 0u; attempt < (retries + 1) && !acked; attempt++) {
+            lock.lock();
+            _serial._response_queue.clear();
+            AresSerial::FrameResponse resp = _wait_response(response_timeout);
+            lock.unlock();
+            // Todo: check response (not frame error, ACK code 0)
+            check_python_errors();
+            // todo: check for lora ack here
+
+        }
+        // todo: insert response here
+
+
         _send_frame_released(buf);
         responses.emplace_back(_wait_response(timeout));
         lock.unlock();

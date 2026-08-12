@@ -20,8 +20,9 @@ namespace py = pybind11;
 
 class FrameDispatcher {
   public:
-    FrameDispatcher(AresSerial &serial, const py::kwargs &kwargs)
-        : _serial(serial) {
+    FrameDispatcher(AresSerial &serial, bool cmd_specific_supported,
+                    const py::kwargs &kwargs)
+        : _serial(serial), command_specific_supported(cmd_specific_supported) {
         ares::from_kwargs(kwargs, SP(response_timeout), SP(ack_timeout),
                           SP(retries), SP(broadcast), SP(destination));
     }
@@ -49,6 +50,7 @@ class FrameDispatcher {
     AresFrame::AresFrameType _type_dispatched = AresFrame::UNKNOWN;
     bool broadcast_supported = false;
     bool lora_response_supported = false;
+    bool command_specific_supported = false;
 
     void _send_frame(AresFrame::Frame &frame,
                      const std::chrono::milliseconds &timeout,
