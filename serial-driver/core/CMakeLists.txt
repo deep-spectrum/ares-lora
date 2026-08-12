@@ -69,6 +69,7 @@ set(ARES_SERIAL_DRIVER_SRC
 
         # Top level
         src/ares_lora_serial/serial-driver/serial_driver.cpp
+        src/ares_lora_serial/serial-driver/frame_dispatcher.cpp
 )
 
 set(PACKAGE_NAME ares_lora_serial_core)
