@@ -13,6 +13,7 @@
 
 #include <ares-lora-serial/frames/frame_types.hpp>
 #include <ares-lora-serial/frames/lora/lora_base.hpp>
+#include <ares-lora-serial/frames/lora/poll/heartbeat.hpp>
 #include <ares-lora-serial/frames/payload_base.hpp>
 
 namespace AresFrame {
@@ -23,6 +24,7 @@ namespace AresFrame {
  */
 struct Poll : Internal::FramePayloadBase, Internal::LoraBase {
     static constexpr AresFrameType frame_type = POLL;
+    using response_type = Heartbeat;
 
     /**
      * Constructor.

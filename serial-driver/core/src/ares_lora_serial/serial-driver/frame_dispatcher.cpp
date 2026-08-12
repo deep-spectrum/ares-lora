@@ -36,6 +36,15 @@ struct has_member_broadcast<T,
 template <typename T>
 inline constexpr bool has_member_broadcast_v = has_member_broadcast<T>::value;
 
+template <typename T, typename = void>
+struct has_response_type : std::false_type {};
+
+template <typename T>
+struct has_response_type<T, std::void_t<typename T::response_type>> : std::true_type {};
+
+template <typename T>
+inline constexpr bool has_response_type_v = has_response_type<T>::value;
+
 static void set_lora_destination_id(AresFrame::Frame::TxTypes &payload,
                                     uint16_t destination) {
     std::visit(
@@ -62,7 +71,7 @@ static bool set_lora_broadcast(AresFrame::Frame::TxTypes &payload,
 
 static bool is_lora_frame(AresFrame::Frame::TxTypes &payload) {
     return std::visit(
-        [](auto &obj) {
+        [](const auto &obj) {
             if constexpr (std::is_base_of_v<AresFrame::Internal::LoraBase,
                                             std::decay_t<decltype(obj)>>) {
                 return true;
@@ -72,10 +81,20 @@ static bool is_lora_frame(AresFrame::Frame::TxTypes &payload) {
         payload);
 }
 
+static bool frame_has_response_type(AresFrame::Frame::TxTypes &payload) {
+    return std::visit([](const auto &obj) {
+        if constexpr (has_response_type_v<decltype(obj)>) {
+            return true;
+        }
+        return false;
+    }, payload);
+}
+
 py::dict FrameDispatcher::send_frame(AresFrame::Frame::TxTypes &payload) {
     set_lora_destination_id(payload, destination);
     broadcast_supported = set_lora_broadcast(payload, broadcast);
     is_lora_payload = is_lora_frame(payload);
+    lora_response_supported = frame_has_response_type(payload);
 
     AresFrame::Frame frame(payload);
     type_dispatched = frame.type();

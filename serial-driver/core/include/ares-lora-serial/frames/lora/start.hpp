@@ -12,6 +12,7 @@
 #define ARES_START_HPP
 
 #include <ares-lora-serial/frames/frame_types.hpp>
+#include <ares-lora-serial/frames/lora/lora_ack.hpp>
 #include <ares-lora-serial/frames/lora/lora_base.hpp>
 #include <ares-lora-serial/frames/payload_base.hpp>
 
@@ -23,6 +24,7 @@ namespace AresFrame {
  */
 struct Start : Internal::FramePayloadBase, Internal::LoraBase {
     static constexpr AresFrameType frame_type = START;
+    using response_type = LoraAck;
 
     /**
      * Constructor.

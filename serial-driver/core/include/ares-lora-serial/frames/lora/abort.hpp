@@ -12,6 +12,7 @@
 #define ARES_ABORT_HPP
 
 #include <ares-lora-serial/frames/frame_types.hpp>
+#include <ares-lora-serial/frames/lora/lora_ack.hpp>
 #include <ares-lora-serial/frames/lora/lora_base.hpp>
 #include <ares-lora-serial/frames/payload_base.hpp>
 
@@ -22,6 +23,7 @@ namespace AresFrame {
  */
 struct Abort : Internal::FramePayloadBase, Internal::LoraBase {
     static constexpr AresFrameType frame_type = ABORT;
+    using response_type = LoraAck;
 
     /**
      * Constructor.

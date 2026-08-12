@@ -39,6 +39,7 @@ class FrameDispatcher {
     bool is_lora_payload = false;
     AresFrame::AresFrameType type_dispatched = AresFrame::UNKNOWN;
     bool broadcast_supported = false;
+    bool lora_response_supported = false;
 
     const py::kwargs &_kwargs;
 
