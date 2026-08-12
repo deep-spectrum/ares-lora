@@ -13,6 +13,7 @@
 
 #include <ares-lora-serial/frames/frame_types.hpp>
 #include <ares-lora-serial/frames/lora/config/common.hpp>
+#include <ares-lora-serial/frames/lora/lora_base.hpp>
 #include <ares-lora-serial/frames/payload_base.hpp>
 
 namespace AresFrame {
@@ -20,7 +21,7 @@ namespace AresFrame {
  * @struct NodeConfigPoll
  * Payload for AresFrame::NODE_CONFIG_POLL frames
  */
-struct NodeConfigPoll : Internal::FramePayloadBase {
+struct NodeConfigPoll : Internal::FramePayloadBase, Internal::LoraBase {
     static constexpr AresFrameType frame_type = NODE_CONFIG_POLL;
 
     /**
