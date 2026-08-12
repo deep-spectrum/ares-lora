@@ -8,6 +8,7 @@
  * @author Tom Schmitz \<tschmitz@andrew.cmu.edu\>
  */
 
+#include <ares-lora-serial/frames/lora/lora_base.hpp>
 #include <ares-lora-serial/serial-driver/frame_dispatcher.hpp>
 #include <string>
 #include <type_traits>
@@ -46,28 +47,46 @@ static void set_lora_destination_id(AresFrame::Frame::TxTypes &payload,
         payload);
 }
 
-static void set_lora_broadcast(AresFrame::Frame::TxTypes &payload,
+static bool set_lora_broadcast(AresFrame::Frame::TxTypes &payload,
                                bool broadcast) {
-    std::visit(
+    return std::visit(
         [&broadcast](auto &obj) {
             if constexpr (has_member_broadcast_v<std::decay_t<decltype(obj)>>) {
                 obj.broadcast = broadcast;
+                return true;
             }
+            return false;
         },
         payload);
 }
 
-py::tuple FrameDispatcher::send_frame(AresFrame::Frame::TxTypes &payload) {
+static bool is_lora_frame(AresFrame::Frame::TxTypes &payload) {
+    return std::visit(
+        [](auto &obj) {
+            if constexpr (std::is_base_of_v<AresFrame::Internal::LoraBase,
+                                            std::decay_t<decltype(obj)>>) {
+                return true;
+            }
+            return false;
+        },
+        payload);
+}
+
+py::dict FrameDispatcher::send_frame(AresFrame::Frame::TxTypes &payload) {
     set_lora_destination_id(payload, destination);
-    set_lora_broadcast(payload, broadcast);
+    broadcast_supported = set_lora_broadcast(payload, broadcast);
+    is_lora_payload = is_lora_frame(payload);
 
     AresFrame::Frame frame(payload);
+    type_dispatched = frame.type();
     std::vector<AresSerial::FrameResponse> responses;
 
     _send_frame(frame, response_timeout, responses);
 
+    py::dict ret;
+
     // todo
-    return py::tuple();
+    return ret;
 }
 
 void FrameDispatcher::_send_frame(

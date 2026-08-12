@@ -26,7 +26,7 @@ class FrameDispatcher {
                           SP(retries), SP(broadcast), SP(destination));
     }
 
-    py::tuple send_frame(AresFrame::Frame::TxTypes &payload);
+    py::dict send_frame(AresFrame::Frame::TxTypes &payload);
 
   private:
     AresSerial &_serial;
@@ -35,6 +35,10 @@ class FrameDispatcher {
     uint32_t retries = 0;
     bool broadcast = false;
     uint16_t destination = 0;
+
+    bool is_lora_payload = false;
+    AresFrame::AresFrameType type_dispatched = AresFrame::UNKNOWN;
+    bool broadcast_supported = false;
 
     const py::kwargs &_kwargs;
 
