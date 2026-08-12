@@ -40,19 +40,18 @@ class FrameDispatcher {
 
     void _send_frame(AresFrame::Frame &frame,
                      const std::chrono::milliseconds &timeout,
-                     std::vector<AresSerial::FrameResponse> &responses);
-    void
-    _send_frame_released(AresFrame::Frame &frame,
-                         const std::chrono::milliseconds &timeout,
-                         std::vector<AresSerial::FrameResponse> &responses);
-    void _send_frame_released(const std::vector<uint8_t> &buf);
-    AresSerial::FrameResponse
-    _wait_response(const std::chrono::milliseconds &timeout);
-    AresSerial::FrameResponse
-    _wait_response_timeout(const std::chrono::milliseconds &timeout);
-    AresSerial::FrameResponse _wait_response_forever();
+                     std::vector<AresSerial::FrameResponse> &responses) const;
+    void _send_frame_released(
+        AresFrame::Frame &frame, const std::chrono::milliseconds &timeout,
+        std::vector<AresSerial::FrameResponse> &responses) const;
+    void _send_frame_released(const std::vector<uint8_t> &buf) const;
+    [[nodiscard]] AresSerial::FrameResponse
+    _wait_response(const std::chrono::milliseconds &timeout) const;
+    [[nodiscard]] AresSerial::FrameResponse
+    _wait_response_timeout(const std::chrono::milliseconds &timeout) const;
+    [[nodiscard]] AresSerial::FrameResponse _wait_response_forever() const;
 
-    void _handle_bad_frame(const AresSerial::FrameResponse &response);
+    static void _handle_bad_frame(const AresSerial::FrameResponse &response);
 };
 
 #endif // ARES_FRAME_DISPATCHER_HPP

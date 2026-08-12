@@ -21,7 +21,7 @@ constexpr const char *ref_level = "ref_level";
 
 LOG_MODULE_REGISTER(serial_logger);
 
-static void check_python_errors() {
+void check_python_errors() {
     py::gil_scoped_acquire acquire;
 
     if (PyErr_CheckSignals() != 0) {

@@ -309,4 +309,6 @@ class AresSerial {
     BleInfo _ble_info;
 };
 
+void check_python_errors();
+
 #endif // ARES_SERIAL_DRIVER_HPP
