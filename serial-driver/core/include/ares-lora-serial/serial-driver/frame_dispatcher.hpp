@@ -67,15 +67,22 @@ class FrameDispatcher {
 
     void _send_frame(AresFrame::Frame &frame,
                      const std::chrono::milliseconds &timeout,
-                     std::vector<AresSerial::FrameResponse> &responses) const;
-    void _send_frame_released(
-        AresFrame::Frame &frame, const std::chrono::milliseconds &timeout,
-        std::vector<AresSerial::FrameResponse> &responses) const;
+                     std::vector<AresSerial::FrameResponse> &responses);
+    void
+    _send_frame_released(AresFrame::Frame &frame,
+                         const std::chrono::milliseconds &timeout,
+                         std::vector<AresSerial::FrameResponse> &responses);
     void _send_frame_released(const std::vector<uint8_t> &buf) const;
 
     void _send_frame_normal_released(
         AresFrame::Frame &frame, const std::chrono::milliseconds &timeout,
         std::vector<AresSerial::FrameResponse> &responses) const;
+
+    void _send_lora_expecting_response_released(
+        AresFrame::Frame &frame, const std::chrono::milliseconds &timeout,
+        std::vector<AresSerial::FrameResponse> &responses);
+    std::vector<AresFrame::Frame::AckTypes> _lora_responses;
+    bool _wait_lora_response(AresFrame::Frame &frame);
 
     [[nodiscard]] AresSerial::FrameResponse
     _wait_response(const std::chrono::milliseconds &timeout) const;
@@ -85,7 +92,8 @@ class FrameDispatcher {
 
     void _verify_responses(
         const std::vector<AresSerial::FrameResponse> &responses) const;
-    bool _verify_response(const AresSerial::FrameResponse &response) const;
+    [[nodiscard]] bool
+    _verify_response(const AresSerial::FrameResponse &response) const;
 
     static void _handle_bad_frame(const AresSerial::FrameResponse &response);
 };

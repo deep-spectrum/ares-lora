@@ -87,7 +87,7 @@ class Frame {
     /**
      * @typedef AckTypes
      *
-     * A variant of the different acknowledgement frame types.
+     * A variant of the different acknowledgement frame types for LoRa.
      */
     using AckTypes = std::variant<std::monostate, LoraAck, LogAck, Heartbeat,
                                   NodeConfigResponse>;

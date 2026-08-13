@@ -10,6 +10,7 @@
 
 #include <ares-lora-serial/frames/lora/lora_base.hpp>
 #include <ares-lora-serial/serial-driver/frame_dispatcher.hpp>
+#include <chrono>
 #include <string>
 #include <type_traits>
 
@@ -45,6 +46,28 @@ struct has_response_type<T, std::void_t<typename T::response_type>>
 
 template <typename T>
 inline constexpr bool has_response_type_v = has_response_type<T>::value;
+
+template <typename T, typename = void>
+struct has_expected_response : std::false_type {};
+
+template <typename T>
+struct has_expected_response<
+    T, std::void_t<decltype(std::declval<T>().expected_response())>>
+    : std::true_type {};
+
+template <typename T>
+inline constexpr bool has_expected_response_v = has_expected_response<T>::value;
+
+// template<typename T, typename Variant>
+// struct is_lora_ack_type : std::false_type {};
+//
+// template<typename T, typename... Variant>
+// struct is_lora_ack_type<T, std::variant<Variant...>> :
+// std::disjunction<std::is_same<T, Variant>...> {};
+//
+// template <typename T, typename Variant>
+// inline constexpr bool is_lora_ack_type_v = is_lora_ack_type<T,
+// Variant>::value;
 
 static void set_lora_destination_id(AresFrame::Frame::TxTypes &payload,
                                     uint16_t destination) {
@@ -124,16 +147,16 @@ AresFrame::AresFrameType FrameDispatcher::type_dispatched() const {
 
 void FrameDispatcher::_send_frame(
     AresFrame::Frame &frame, const std::chrono::milliseconds &timeout,
-    std::vector<AresSerial::FrameResponse> &responses) const {
+    std::vector<AresSerial::FrameResponse> &responses) {
     py::gil_scoped_release release;
     _send_frame_released(frame, timeout, responses);
 }
 
 void FrameDispatcher::_send_frame_released(
     AresFrame::Frame &frame, const std::chrono::milliseconds &timeout,
-    std::vector<AresSerial::FrameResponse> &responses) const {
+    std::vector<AresSerial::FrameResponse> &responses) {
     if (is_lora_payload && lora_response_supported && !broadcast) {
-        // todo: Send frame that expects lora responses
+        _send_lora_expecting_response_released(frame, timeout, responses);
     } else {
         _send_frame_normal_released(frame, timeout, responses);
     }
@@ -163,6 +186,90 @@ void FrameDispatcher::_send_frame_normal_released(
     } while (frame.frame_available());
 
     _verify_responses(responses);
+}
+
+void FrameDispatcher::_send_lora_expecting_response_released(
+    AresFrame::Frame &frame, const std::chrono::milliseconds &timeout,
+    std::vector<AresSerial::FrameResponse> &responses) {
+    std::unique_lock lock(_serial._command_lock, std::defer_lock);
+    std::vector<uint8_t> buf;
+
+    do {
+        frame.serialize(buf);
+        AresSerial::FrameResponse fw_response;
+        bool acked = false;
+        size_t max_attempts = retries + 1;
+
+        for (size_t attempt = 0u; attempt < max_attempts && !acked; attempt++) {
+            lock.lock();
+            _serial._response_queue.clear();
+            _send_frame_released(buf);
+            fw_response = _wait_response(timeout);
+            check_python_errors();
+            (void)_verify_response(fw_response);
+            acked = _wait_lora_response(frame);
+            lock.unlock();
+        }
+
+        responses.emplace_back(fw_response);
+    } while (frame.frame_available());
+}
+
+AresFrame::Frame::AckTypes
+get_expected_response(const AresFrame::Frame::TxTypes &payload) {
+    return std::visit(
+        [](const auto &obj) -> AresFrame::Frame::AckTypes {
+            if constexpr (has_expected_response_v<decltype(obj)>) {
+                return obj.expected_response();
+            } else {
+                throw std::runtime_error("");
+            }
+        },
+        payload);
+}
+
+bool compare_ack(const AresFrame::Frame::AckTypes &expected,
+                 const AresFrame::Frame::AckTypes &received) {
+    if (expected.index() != received.index()) {
+        return false;
+    }
+
+    return std::visit(
+        [&received](const auto &expect) {
+            using Type = std::decay_t<decltype(expect)>;
+            return expect == std::get<Type>(received);
+        },
+        expected);
+}
+
+bool FrameDispatcher::_wait_lora_response(AresFrame::Frame &frame) {
+    AresFrame::Frame::AckTypes expected =
+        get_expected_response(frame.tx_payload());
+    AresFrame::Frame::AckTypes received = std::monostate();
+    bool timed_out = false;
+    auto now = std::chrono::steady_clock::now;
+
+    auto to_time = now() + ack_timeout;
+    while (compare_ack(expected, received) && !timed_out) {
+        try {
+            received = *_serial._ack_queue.get(
+                std::chrono::duration_cast<std::chrono::milliseconds>(
+                    ack_timeout));
+        } catch (const ares::queue_exception &e) {
+            timed_out = e.reason() == ares::queue_exception::QUEUE_TIMEOUT;
+            continue;
+        }
+
+        timed_out = now() > to_time;
+    }
+
+    if (!timed_out) {
+        _lora_responses.emplace_back(received);
+    } else {
+        _lora_responses.emplace_back(std::monostate());
+    }
+
+    return timed_out;
 }
 
 AresSerial::FrameResponse FrameDispatcher::_wait_response(
