@@ -83,7 +83,9 @@ class FrameDispatcher {
     _wait_response_timeout(const std::chrono::milliseconds &timeout) const;
     [[nodiscard]] AresSerial::FrameResponse _wait_response_forever() const;
 
-    void _verify_response(const AresSerial::FrameResponse &response);
+    void _verify_responses(
+        const std::vector<AresSerial::FrameResponse> &responses) const;
+    bool _verify_response(const AresSerial::FrameResponse &response) const;
 
     static void _handle_bad_frame(const AresSerial::FrameResponse &response);
 };

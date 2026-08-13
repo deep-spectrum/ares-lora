@@ -161,6 +161,8 @@ void FrameDispatcher::_send_frame_normal_released(
         lock.unlock();
         check_python_errors();
     } while (frame.frame_available());
+
+    _verify_responses(responses);
 }
 
 AresSerial::FrameResponse FrameDispatcher::_wait_response(
@@ -191,6 +193,40 @@ AresSerial::FrameResponse FrameDispatcher::_wait_response_timeout(
 AresSerial::FrameResponse FrameDispatcher::_wait_response_forever() const {
     // TODO: Add a check condition
     return _serial._response_queue.get();
+}
+
+void FrameDispatcher::_verify_responses(
+    const std::vector<AresSerial::FrameResponse> &responses) const {
+    for (const auto &resp : responses) {
+        (void)_verify_response(resp);
+    }
+}
+
+bool FrameDispatcher::_verify_response(
+    const AresSerial::FrameResponse &response) const {
+    bool ack_no_err = true;
+    switch (response.type) {
+    case AresSerial::FrameResponse::ACK: {
+        ack_no_err = std::get<AresFrame::Ack>(response.payload).code == 0;
+        break;
+    }
+    case AresSerial::FrameResponse::BAD_FRAME: {
+        _handle_bad_frame(response);
+        break;
+    }
+    case AresSerial::FrameResponse::COMMAND_SPECIFIC: {
+        if (!command_specific_supported) {
+            // todo: throw error
+        }
+        break;
+    }
+    default: {
+        // todo: throw exception
+        break;
+    }
+    }
+
+    return ack_no_err;
 }
 
 void FrameDispatcher::_handle_bad_frame(
