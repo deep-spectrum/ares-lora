@@ -138,7 +138,7 @@ class AresSerial {
 
     // getters/setters
     void set_ready(bool new_state);
-    [[nodiscard]] bool get_ready() const;
+    [[nodiscard]] bool get_ready();
 
     // Driver logging
     void register_logger_callbacks(
@@ -175,6 +175,8 @@ class AresSerial {
     Serial::Serial _serial;
     std::mutex _command_lock;
     std::exception_ptr _exception;
+
+    std::mutex _ready_mtx;
     bool _ready = false;
 
     void _check_crash();

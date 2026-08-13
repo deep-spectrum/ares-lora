@@ -69,9 +69,19 @@ AresSerial::~AresSerial() {
     _serial.close();
 }
 
-void AresSerial::set_ready(bool new_state) { _ready = new_state; }
+void AresSerial::set_ready(bool new_state) {
+    py::gil_scoped_release release;
+    std::unique_lock lock(_ready_mtx);
+    _ready = new_state;
+}
 
-bool AresSerial::get_ready() const { return _ready; }
+bool AresSerial::get_ready() {
+    bool ret;
+    py::gil_scoped_release release;
+    std::unique_lock lock(_ready_mtx);
+    ret = _ready;
+    return ret;
+}
 
 void AresSerial::register_logger_callbacks(
     const std::function<void(const std::string &)> &dbg,
@@ -526,7 +536,10 @@ void AresSerial::EventDispatcher::operator()(
 void AresSerial::EventDispatcher::operator()(
     const AresFrame::Poll &event) const {
     LOG_INF("Poll event received");
-    self._lora_response_q.put(AresFrame::Heartbeat{self._ready, event.id});
+    std::unique_lock lock(self._ready_mtx);
+    bool ready = self._ready;
+    lock.unlock();
+    self._lora_response_q.put(AresFrame::Heartbeat{ready, event.id});
 }
 
 void AresSerial::EventDispatcher::operator()(

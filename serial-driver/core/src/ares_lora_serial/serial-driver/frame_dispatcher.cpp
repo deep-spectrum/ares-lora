@@ -141,7 +141,8 @@ void FrameDispatcher::_send_frame_released(
 
         bool acked = false;
 
-        for (size_t attempt = 0u; attempt < (retries + 1) && !acked; attempt++) {
+        for (size_t attempt = 0u; attempt < (retries + 1) && !acked;
+             attempt++) {
             lock.lock();
             _serial._response_queue.clear();
             AresSerial::FrameResponse resp = _wait_response(response_timeout);
@@ -149,10 +150,8 @@ void FrameDispatcher::_send_frame_released(
             // Todo: check response (not frame error, ACK code 0)
             check_python_errors();
             // todo: check for lora ack here
-
         }
         // todo: insert response here
-
 
         _send_frame_released(buf);
         responses.emplace_back(_wait_response(timeout));
