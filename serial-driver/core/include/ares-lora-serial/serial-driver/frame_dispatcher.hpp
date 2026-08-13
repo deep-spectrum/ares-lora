@@ -31,7 +31,20 @@ class FrameDispatcher {
         : _serial(serial), response_timeout(response_timeout),
           lora_fields_already_set(true) {}
 
+    template <typename T> py::dict send_frame(T &payload) {
+        AresFrame::Frame::TxTypes fucking_bullshit = payload;
+        return send_frame(fucking_bullshit);
+    }
+
     py::dict send_frame(AresFrame::Frame::TxTypes &payload);
+
+    template <typename T>
+    void send_frame(T &payload,
+                    std::vector<AresSerial::FrameResponse> &responses) {
+        AresFrame::Frame::TxTypes fucking_bullshit = payload;
+        send_frame(fucking_bullshit, responses);
+    }
+
     void send_frame(AresFrame::Frame::TxTypes &payload,
                     std::vector<AresSerial::FrameResponse> &responses);
 

@@ -69,6 +69,26 @@ AresSerial::~AresSerial() {
     _serial.close();
 }
 
+py::tuple AresSerial::setting(const py::kwargs &kwargs) {
+    _check_crash();
+    AresFrame::Setting payload;
+
+    if (!kwargs.contains("id")) {
+        // todo: throw kwargs error
+    }
+
+    payload.setting_id = kwargs["id"].cast<decltype(payload.setting_id)>();
+
+    if (kwargs.contains("value")) {
+        payload.value = kwargs["value"].cast<decltype(payload.value)>();
+        payload.set = true;
+    }
+
+    FrameDispatcher dispatcher(*this, payload.set, kwargs);
+    (void)dispatcher.send_frame(payload);
+    return py::tuple();
+}
+
 void AresSerial::set_ready(bool new_state) {
     py::gil_scoped_release release;
     std::unique_lock lock(_ready_mtx);
