@@ -132,32 +132,11 @@ void FrameDispatcher::_send_frame(
 void FrameDispatcher::_send_frame_released(
     AresFrame::Frame &frame, const std::chrono::milliseconds &timeout,
     std::vector<AresSerial::FrameResponse> &responses) const {
-    std::unique_lock lock(_serial._command_lock, std::defer_lock);
-    std::vector<uint8_t> buf;
-    size_t acked_frames = 0;
-
-    do {
-        frame.serialize(buf);
-
-        bool acked = false;
-
-        for (size_t attempt = 0u; attempt < (retries + 1) && !acked;
-             attempt++) {
-            lock.lock();
-            _serial._response_queue.clear();
-            AresSerial::FrameResponse resp = _wait_response(response_timeout);
-            lock.unlock();
-            // Todo: check response (not frame error, ACK code 0)
-            check_python_errors();
-            // todo: check for lora ack here
-        }
-        // todo: insert response here
-
-        _send_frame_released(buf);
-        responses.emplace_back(_wait_response(timeout));
-        lock.unlock();
-        check_python_errors();
-    } while (frame.frame_available());
+    if (is_lora_payload && lora_response_supported && !broadcast) {
+        // todo: Send frame that expects lora responses
+    } else {
+        _send_frame_normal_released(frame, timeout, responses);
+    }
 }
 
 void FrameDispatcher::_send_frame_released(
@@ -165,6 +144,23 @@ void FrameDispatcher::_send_frame_released(
     // todo log
     std::unique_lock lock(_serial._serial_lock);
     _serial._serial.write(buf);
+}
+
+void FrameDispatcher::_send_frame_normal_released(
+    AresFrame::Frame &frame, const std::chrono::milliseconds &timeout,
+    std::vector<AresSerial::FrameResponse> &responses) const {
+    std::unique_lock lock(_serial._command_lock, std::defer_lock);
+    std::vector<uint8_t> buf;
+
+    do {
+        lock.lock();
+        _serial._response_queue.clear();
+        frame.serialize(buf);
+        _send_frame_released(buf);
+        responses.emplace_back(_wait_response(timeout));
+        lock.unlock();
+        check_python_errors();
+    } while (frame.frame_available());
 }
 
 AresSerial::FrameResponse FrameDispatcher::_wait_response(

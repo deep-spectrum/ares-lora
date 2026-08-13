@@ -72,6 +72,11 @@ class FrameDispatcher {
         AresFrame::Frame &frame, const std::chrono::milliseconds &timeout,
         std::vector<AresSerial::FrameResponse> &responses) const;
     void _send_frame_released(const std::vector<uint8_t> &buf) const;
+
+    void _send_frame_normal_released(
+        AresFrame::Frame &frame, const std::chrono::milliseconds &timeout,
+        std::vector<AresSerial::FrameResponse> &responses) const;
+
     [[nodiscard]] AresSerial::FrameResponse
     _wait_response(const std::chrono::milliseconds &timeout) const;
     [[nodiscard]] AresSerial::FrameResponse

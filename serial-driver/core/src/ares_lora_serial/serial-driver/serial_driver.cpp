@@ -89,6 +89,15 @@ py::tuple AresSerial::setting(const py::kwargs &kwargs) {
     return py::tuple();
 }
 
+py::tuple AresSerial::version(const py::kwargs &kwargs) {
+    _check_crash();
+
+    FrameDispatcher dispatcher(*this, true, kwargs);
+    AresFrame::Version payload;
+    dispatcher.send_frame(payload);
+    return py::tuple(); // todo
+}
+
 void AresSerial::set_ready(bool new_state) {
     py::gil_scoped_release release;
     std::unique_lock lock(_ready_mtx);
