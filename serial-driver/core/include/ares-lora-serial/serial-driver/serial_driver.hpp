@@ -117,24 +117,24 @@ class AresSerial {
 
     // mcu
     py::tuple setting(const py::kwargs &kwargs);
-    int lora_config(const AresLoraConfig &config, const py::kwargs &kwargs);
-    py::tuple led(const py::kwargs &kwargs);
+    // int lora_config(const AresLoraConfig &config, const py::kwargs &kwargs);
+    // py::tuple led(const py::kwargs &kwargs);
     py::tuple version(const py::kwargs &kwargs);
-    int reboot();
+    // int reboot();
 
     // lora
-    int start(const py::kwargs &kwargs);
-    py::tuple poll(const py::kwargs &kwargs);
-    py::tuple log(const py::kwargs &kwargs);
-    int abort(const py::kwargs &kwargs);
-    py::dict node_config(const py::kwargs &kwargs);
-    py::dict node_config_poll(const py::kwargs &kwargs);
-    int notify_run_ready(const py::kwargs &kwargs);
+    // int start(const py::kwargs &kwargs);
+    // py::tuple poll(const py::kwargs &kwargs);
+    // py::tuple log(const py::kwargs &kwargs);
+    // int abort(const py::kwargs &kwargs);
+    // py::dict node_config(const py::kwargs &kwargs);
+    // py::dict node_config_poll(const py::kwargs &kwargs);
+    // int notify_run_ready(const py::kwargs &kwargs);
 
     // ble
-    py::tuple ble_state(uint8_t value);
-    int ble_disconnect();
-    py::tuple ble_send_image(const py::bytes &image);
+    // py::tuple ble_state(uint8_t value);
+    // int ble_disconnect();
+    // py::tuple ble_send_image(const py::bytes &image);
 
     // getters/setters
     void set_ready(bool new_state);
