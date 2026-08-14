@@ -293,7 +293,7 @@ stop_driver_task(ares::Task<Signature> &task,
 
 void AresSerial::stop_driver() {
     constexpr size_t max_attempts = 10;
-    if (!_tasks_running || !_exception) {
+    if (!_tasks_running && !_exception) {
         return;
     }
 
@@ -528,17 +528,6 @@ bool AresSerial::_stop_event_queues() {
     success = queue_nullptr(_abortion_event_q) && success;
     success = queue_nullptr(_run_ready_event_q) && success;
     return success;
-}
-
-template <typename T, size_t size, bool overwrite>
-void put_no_except(const T &event,
-                   ares::bounded_queue<std::unique_ptr<T>, size, overwrite> &q,
-                   const std::chrono::milliseconds &timeout) {
-    try {
-        q.put(std::make_unique<T>(event), timeout);
-    } catch (ares::queue_exception &) {
-        // nop
-    }
 }
 
 void AresSerial::EventDispatcher::operator()(

@@ -13,6 +13,8 @@
 
 #include <ares-lora-serial/serial-driver/serial_driver.hpp>
 #include <ares/pyutil.hpp>
+// ReSharper disable once CppUnusedIncludeDirective
+#include <pybind11/chrono.h>
 #include <pybind11/pybind11.h>
 #include <vector>
 

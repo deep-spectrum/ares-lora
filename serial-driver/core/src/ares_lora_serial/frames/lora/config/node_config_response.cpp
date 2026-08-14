@@ -21,7 +21,7 @@ void NodeConfigResponse::serialize(std::vector<uint8_t> &buffer) {
 
     switch (type) {
     case SAVE_FOLDER: {
-        Internal::serialize_save_folder(std::get<NodeConfigSaveFolder>(config),
+        Internal::serialize_save_folder(std::get<ares::DateTime>(config),
                                         config_field);
         break;
     }
@@ -57,7 +57,7 @@ void NodeConfigResponse::deserialize(const uint8_t *buffer, std::size_t len) {
 
     switch (type) {
     case SAVE_FOLDER: {
-        NodeConfigSaveFolder ret;
+        ares::DateTime ret;
         Internal::deserialize_save_folder(ret, config_field);
         config = ret;
         break;

@@ -240,6 +240,18 @@ class AresSerial {
     struct EventDispatcher {
         AresSerial &self;
 
+        template <typename T, size_t size, bool overwrite>
+        static void put_no_except(
+            const T &event,
+            ares::bounded_queue<std::unique_ptr<T>, size, overwrite> &q,
+            const std::chrono::milliseconds &timeout) {
+            try {
+                q.put(std::make_unique<T>(event), timeout);
+            } catch (ares::queue_exception &) {
+                // nop
+            }
+        }
+
         void operator()(const AresFrame::Start &event) const;
         void operator()(const AresFrame::Heartbeat &event) const;
         void operator()(const AresFrame::Poll &event) const;
@@ -266,9 +278,13 @@ class AresSerial {
                 response.type = FrameResponse::COMMAND_SPECIFIC;
             }
 
-            static_assert(
-                std::is_constructible_v<decltype(response.payload), T>);
-            response.payload = event;
+            if constexpr (std::is_constructible_v<decltype(response.payload),
+                                                  T>) {
+                response.payload = event;
+                self._response_queue.put(response);
+            } else {
+                assert(false);
+            }
         }
     };
 
