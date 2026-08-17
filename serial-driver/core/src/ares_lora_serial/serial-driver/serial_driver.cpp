@@ -111,7 +111,8 @@ py::tuple AresSerial::led(const py::kwargs &kwargs) {
     payload.led = kwargs["id"].cast<decltype(payload.led)>();
 
     if (kwargs.contains("state")) {
-        payload.state = kwargs["state"].cast<decltype(payload.state)>();
+        payload.state = static_cast<decltype(payload.state)>(
+            kwargs["state"].cast<uint8_t>());
     } else {
         payload.state = AresFrame::Led::FETCH;
     }
@@ -150,7 +151,7 @@ py::tuple AresSerial::reboot(const py::kwargs &kwargs) {
 
     {
         py::gil_scoped_release release;
-        std::this_thread::sleep_for(std::chrono::seconds(payload.delay));
+        std::this_thread::sleep_for(std::chrono::seconds(payload.delay + 1));
     }
 
     return ret;

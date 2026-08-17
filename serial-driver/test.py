@@ -3,5 +3,5 @@ from datetime import timedelta
 
 s = _AresSerial("/dev/ttyACM1")
 s.start_driver()
-
+s.reboot()
 s.stop_driver()

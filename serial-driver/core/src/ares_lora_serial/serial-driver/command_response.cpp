@@ -21,7 +21,7 @@ py::object CommandResponse::specific_ret(const AresFrame::Setting &ret) {
 }
 
 py::object CommandResponse::specific_ret(const AresFrame::Led &ret) {
-    return py::cast(ret.state);
+    return py::cast(static_cast<uint8_t>(ret.state));
 }
 
 py::object CommandResponse::specific_ret(const AresFrame::Heartbeat &ret) {
