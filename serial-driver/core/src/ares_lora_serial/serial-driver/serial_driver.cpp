@@ -85,8 +85,8 @@ py::tuple AresSerial::setting(const py::kwargs &kwargs) {
     }
 
     FrameDispatcher dispatcher(*this, payload.set, kwargs);
-    CommandResponse response = dispatcher.send_frame(payload);
-    return response.build_python_response<AresFrame::Setting>();
+    return dispatcher.send_frame(payload)
+        .build_python_response<AresFrame::Setting>();
 }
 
 py::tuple AresSerial::lora_config(const AresLoraConfig &config,
@@ -100,13 +100,34 @@ py::tuple AresSerial::lora_config(const AresLoraConfig &config,
     return dispatcher.send_frame(payload).build_python_response();
 }
 
-py::tuple AresSerial::version(const py::kwargs &kwargs) {
+py::tuple AresSerial::led(const py::kwargs &kwargs) {
     _check_crash();
+    AresFrame::Led payload;
+
+    if (!kwargs.contains("id")) {
+        // todo throw kwargs error
+    }
+
+    payload.led = kwargs["id"].cast<decltype(payload.led)>();
+
+    if (kwargs.contains("state")) {
+        payload.state = kwargs["state"].cast<decltype(payload.state)>();
+    } else {
+        payload.state = AresFrame::Led::FETCH;
+    }
 
     FrameDispatcher dispatcher(*this, true, kwargs);
+    return dispatcher.send_frame(payload)
+        .build_python_response<AresFrame::Led>();
+}
+
+py::tuple AresSerial::version(const py::kwargs &kwargs) {
+    _check_crash();
     AresFrame::Version payload;
-    CommandResponse response = dispatcher.send_frame(payload);
-    return response.build_python_response<AresFrame::Version>();
+
+    FrameDispatcher dispatcher(*this, true, kwargs);
+    return dispatcher.send_frame(payload)
+        .build_python_response<AresFrame::Version>();
 }
 
 void AresSerial::set_ready(bool new_state) {

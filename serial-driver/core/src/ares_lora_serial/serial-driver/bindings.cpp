@@ -20,6 +20,7 @@ PYBIND11_MODULE(_ares_lora_serial, m, py::mod_gil_not_used()) {
         // Frames
         .def("setting", &AresSerial::setting)
         .def("lora_config", &AresSerial::lora_config)
+        .def("led", &AresSerial::led)
         .def("version", &AresSerial::version)
 
         // Events
