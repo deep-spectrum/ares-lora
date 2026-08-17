@@ -124,8 +124,8 @@ class AresSerial {
     py::tuple reboot(const py::kwargs &kwargs);
 
     // lora
-    // int start(const py::kwargs &kwargs);
-    // py::tuple poll(const py::kwargs &kwargs);
+    py::tuple start(int64_t second, uint64_t usec, const py::kwargs &kwargs);
+    py::tuple poll(const py::kwargs &kwargs);
     // py::tuple log(const py::kwargs &kwargs);
     // int abort(const py::kwargs &kwargs);
     // py::dict node_config(const py::kwargs &kwargs);
@@ -268,8 +268,9 @@ class AresSerial {
         void operator()(const AresFrame::NodeConfigPoll &event) const;
         void operator()(const AresFrame::NodeConfigResponse &event) const;
         void operator()(const AresFrame::NodeReady &event) const;
+        void operator()(const AresFrame::LoraAck &event) const;
 
-        template <typename T> void operator()(const T &event) {
+        template <typename T> void operator()(const T &event) const {
             FrameResponse response;
             if constexpr (std::is_same_v<T, AresFrame::Ack>) {
                 response.type = FrameResponse::ACK;

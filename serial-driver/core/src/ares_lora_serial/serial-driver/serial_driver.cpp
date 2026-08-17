@@ -157,6 +157,27 @@ py::tuple AresSerial::reboot(const py::kwargs &kwargs) {
     return ret;
 }
 
+py::tuple AresSerial::start(int64_t second, uint64_t usec,
+                            const py::kwargs &kwargs) {
+    _check_crash();
+    AresFrame::Start payload;
+
+    payload.sec = second;
+    payload.usec = usec;
+
+    FrameDispatcher dispatcher(*this, false, kwargs);
+    return dispatcher.send_frame(payload).build_python_response();
+}
+
+py::tuple AresSerial::poll(const py::kwargs &kwargs) {
+    _check_crash();
+    AresFrame::Poll payload;
+
+    FrameDispatcher dispatcher(*this, false, kwargs);
+    return dispatcher.send_frame(payload)
+        .build_python_response<AresFrame::Heartbeat>();
+}
+
 void AresSerial::set_ready(bool new_state) {
     py::gil_scoped_release release;
     std::unique_lock lock(_ready_mtx);
@@ -538,7 +559,7 @@ void AresSerial::_send_lora_responses_helper() {
         FrameDispatcher dispatcher(*this, _send_lora_response_timeout);
 
         try {
-            dispatcher.send_frame(payload, responses);
+            dispatcher.send_frame_released(payload, responses);
         } catch (const std::exception &exc) {
             LOG_ERR("_send_frame_released(): %s", exc.what());
         }
@@ -786,4 +807,13 @@ void AresSerial::EventDispatcher::operator()(
     }
 
     put_no_except(event, self._run_ready_event_q, 100ms);
+}
+
+void AresSerial::EventDispatcher::operator()(
+    const AresFrame::LoraAck &event) const {
+    LOG_INF("Received lora acknowledgement message (message_id: %u, message "
+            "acked: %u)",
+            event.id, event.message_type);
+    AresFrame::Frame::AckTypes ack_event = event;
+    put_no_except(ack_event, self._ack_queue, 100ms);
 }

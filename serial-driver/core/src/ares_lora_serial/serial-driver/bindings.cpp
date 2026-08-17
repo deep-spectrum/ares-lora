@@ -19,10 +19,12 @@ PYBIND11_MODULE(_ares_lora_serial, m, py::mod_gil_not_used()) {
         .def(py::init<const std::string &, const py::kwargs &>())
         // Frames
         .def("setting", &AresSerial::setting)
-        .def("lora_config", &AresSerial::lora_config)
+        .def("lora_config", &AresSerial::lora_config, py::arg("config"))
         .def("led", &AresSerial::led)
         .def("version", &AresSerial::version)
         .def("reboot", &AresSerial::reboot)
+        .def("start", &AresSerial::start, py::arg("second"), py::arg("usec"))
+        .def("poll", &AresSerial::poll)
 
         // Events
         .def("wait_start_event", &AresSerial::wait_start_event)

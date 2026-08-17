@@ -41,7 +41,8 @@ template <typename T, typename = void>
 struct has_response_type : std::false_type {};
 
 template <typename T>
-struct has_response_type<T, std::void_t<typename T::response_type>>
+struct has_response_type<T,
+                         std::void_t<typename std::decay_t<T>::response_type>>
     : std::true_type {};
 
 template <typename T>
@@ -57,17 +58,6 @@ struct has_expected_response<
 
 template <typename T>
 inline constexpr bool has_expected_response_v = has_expected_response<T>::value;
-
-// template<typename T, typename Variant>
-// struct is_lora_ack_type : std::false_type {};
-//
-// template<typename T, typename... Variant>
-// struct is_lora_ack_type<T, std::variant<Variant...>> :
-// std::disjunction<std::is_same<T, Variant>...> {};
-//
-// template <typename T, typename Variant>
-// inline constexpr bool is_lora_ack_type_v = is_lora_ack_type<T,
-// Variant>::value;
 
 static void set_lora_destination_id(AresFrame::Frame::TxTypes &payload,
                                     uint16_t destination) {
@@ -108,10 +98,7 @@ static bool is_lora_frame(AresFrame::Frame::TxTypes &payload) {
 static bool frame_has_response_type(AresFrame::Frame::TxTypes &payload) {
     return std::visit(
         []([[maybe_unused]] const auto &obj) {
-            if constexpr (has_response_type_v<decltype(obj)>) {
-                return true;
-            }
-            return false;
+            return has_response_type_v<decltype(obj)>;
         },
         payload);
 }
@@ -124,20 +111,25 @@ FrameDispatcher::send_frame(AresFrame::Frame::TxTypes &payload) {
     lora_response_supported = frame_has_response_type(payload);
     _response.clear();
 
+    AresFrame::Frame frame(payload);
+    _type_dispatched = frame.type();
+
     std::vector<AresSerial::FrameResponse> responses;
 
-    send_frame(payload, responses);
+    _send_frame(frame, response_timeout, responses);
     _process_responses(responses);
 
     return _response;
 }
 
-void FrameDispatcher::send_frame(
+void FrameDispatcher::send_frame_released(
     AresFrame::Frame::TxTypes &payload,
     std::vector<AresSerial::FrameResponse> &responses) {
     AresFrame::Frame frame(payload);
     _type_dispatched = frame.type();
-    _send_frame(frame, response_timeout, responses);
+    _response.clear();
+    _send_frame_released(frame, response_timeout, responses);
+    _process_responses(responses);
 }
 
 AresFrame::AresFrameType FrameDispatcher::type_dispatched() const {
@@ -249,7 +241,7 @@ bool FrameDispatcher::_wait_lora_response(AresFrame::Frame &frame) {
     auto now = std::chrono::steady_clock::now;
 
     auto to_time = now() + ack_timeout;
-    while (compare_ack(expected, received) && !timed_out) {
+    while (!compare_ack(expected, received) && !timed_out) {
         try {
             received = *_serial._ack_queue.get(
                 std::chrono::duration_cast<std::chrono::milliseconds>(

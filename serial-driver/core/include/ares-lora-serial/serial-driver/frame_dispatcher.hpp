@@ -11,10 +11,10 @@
 #ifndef ARES_FRAME_DISPATCHER_HPP
 #define ARES_FRAME_DISPATCHER_HPP
 
+#include <ares-lora-serial/serial-driver/command_response.hpp>
 #include <ares-lora-serial/serial-driver/serial_driver.hpp>
 #include <ares/pyutil.hpp>
 // ReSharper disable once CppUnusedIncludeDirective
-#include <ares-lora-serial/serial-driver/command_response.hpp>
 #include <pybind11/chrono.h>
 #include <pybind11/pybind11.h>
 #include <vector>
@@ -42,14 +42,15 @@ class FrameDispatcher {
     CommandResponse send_frame(AresFrame::Frame::TxTypes &payload);
 
     template <typename T>
-    void send_frame(T &payload,
-                    std::vector<AresSerial::FrameResponse> &responses) {
+    void
+    send_frame_released(T &payload,
+                        std::vector<AresSerial::FrameResponse> &responses) {
         AresFrame::Frame::TxTypes fucking_bullshit = payload;
-        send_frame(fucking_bullshit, responses);
+        send_frame_released(fucking_bullshit, responses);
     }
 
-    void send_frame(AresFrame::Frame::TxTypes &payload,
-                    std::vector<AresSerial::FrameResponse> &responses);
+    void send_frame_released(AresFrame::Frame::TxTypes &payload,
+                             std::vector<AresSerial::FrameResponse> &responses);
 
     [[nodiscard]] AresFrame::AresFrameType type_dispatched() const;
 
