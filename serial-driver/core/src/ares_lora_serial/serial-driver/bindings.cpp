@@ -14,10 +14,12 @@
 #include <pybind11/pybind11.h>
 
 PYBIND11_MODULE(_ares_lora_serial, m, py::mod_gil_not_used()) {
+    // AresSerial
     py::class_<AresSerial>(m, "_AresSerial")
         .def(py::init<const std::string &, const py::kwargs &>())
         // Frames
         .def("setting", &AresSerial::setting)
+        .def("lora_config", &AresSerial::lora_config)
         .def("version", &AresSerial::version)
 
         // Events
@@ -47,4 +49,20 @@ PYBIND11_MODULE(_ares_lora_serial, m, py::mod_gil_not_used()) {
 
         // Properties
         .def_property("ready", &AresSerial::get_ready, &AresSerial::set_ready);
+
+    // AresLoraConfig
+    py::class_<AresLoraConfig>(m, "_AresLoraConfig",
+                               "LoRa configurations container")
+        .def(py::init<>())
+        .def(py::init<const py::kwargs>())
+        .def_readwrite("frequency", &AresLoraConfig::frequency,
+                       "LoRa center frequency in Hz")
+        .def_readwrite("preamble_length", &AresLoraConfig::preamble_length,
+                       "Preamble length")
+        .def_readwrite("bandwidth", &AresLoraConfig::bandwidth,
+                       "LoRa bandwidth")
+        .def_readwrite("datarate", &AresLoraConfig::datarate, "LoRa data rate")
+        .def_readwrite("coding_rate", &AresLoraConfig::coding_rate,
+                       "LoRa coding rate")
+        .def_readwrite("tx_power", &AresLoraConfig::tx_power, "LoRa tx power");
 }

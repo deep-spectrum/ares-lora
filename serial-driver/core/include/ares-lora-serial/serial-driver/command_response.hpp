@@ -50,12 +50,15 @@ py::tuple CommandResponse::build_python_response() const {
     py::tuple codes =
         ares::array_to_tuple(error_codes.data(), error_codes.size());
 
-    if (response_values.empty()) {
+    if constexpr (std::is_void_v<Expected>) {
         return py::make_tuple(codes, py::none());
-    }
+    } else {
+        if (response_values.empty()) {
+            return py::make_tuple(codes, py::none());
+        }
 
-    return py::make_tuple(codes,
-                          this->template get_additional_response<Expected>());
+        return py::make_tuple(codes, get_additional_response<Expected>());
+    }
 }
 
 template <typename T>

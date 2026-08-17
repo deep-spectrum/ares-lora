@@ -117,10 +117,11 @@ class AresSerial {
 
     // mcu
     py::tuple setting(const py::kwargs &kwargs);
-    // int lora_config(const AresLoraConfig &config, const py::kwargs &kwargs);
-    // py::tuple led(const py::kwargs &kwargs);
+    py::tuple lora_config(const AresLoraConfig &config,
+                          const py::kwargs &kwargs);
+    py::tuple led(const py::kwargs &kwargs);
     py::tuple version(const py::kwargs &kwargs);
-    // int reboot();
+    py::tuple reboot();
 
     // lora
     // int start(const py::kwargs &kwargs);

@@ -89,13 +89,24 @@ py::tuple AresSerial::setting(const py::kwargs &kwargs) {
     return response.build_python_response<AresFrame::Setting>();
 }
 
+py::tuple AresSerial::lora_config(const AresLoraConfig &config,
+                                  const py::kwargs &kwargs) {
+    _check_crash();
+    AresFrame::LoraConfig payload(
+        config.frequency, config.preamble_length, config.bandwidth,
+        config.datarate, config.coding_rate, config.tx_power, 0, 0, 0, 0);
+
+    FrameDispatcher dispatcher(*this, false, kwargs);
+    return dispatcher.send_frame(payload).build_python_response();
+}
+
 py::tuple AresSerial::version(const py::kwargs &kwargs) {
     _check_crash();
 
     FrameDispatcher dispatcher(*this, true, kwargs);
     AresFrame::Version payload;
-    dispatcher.send_frame(payload);
-    return py::tuple(); // todo
+    CommandResponse response = dispatcher.send_frame(payload);
+    return response.build_python_response<AresFrame::Version>();
 }
 
 void AresSerial::set_ready(bool new_state) {
