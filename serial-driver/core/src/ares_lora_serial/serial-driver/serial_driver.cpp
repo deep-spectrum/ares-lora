@@ -178,6 +178,20 @@ py::tuple AresSerial::poll(const py::kwargs &kwargs) {
         .build_python_response<AresFrame::Heartbeat>();
 }
 
+py::tuple AresSerial::log(const py::kwargs &kwargs) {
+    _check_crash();
+    AresFrame::Log payload;
+    payload.log_id = _log_id;
+    _log_id++;
+
+    if (kwargs.contains("message")) {
+        payload.msg = kwargs["message"].cast<std::string>();
+    }
+
+    FrameDispatcher dispatcher(*this, false, kwargs);
+    return dispatcher.send_frame(payload).build_python_response();
+}
+
 void AresSerial::set_ready(bool new_state) {
     py::gil_scoped_release release;
     std::unique_lock lock(_ready_mtx);
@@ -646,6 +660,11 @@ void AresSerial::EventDispatcher::operator()(
     LOG_DBG("Part %d of %d", event.part, event.num_parts);
     LOG_DBG("Log message: %s", event.msg.c_str());
     LOG_DBG("Log ID: %d", event.log_id);
+
+    if (!event.broadcast) {
+        self._lora_response_q.put(AresFrame::LogAck{event.part, event.num_parts,
+                                                    event.log_id, event.id});
+    }
 
     put_no_except(event, self._log_event_q, 100ms);
 }

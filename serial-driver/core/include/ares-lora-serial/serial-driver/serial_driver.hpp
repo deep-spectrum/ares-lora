@@ -126,7 +126,7 @@ class AresSerial {
     // lora
     py::tuple start(int64_t second, uint64_t usec, const py::kwargs &kwargs);
     py::tuple poll(const py::kwargs &kwargs);
-    // py::tuple log(const py::kwargs &kwargs);
+    py::tuple log(const py::kwargs &kwargs);
     // int abort(const py::kwargs &kwargs);
     // py::dict node_config(const py::kwargs &kwargs);
     // py::dict node_config_poll(const py::kwargs &kwargs);
@@ -179,6 +179,7 @@ class AresSerial {
 
     std::mutex _ready_mtx;
     bool _ready = false;
+    uint16_t _log_id = 0;
 
     void _check_crash();
 

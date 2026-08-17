@@ -29,10 +29,12 @@ struct LogAck : Internal::FramePayloadBase, Internal::LoraBase {
      * Constructor.
      * @param part See LogAck::part
      * @param num_parts See LogAck::num_parts
+     * @param log_id See LogAck::log_id
      * @param id See LogAck::id
      */
-    explicit LogAck(uint8_t part, uint8_t num_parts, uint16_t id)
-        : part(part), num_parts(num_parts), id(id) {}
+    explicit LogAck(uint8_t part, uint8_t num_parts, uint16_t log_id,
+                    uint16_t id)
+        : part(part), num_parts(num_parts), id(id), log_id(log_id) {}
 
     /**
      * Default constructor.

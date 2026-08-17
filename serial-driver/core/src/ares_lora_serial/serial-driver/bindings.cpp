@@ -25,6 +25,7 @@ PYBIND11_MODULE(_ares_lora_serial, m, py::mod_gil_not_used()) {
         .def("reboot", &AresSerial::reboot)
         .def("start", &AresSerial::start, py::arg("second"), py::arg("usec"))
         .def("poll", &AresSerial::poll)
+        .def("log", &AresSerial::log)
 
         // Events
         .def("wait_start_event", &AresSerial::wait_start_event)

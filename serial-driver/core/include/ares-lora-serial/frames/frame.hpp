@@ -63,7 +63,7 @@ class Frame {
         std::variant<std::monostate, Setting, Start, LoraConfig, Led, Heartbeat,
                      Poll, Log, Version, BleState, BleChunk, BleImage,
                      BleDisconnect, Reboot, Abort, NodeConfig, NodeConfigPoll,
-                     NodeConfigResponse, NodeReady, LoraAck>;
+                     NodeConfigResponse, NodeReady, LoraAck, LogAck>;
 
     /**
      * @typedef RxTypes
