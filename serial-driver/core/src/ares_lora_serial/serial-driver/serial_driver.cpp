@@ -130,6 +130,32 @@ py::tuple AresSerial::version(const py::kwargs &kwargs) {
         .build_python_response<AresFrame::Version>();
 }
 
+py::tuple AresSerial::reboot(const py::kwargs &kwargs) {
+    _check_crash();
+    AresFrame::Reboot payload;
+
+    if (kwargs.contains("delay")) {
+        payload.delay = kwargs["delay"].cast<decltype(payload.delay)>();
+        if (payload.delay < 5) {
+            payload.delay = 5;
+        } else if (payload.delay > 30) {
+            payload.delay = 30;
+        }
+    }
+
+    FrameDispatcher dispatcher(*this, false, kwargs);
+    py::tuple ret = dispatcher.send_frame(payload).build_python_response();
+    stop_driver();
+    _serial.close();
+
+    {
+        py::gil_scoped_release release;
+        std::this_thread::sleep_for(std::chrono::seconds(payload.delay));
+    }
+
+    return ret;
+}
+
 void AresSerial::set_ready(bool new_state) {
     py::gil_scoped_release release;
     std::unique_lock lock(_ready_mtx);

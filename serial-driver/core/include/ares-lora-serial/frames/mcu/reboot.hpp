@@ -25,6 +25,11 @@ struct Reboot : Internal::FramePayloadBase {
 
     /**
      * Constructor.
+     */
+    Reboot() = default;
+
+    /**
+     * Constructor.
      * @param delay See Reboot::delay.
      */
     explicit Reboot(uint8_t delay) : delay(delay) {}

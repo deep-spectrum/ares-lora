@@ -22,6 +22,7 @@ PYBIND11_MODULE(_ares_lora_serial, m, py::mod_gil_not_used()) {
         .def("lora_config", &AresSerial::lora_config)
         .def("led", &AresSerial::led)
         .def("version", &AresSerial::version)
+        .def("reboot", &AresSerial::reboot)
 
         // Events
         .def("wait_start_event", &AresSerial::wait_start_event)
