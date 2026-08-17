@@ -14,6 +14,7 @@
 #include <ares-lora-serial/serial-driver/serial_driver.hpp>
 #include <ares/pyutil.hpp>
 // ReSharper disable once CppUnusedIncludeDirective
+#include <ares-lora-serial/serial-driver/command_response.hpp>
 #include <pybind11/chrono.h>
 #include <pybind11/pybind11.h>
 #include <vector>
@@ -33,12 +34,12 @@ class FrameDispatcher {
         : _serial(serial), response_timeout(response_timeout),
           lora_fields_already_set(true) {}
 
-    template <typename T> py::dict send_frame(T &payload) {
+    template <typename T> CommandResponse send_frame(T &payload) {
         AresFrame::Frame::TxTypes fucking_bullshit = payload;
         return send_frame(fucking_bullshit);
     }
 
-    py::dict send_frame(AresFrame::Frame::TxTypes &payload);
+    CommandResponse send_frame(AresFrame::Frame::TxTypes &payload);
 
     template <typename T>
     void send_frame(T &payload,
@@ -66,6 +67,8 @@ class FrameDispatcher {
     bool broadcast_supported = false;
     bool lora_response_supported = false;
     bool command_specific_supported = false;
+
+    CommandResponse _response;
 
     void _send_frame(AresFrame::Frame &frame,
                      const std::chrono::milliseconds &timeout,
@@ -98,6 +101,9 @@ class FrameDispatcher {
     _verify_response(const AresSerial::FrameResponse &response) const;
 
     static void _handle_bad_frame(const AresSerial::FrameResponse &response);
+
+    void
+    _process_responses(const std::vector<AresSerial::FrameResponse> &responses);
 };
 
 #endif // ARES_FRAME_DISPATCHER_HPP

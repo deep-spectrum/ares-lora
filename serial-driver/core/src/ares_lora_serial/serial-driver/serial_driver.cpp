@@ -85,8 +85,8 @@ py::tuple AresSerial::setting(const py::kwargs &kwargs) {
     }
 
     FrameDispatcher dispatcher(*this, payload.set, kwargs);
-    (void)dispatcher.send_frame(payload);
-    return py::tuple();
+    CommandResponse response = dispatcher.send_frame(payload);
+    return response.build_python_response<AresFrame::Setting>();
 }
 
 py::tuple AresSerial::version(const py::kwargs &kwargs) {

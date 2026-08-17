@@ -116,21 +116,20 @@ static bool frame_has_response_type(AresFrame::Frame::TxTypes &payload) {
         payload);
 }
 
-py::dict FrameDispatcher::send_frame(AresFrame::Frame::TxTypes &payload) {
+CommandResponse
+FrameDispatcher::send_frame(AresFrame::Frame::TxTypes &payload) {
     set_lora_destination_id(payload, destination);
     broadcast_supported = set_lora_broadcast(payload, broadcast);
     is_lora_payload = is_lora_frame(payload);
     lora_response_supported = frame_has_response_type(payload);
+    _response.clear();
 
     std::vector<AresSerial::FrameResponse> responses;
 
     send_frame(payload, responses);
-    // todo: how the fuck do I handle lora responses?
+    _process_responses(responses);
 
-    py::dict ret;
-
-    // todo: How do I process responses?
-    return ret;
+    return _response;
 }
 
 void FrameDispatcher::send_frame(
@@ -342,4 +341,36 @@ void FrameDispatcher::_handle_bad_frame(
     ss << "Internal error: Bad frame received (code: "
        << std::get<AresFrame::FramingError>(response.payload).type << ")";
     throw py::buffer_error(ss.str());
+}
+
+void FrameDispatcher::_process_responses(
+    const std::vector<AresSerial::FrameResponse> &responses) {
+    for (const auto &response : responses) {
+        int err_code = 0;
+        switch (response.type) {
+        case AresSerial::FrameResponse::ACK: {
+            err_code = std::get<AresFrame::Ack>(response.payload).code;
+            break;
+        }
+        case AresSerial::FrameResponse::COMMAND_SPECIFIC: {
+            std::visit(
+                [this](auto &obj) {
+                    _response.response_values.emplace_back(obj);
+                },
+                response.payload);
+            break;
+        }
+        default: {
+            // todo: exception
+            break;
+        }
+        }
+        _response.error_codes.emplace_back(err_code);
+    }
+
+    for (const auto &response : _lora_responses) {
+        std::visit(
+            [this](auto &obj) { _response.response_values.emplace_back(obj); },
+            response);
+    }
 }
