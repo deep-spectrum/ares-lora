@@ -192,6 +192,22 @@ py::tuple AresSerial::log(const py::kwargs &kwargs) {
     return dispatcher.send_frame(payload).build_python_response();
 }
 
+py::tuple AresSerial::abort(const py::kwargs &kwargs) {
+    _check_crash();
+    AresFrame::Abort payload;
+
+    FrameDispatcher dispatcher(*this, false, kwargs);
+    return dispatcher.send_frame(payload).build_python_response();
+}
+
+py::tuple AresSerial::notify_run_ready(const py::kwargs &kwargs) {
+    _check_crash();
+    AresFrame::NodeReady payload;
+
+    FrameDispatcher dispatcher(*this, false, kwargs);
+    return dispatcher.send_frame(payload).build_python_response();
+}
+
 void AresSerial::set_ready(bool new_state) {
     py::gil_scoped_release release;
     std::unique_lock lock(_ready_mtx);

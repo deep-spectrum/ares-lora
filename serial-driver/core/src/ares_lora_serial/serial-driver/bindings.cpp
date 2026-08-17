@@ -26,6 +26,8 @@ PYBIND11_MODULE(_ares_lora_serial, m, py::mod_gil_not_used()) {
         .def("start", &AresSerial::start, py::arg("second"), py::arg("usec"))
         .def("poll", &AresSerial::poll)
         .def("log", &AresSerial::log)
+        .def("abort", &AresSerial::abort)
+        .def("notify_run_ready", &AresSerial::notify_run_ready)
 
         // Events
         .def("wait_start_event", &AresSerial::wait_start_event)
