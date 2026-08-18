@@ -128,7 +128,7 @@ class AresSerial {
     py::tuple poll(const py::kwargs &kwargs);
     py::tuple log(const py::kwargs &kwargs);
     py::tuple abort(const py::kwargs &kwargs);
-    // py::dict node_config(const py::kwargs &kwargs);
+    py::dict node_config(const py::kwargs &kwargs);
     // py::dict node_config_poll(const py::kwargs &kwargs);
     py::tuple notify_run_ready(const py::kwargs &kwargs);
 

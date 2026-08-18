@@ -110,6 +110,7 @@ FrameDispatcher::send_frame(AresFrame::Frame::TxTypes &payload) {
     is_lora_payload = is_lora_frame(payload);
     lora_response_supported = frame_has_response_type(payload);
     _response.clear();
+    _lora_responses.clear();
 
     AresFrame::Frame frame(payload);
     _type_dispatched = frame.type();

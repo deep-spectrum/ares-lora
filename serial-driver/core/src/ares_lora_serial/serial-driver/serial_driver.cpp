@@ -214,6 +214,52 @@ py::tuple AresSerial::abort(const py::kwargs &kwargs) {
     return send_broadcastable_lora_msg(dispatcher, payload);
 }
 
+static void _parse_node_config_kwargs(
+    std::map<std::string, AresFrame::NodeConfig> &payloads,
+    const py::kwargs &kwargs) {
+    if (kwargs.contains("folder_dt")) {
+        ares::DateTime dt(
+            kwargs["folder_dt"].cast<std::chrono::system_clock::time_point>());
+        payloads["folder_dt"] =
+            AresFrame::NodeConfig(0, AresFrame::SAVE_FOLDER, dt);
+    }
+
+    if (kwargs.contains("bandwidth")) {
+        payloads["bandwidth"] = AresFrame::NodeConfig(
+            0, AresFrame::BANDWIDTH, kwargs["bandwidth"].cast<double>());
+    }
+
+    if (kwargs.contains("center_freq")) {
+        payloads["center_freq"] = AresFrame::NodeConfig(
+            0, AresFrame::CENTER_FREQ, kwargs["center_freq"].cast<double>());
+    }
+
+    if (kwargs.contains("ref_level")) {
+        payloads["ref_level"] = AresFrame::NodeConfig(
+            0, AresFrame::REF_LEVEL, kwargs["ref_level"].cast<double>());
+    }
+
+    if (kwargs.contains("duration")) {
+        payloads["duration"] = AresFrame::NodeConfig(
+            0, AresFrame::DURATION, kwargs["duration"].cast<uint32_t>());
+    }
+}
+
+py::dict AresSerial::node_config(const py::kwargs &kwargs) {
+    _check_crash();
+
+    std::map<std::string, AresFrame::NodeConfig> payloads;
+    _parse_node_config_kwargs(payloads, kwargs);
+
+    FrameDispatcher dispatcher(*this, false, kwargs);
+    py::dict ret;
+    for (auto &[key, payload] : payloads) {
+        ret[key.c_str()] = dispatcher.send_frame(payload)
+                               .build_python_response<AresFrame::LoraAck>();
+    }
+    return ret;
+}
+
 py::tuple AresSerial::notify_run_ready(const py::kwargs &kwargs) {
     _check_crash();
     AresFrame::NodeReady payload;

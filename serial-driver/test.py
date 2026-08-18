@@ -3,5 +3,5 @@ from datetime import timedelta
 
 s = _AresSerial("/dev/ttyACM1")
 s.start_driver()
-print(s.start(10, 20, response_timeout=30.0, ack_timeout=5.0, broadcast=True))
+print(s.node_config(response_timeout=20.0, bandwidth=160e6, center_freq=2.45e9, duration=30, ref_level=-20.0))
 s.stop_driver()

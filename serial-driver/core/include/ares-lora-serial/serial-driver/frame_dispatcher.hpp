@@ -71,6 +71,7 @@ class FrameDispatcher {
     bool lora_response_supported = false;
     bool command_specific_supported = false;
 
+    std::vector<AresFrame::Frame::AckTypes> _lora_responses;
     CommandResponse _response;
 
     void _send_frame(AresFrame::Frame &frame,
@@ -89,7 +90,6 @@ class FrameDispatcher {
     void _send_lora_expecting_response_released(
         AresFrame::Frame &frame, const std::chrono::milliseconds &timeout,
         std::vector<AresSerial::FrameResponse> &responses);
-    std::vector<AresFrame::Frame::AckTypes> _lora_responses;
     bool _wait_lora_response(AresFrame::Frame &frame);
 
     [[nodiscard]] AresSerial::FrameResponse
