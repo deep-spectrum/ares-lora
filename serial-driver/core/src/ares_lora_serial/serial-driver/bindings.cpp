@@ -76,4 +76,9 @@ PYBIND11_MODULE(_ares_lora_serial, m, py::mod_gil_not_used()) {
         .def_readwrite("coding_rate", &AresLoraConfig::coding_rate,
                        "LoRa coding rate")
         .def_readwrite("tx_power", &AresLoraConfig::tx_power, "LoRa tx power");
+
+    py::register_local_exception<AresTimeoutError>(m, "AresTimeout",
+                                                   PyExc_TimeoutError);
+    py::register_local_exception<AresThreadTerminate>(m, "AresThreadTerminate",
+                                                      PyExc_Exception);
 }
