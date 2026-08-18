@@ -134,7 +134,7 @@ class AresSerial {
 
     // ble
     py::tuple ble_state(const py::kwargs &kwargs);
-    // int ble_disconnect();
+    py::tuple ble_disconnect(const py::kwargs &kwargs);
     // py::tuple ble_send_image(const py::bytes &image);
 
     // getters/setters

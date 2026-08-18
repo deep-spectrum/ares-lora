@@ -339,6 +339,13 @@ py::tuple AresSerial::ble_state(const py::kwargs &kwargs) {
         .build_python_response<AresFrame::BleState>();
 }
 
+py::tuple AresSerial::ble_disconnect(const py::kwargs &kwargs) {
+    _check_crash();
+    AresFrame::BleDisconnect payload;
+    FrameDispatcher dispatcher(*this, false, kwargs);
+    return dispatcher.send_frame(payload).build_python_response();
+}
+
 void AresSerial::set_ready(bool new_state) {
     py::gil_scoped_release release;
     std::unique_lock lock(_ready_mtx);

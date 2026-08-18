@@ -31,6 +31,7 @@ PYBIND11_MODULE(_ares_lora_serial, m, py::mod_gil_not_used()) {
         .def("node_config_poll", &AresSerial::node_config_poll)
         .def("notify_run_ready", &AresSerial::notify_run_ready)
         .def("ble_state", &AresSerial::ble_state)
+        .def("ble_disconnect", &AresSerial::ble_disconnect)
 
         // Events
         .def("wait_start_event", &AresSerial::wait_start_event)

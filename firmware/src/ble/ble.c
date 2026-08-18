@@ -239,6 +239,7 @@ int ares_disable_ble(void) {
         if (ret != 0) {
             LOG_ERR("bt_le_adv_stop(): %d", ret);
         }
+        // TODO: Bugfix clear advertising flag
     }
 
     return ret;
