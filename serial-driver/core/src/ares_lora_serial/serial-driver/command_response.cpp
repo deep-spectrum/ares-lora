@@ -48,3 +48,23 @@ py::tuple CommandResponse::specific_ret(const AresFrame::Version &ret) {
 py::object CommandResponse::specific_ret(const AresFrame::BleState &ret) {
     return py::cast(ret.state);
 }
+
+py::object
+CommandResponse::specific_ret(const AresFrame::NodeConfigResponse &ret) {
+    switch (ret.type) {
+    case AresFrame::SAVE_FOLDER: {
+        return py::cast(std::get<ares::DateTime>(ret.config).time_point());
+    }
+    case AresFrame::DURATION: {
+        return py::cast(std::get<uint32_t>(ret.config));
+    }
+    case AresFrame::BANDWIDTH:
+    case AresFrame::CENTER_FREQ:
+    case AresFrame::REF_LEVEL: {
+        return py::cast(std::get<double>(ret.config));
+    }
+    default: {
+        return py::none();
+    }
+    }
+}

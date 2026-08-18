@@ -15,6 +15,7 @@
 #include <ares-lora-serial/frames/frame.hpp>
 #include <ares/pyutil.hpp>
 #include <pybind11/pybind11.h>
+#include <string>
 #include <vector>
 
 namespace py = pybind11;
@@ -25,8 +26,9 @@ struct CommandResponse {
 
     void clear();
 
-    template <typename Expected = void>
-    [[nodiscard]] py::tuple build_python_response() const;
+    template <typename Expected = void, typename BadCastException = void>
+    [[nodiscard]] py::tuple
+    build_python_response(const std::string &exc_msg = "") const;
 
   private:
     static py::object specific_ret(const AresFrame::Setting &ret);
@@ -34,10 +36,11 @@ struct CommandResponse {
     static py::object specific_ret(const AresFrame::Heartbeat &ret);
     static py::tuple specific_ret(const AresFrame::Version &ret);
     static py::object specific_ret(const AresFrame::BleState &ret);
-    // TODO: How to deal with NodeConfigResponse
+    static py::object specific_ret(const AresFrame::NodeConfigResponse &ret);
 
-    template <typename T>
-    [[nodiscard]] py::tuple get_additional_response() const;
+    template <typename T, typename BadCastException>
+    [[nodiscard]] py::tuple
+    get_additional_response(const std::string &exc_msg) const;
 
     template <typename T> static py::object specific_ret(const T &ret) {
         ARG_UNUSED(ret);
@@ -45,8 +48,9 @@ struct CommandResponse {
     }
 };
 
-template <typename Expected>
-py::tuple CommandResponse::build_python_response() const {
+template <typename Expected, typename BadCastException>
+py::tuple
+CommandResponse::build_python_response(const std::string &exc_msg) const {
     py::tuple codes =
         ares::array_to_tuple(error_codes.data(), error_codes.size());
 
@@ -57,16 +61,30 @@ py::tuple CommandResponse::build_python_response() const {
             return py::make_tuple(codes, py::none());
         }
 
-        return py::make_tuple(codes, get_additional_response<Expected>());
+        return py::make_tuple(
+            codes,
+            get_additional_response<Expected, BadCastException>(exc_msg));
     }
 }
 
-template <typename T>
-py::tuple CommandResponse::get_additional_response() const {
+template <typename T, typename BadCastException>
+py::tuple
+CommandResponse::get_additional_response(const std::string &exc_msg) const {
     std::vector<py::object> resp;
 
     for (const auto &i : response_values) {
-        resp.emplace_back(specific_ret(std::any_cast<T>(i)));
+        if constexpr (std::is_same_v<T, AresFrame::LoraAck> ||
+                      std::is_same_v<T, AresFrame::LogAck>) {
+            bool value = i.type() == typeid(T);
+            resp.emplace_back(py::bool_(value));
+        } else if constexpr (!std::is_void_v<BadCastException>) {
+            if (i.type() == typeid(std::monostate)) {
+                throw BadCastException(exc_msg);
+            }
+            resp.emplace_back(specific_ret(std::any_cast<T>(i)));
+        } else {
+            resp.emplace_back(specific_ret(std::any_cast<T>(i)));
+        }
     }
 
     return ares::array_to_tuple(resp.data(), resp.size());

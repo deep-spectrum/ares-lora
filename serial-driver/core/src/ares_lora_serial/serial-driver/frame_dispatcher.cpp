@@ -136,6 +136,8 @@ AresFrame::AresFrameType FrameDispatcher::type_dispatched() const {
     return _type_dispatched;
 }
 
+bool FrameDispatcher::broadcast_msg() const { return broadcast; }
+
 void FrameDispatcher::_send_frame(
     AresFrame::Frame &frame, const std::chrono::milliseconds &timeout,
     std::vector<AresSerial::FrameResponse> &responses) {

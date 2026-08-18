@@ -3,5 +3,5 @@ from datetime import timedelta
 
 s = _AresSerial("/dev/ttyACM1")
 s.start_driver()
-print(s.log(message="This is a very long message. Did you know C++ is a horrible language. It should not be used in the future. Anything done over serial will be done in C instead because things are so much easier to keep track of.", response_timeout=30.0, destination=1, retries=3))
+print(s.start(10, 20, response_timeout=30.0, ack_timeout=5.0, broadcast=True))
 s.stop_driver()

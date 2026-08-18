@@ -54,6 +54,8 @@ class FrameDispatcher {
 
     [[nodiscard]] AresFrame::AresFrameType type_dispatched() const;
 
+    [[nodiscard]] bool broadcast_msg() const;
+
   private:
     AresSerial &_serial;
     std::chrono::milliseconds response_timeout = 2s;

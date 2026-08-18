@@ -157,6 +157,18 @@ py::tuple AresSerial::reboot(const py::kwargs &kwargs) {
     return ret;
 }
 
+template <typename Payload, typename AckType = AresFrame::LoraAck>
+static py::tuple send_broadcastable_lora_msg(
+    FrameDispatcher &dispatcher, Payload &payload,
+    const std::string &msg = "Timed out waiting for ACK") {
+    if (dispatcher.broadcast_msg()) {
+        return dispatcher.send_frame<Payload>(payload)
+            .template build_python_response<AckType>();
+    }
+    return dispatcher.send_frame<Payload>(payload)
+        .template build_python_response<AckType, AresTimeoutError>(msg);
+}
+
 py::tuple AresSerial::start(int64_t second, uint64_t usec,
                             const py::kwargs &kwargs) {
     _check_crash();
@@ -166,7 +178,7 @@ py::tuple AresSerial::start(int64_t second, uint64_t usec,
     payload.usec = usec;
 
     FrameDispatcher dispatcher(*this, false, kwargs);
-    return dispatcher.send_frame(payload).build_python_response();
+    return send_broadcastable_lora_msg(dispatcher, payload);
 }
 
 py::tuple AresSerial::poll(const py::kwargs &kwargs) {
@@ -175,7 +187,8 @@ py::tuple AresSerial::poll(const py::kwargs &kwargs) {
 
     FrameDispatcher dispatcher(*this, false, kwargs);
     return dispatcher.send_frame(payload)
-        .build_python_response<AresFrame::Heartbeat>();
+        .build_python_response<AresFrame::Heartbeat, AresTimeoutError>(
+            "Timed out waiting for heartbeat");
 }
 
 py::tuple AresSerial::log(const py::kwargs &kwargs) {
@@ -189,7 +202,8 @@ py::tuple AresSerial::log(const py::kwargs &kwargs) {
     }
 
     FrameDispatcher dispatcher(*this, false, kwargs);
-    return dispatcher.send_frame(payload).build_python_response();
+    return send_broadcastable_lora_msg<decltype(payload), AresFrame::LogAck>(
+        dispatcher, payload);
 }
 
 py::tuple AresSerial::abort(const py::kwargs &kwargs) {
@@ -197,7 +211,7 @@ py::tuple AresSerial::abort(const py::kwargs &kwargs) {
     AresFrame::Abort payload;
 
     FrameDispatcher dispatcher(*this, false, kwargs);
-    return dispatcher.send_frame(payload).build_python_response();
+    return send_broadcastable_lora_msg(dispatcher, payload);
 }
 
 py::tuple AresSerial::notify_run_ready(const py::kwargs &kwargs) {
@@ -205,7 +219,7 @@ py::tuple AresSerial::notify_run_ready(const py::kwargs &kwargs) {
     AresFrame::NodeReady payload;
 
     FrameDispatcher dispatcher(*this, false, kwargs);
-    return dispatcher.send_frame(payload).build_python_response();
+    return send_broadcastable_lora_msg(dispatcher, payload);
 }
 
 void AresSerial::set_ready(bool new_state) {
