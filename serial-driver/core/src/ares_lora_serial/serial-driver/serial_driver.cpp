@@ -74,7 +74,7 @@ py::tuple AresSerial::setting(const py::kwargs &kwargs) {
     AresFrame::Setting payload;
 
     if (!kwargs.contains("id")) {
-        // todo: throw kwargs error
+        throw py::type_error("Requires keyword-only argument id");
     }
 
     payload.setting_id = kwargs["id"].cast<decltype(payload.setting_id)>();
@@ -105,7 +105,7 @@ py::tuple AresSerial::led(const py::kwargs &kwargs) {
     AresFrame::Led payload;
 
     if (!kwargs.contains("id")) {
-        // todo throw kwargs error
+        throw py::type_error("Requires keyword-only argument id");
     }
 
     payload.led = kwargs["id"].cast<decltype(payload.led)>();

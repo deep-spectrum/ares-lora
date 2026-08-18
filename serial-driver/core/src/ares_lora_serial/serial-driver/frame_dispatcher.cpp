@@ -317,12 +317,13 @@ bool FrameDispatcher::_verify_response(
     }
     case AresSerial::FrameResponse::COMMAND_SPECIFIC: {
         if (!command_specific_supported) {
-            // todo: throw error
+            throw std::runtime_error("Received a command specific response "
+                                     "when one was not expected");
         }
         break;
     }
     default: {
-        // todo: throw exception
+        throw std::runtime_error("Received an invalid response from firmware");
         break;
     }
     }
@@ -356,7 +357,8 @@ void FrameDispatcher::_process_responses(
             break;
         }
         default: {
-            // todo: exception
+            throw std::runtime_error(
+                "Invalid response found while processing responses");
             break;
         }
         }
