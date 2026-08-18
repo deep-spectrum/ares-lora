@@ -325,6 +325,20 @@ py::tuple AresSerial::notify_run_ready(const py::kwargs &kwargs) {
     return send_broadcastable_lora_msg(dispatcher, payload);
 }
 
+py::tuple AresSerial::ble_state(const py::kwargs &kwargs) {
+    _check_crash();
+    AresFrame::BleState payload(AresFrame::BleState::REQUEST);
+
+    if (kwargs.contains("state")) {
+        payload.state = static_cast<AresFrame::BleState::State>(
+            kwargs["state"].cast<uint8_t>());
+    }
+
+    FrameDispatcher dispatcher(*this, true, kwargs);
+    return dispatcher.send_frame(payload)
+        .build_python_response<AresFrame::BleState>();
+}
+
 void AresSerial::set_ready(bool new_state) {
     py::gil_scoped_release release;
     std::unique_lock lock(_ready_mtx);

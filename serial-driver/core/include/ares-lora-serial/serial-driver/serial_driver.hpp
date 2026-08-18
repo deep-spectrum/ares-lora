@@ -133,7 +133,7 @@ class AresSerial {
     py::tuple notify_run_ready(const py::kwargs &kwargs);
 
     // ble
-    // py::tuple ble_state(uint8_t value);
+    py::tuple ble_state(const py::kwargs &kwargs);
     // int ble_disconnect();
     // py::tuple ble_send_image(const py::bytes &image);
 

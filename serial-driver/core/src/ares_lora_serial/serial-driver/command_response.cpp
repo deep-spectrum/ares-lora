@@ -46,7 +46,7 @@ py::tuple CommandResponse::specific_ret(const AresFrame::Version &ret) {
 }
 
 py::object CommandResponse::specific_ret(const AresFrame::BleState &ret) {
-    return py::cast(ret.state);
+    return py::cast(static_cast<uint8_t>(ret.state));
 }
 
 py::object
