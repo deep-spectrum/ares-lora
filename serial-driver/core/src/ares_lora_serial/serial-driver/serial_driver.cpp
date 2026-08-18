@@ -260,6 +260,63 @@ py::dict AresSerial::node_config(const py::kwargs &kwargs) {
     return ret;
 }
 
+static void _parse_node_config_args(
+    std::map<std::string, AresFrame::NodeConfigPoll> &payloads,
+    const py::args &args) {
+    for (const auto &arg : args) {
+        if (!py::isinstance<py::str>(arg)) {
+            // Not a string. Skip....
+            continue;
+        }
+
+        const auto val = arg.cast<std::string>();
+        LOG_DBG("Poll parser parsed \"%s\"", val.c_str());
+
+        if (val == "folder_dt") {
+            payloads[val] =
+                AresFrame::NodeConfigPoll(0, AresFrame::SAVE_FOLDER);
+            continue;
+        }
+
+        if (val == "bandwidth") {
+            payloads[val] = AresFrame::NodeConfigPoll(0, AresFrame::BANDWIDTH);
+            continue;
+        }
+
+        if (val == "center_freq") {
+            payloads[val] =
+                AresFrame::NodeConfigPoll(0, AresFrame::CENTER_FREQ);
+            continue;
+        }
+
+        if (val == "duration") {
+            payloads[val] = AresFrame::NodeConfigPoll(0, AresFrame::DURATION);
+            continue;
+        }
+
+        if (val == "ref_level") {
+            payloads[val] = AresFrame::NodeConfigPoll(0, AresFrame::REF_LEVEL);
+        }
+    }
+}
+
+py::dict AresSerial::node_config_poll(const py::args &args,
+                                      const py::kwargs &kwargs) {
+    _check_crash();
+
+    std::map<std::string, AresFrame::NodeConfigPoll> payloads;
+    _parse_node_config_args(payloads, args);
+
+    FrameDispatcher dispatcher(*this, false, kwargs);
+    py::dict ret;
+    for (auto &[key, payload] : payloads) {
+        ret[key.c_str()] =
+            dispatcher.send_frame(payload)
+                .build_python_response<AresFrame::NodeConfigResponse>();
+    }
+    return ret;
+}
+
 py::tuple AresSerial::notify_run_ready(const py::kwargs &kwargs) {
     _check_crash();
     AresFrame::NodeReady payload;
