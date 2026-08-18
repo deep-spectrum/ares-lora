@@ -738,14 +738,17 @@ static bool queue_nullptr(
 
     try {
         q.put_nonblocking(static_cast<std::unique_ptr<T>>(nullptr));
-    } catch (const ares::queue_exception &) {
+        LOG_DBG("Exit successfully requested");
+    } catch (const ares::queue_exception &exc) {
         exit_requested = false;
+        LOG_DBG("Exit not requested successfully: %s", exc.what());
     }
 
     return exit_requested;
 }
 
 bool AresSerial::_stop_event_queues() {
+    LOG_DBG("Stopping event queues");
     bool success = queue_nullptr(_start_event_q);
     success = queue_nullptr(_log_event_q) && success;
     success = queue_nullptr(_pkt_rx_event_q) && success;
@@ -754,6 +757,7 @@ bool AresSerial::_stop_event_queues() {
     success = queue_nullptr(_ble_subscribed_event_q) && success;
     success = queue_nullptr(_abortion_event_q) && success;
     success = queue_nullptr(_run_ready_event_q) && success;
+    LOG_DBG("Stop event queues yielded %d", success);
     return success;
 }
 

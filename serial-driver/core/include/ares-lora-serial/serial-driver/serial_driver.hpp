@@ -16,8 +16,8 @@
 #include <ares/datetime/datetime.hpp>
 #include <ares/serial/serial.hpp>
 #include <ares/synchronization/semaphore.hpp>
+#include <ares/synchronization/shared_flag.hpp>
 #include <ares/work-q/task.hpp>
-#include <atomic>
 #include <chrono>
 #include <exception>
 #include <functional>
@@ -197,7 +197,7 @@ class AresSerial {
 
     // Overall Task related stuff
     std::recursive_mutex _serial_lock;
-    std::atomic_bool _tasks_running = false;
+    ares::SharedFlag _tasks_running;
 
     // Receive task stuff
     ares::Task<void()> _rx_task;
