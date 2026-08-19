@@ -10,11 +10,12 @@
 
 #include <ares-lora-serial/frames/lora/lora_base.hpp>
 #include <ares-lora-serial/serial-driver/frame_dispatcher.hpp>
+#include <ares/logging/log.hpp>
 #include <chrono>
 #include <string>
 #include <type_traits>
 
-// TODO: Get the log in here
+LOG_MODULE_REGISTER(serial_logger);
 
 template <typename T, typename = void>
 struct has_member_id : std::false_type {};
@@ -158,7 +159,7 @@ void FrameDispatcher::_send_frame_released(
 
 void FrameDispatcher::_send_frame_released(
     const std::vector<uint8_t> &buf) const {
-    // todo log
+    LOG_DBG_HEXDUMP(buf, buf.size(), "Sent data");
     std::unique_lock lock(_serial._serial_lock);
     _serial._serial.write(buf);
 }
