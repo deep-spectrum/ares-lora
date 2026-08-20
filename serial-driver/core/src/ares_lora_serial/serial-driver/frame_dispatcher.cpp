@@ -293,8 +293,7 @@ AresSerial::FrameResponse FrameDispatcher::_wait_response_timeout(
 }
 
 AresSerial::FrameResponse FrameDispatcher::_wait_response_forever() const {
-    // TODO: Add a check condition
-    return _serial._response_queue.get();
+    return _serial._response_queue.get(check_python_errors);
 }
 
 void FrameDispatcher::_verify_responses(
