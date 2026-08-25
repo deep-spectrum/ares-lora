@@ -20,12 +20,33 @@
 
 namespace py = pybind11;
 
+/**
+ * @struct CommandResponse
+ * Holds the command acknoledgements and any other responses.
+ */
 struct CommandResponse {
+    /**
+     * Error codes returned.
+     */
     std::vector<int> error_codes;
+
+    /**
+     * Command specific responses or responses from LoRa
+     */
     std::vector<std::any> response_values;
 
+    /**
+     * Clear the responses.
+     */
     void clear();
 
+    /**
+     * Convert the command response into something Python can understand.
+     * @tparam Expected The payload class of the expected response.
+     * @tparam BadCastException The exception to to throw on bad cast.
+     * @param[in] exc_msg The exception message.
+     * @return tuple[tuple[int, ...], tuple[responseValue | None\ | None]]
+     */
     template <typename Expected = void, typename BadCastException = void>
     [[nodiscard]] py::tuple
     build_python_response(const std::string &exc_msg = "") const;
