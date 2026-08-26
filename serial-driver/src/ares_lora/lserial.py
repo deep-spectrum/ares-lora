@@ -529,40 +529,36 @@ class LoraSerial:
         self._check_ret_code(ret[0])
 
     @lora_serial_command
-    def start(self, sec: int, usec: int, timeout: float = 20.0, broadcast: bool = True,
-              destination_id: int | None = None, ack_timeout: float = 5.0) -> None:
+    def start(self, sec: int, usec: int, **kwargs) -> bool | None:
         """Send start time over LoRa
 
         Args:
-            ack_timeout: The time to wait for an acknowledgement from the target node.
             sec: The seconds part of the time to start.
             usec: The microseconds part of the time to start.
-            timeout: The timeout of the transmission.
-            broadcast: Broadcast the message to all the nodes.
-            destination_id: The destination node if not broadcasting. This field is ignored if broadcasting.
+            kwargs: Keyword arguments
+
+        Keyword Args:
+             destination: The destination ID.
+             response_timeout: The maximum time to wait for a response.
+             ack_timeout: Maximum time to wait for a LoRa acknowledgement.
+             broadcast: Flag indicating if the message should be broadcasted.
+             retries: The amount of times to retry if no ACK was received.
+
+        Returns:
+            `None` if a broadcast message. `True` if the message was acknowledged, `False` otherwise.
 
         Raises:
-            ValueError: The destination ID is invalid.
             ValueError: The start time is invalid.
             TimeoutError: No response from the firmware within the timeout.
             LoraException: Firmware responded with an error code.
         """
-        if not broadcast and (destination_id is None or destination_id <= 0):
-            raise ValueError("Direct messages must have a valid destination specified")
         if sec < 0 or usec < 0:
             raise ValueError("Time must be positive")
-        if destination_id is None:
-            destination_id = 0
-        prev_timeout = self._dev.get_response_timeout()
-        self._dev.set_response_timeout(timeout)
-        try:
-            ret = self._dev.start(sec, usec, destination_id, broadcast, ack_timeout)
-        except Exception:
-            self._dev.set_response_timeout(prev_timeout)
-            raise
-        else:
-            self._dev.set_response_timeout(prev_timeout)
-        self._check_ret_code(ret)
+        ret = self._dev.start(sec, usec, **kwargs)
+        self._check_ret_code(ret[0])
+        if ret[1] is not None:
+            return ret[1][0]
+        return None
 
     @lora_serial_command
     def send_poll(self, node_id: int, poll_response_timeout: float = 30.0, timeout: float = 20.0) -> bool:

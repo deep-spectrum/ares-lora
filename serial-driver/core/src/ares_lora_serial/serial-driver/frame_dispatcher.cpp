@@ -192,18 +192,19 @@ void FrameDispatcher::_send_lora_expecting_response_released(
     do {
         frame.serialize(buf);
         AresSerial::FrameResponse fw_response;
-        bool acked = false;
-        size_t max_attempts = retries + 1;
+        bool timed_out = true;
 
-        for (size_t attempt = 0u; attempt < max_attempts && !acked; attempt++) {
+        for (size_t attempt = 0u; attempt <= retries && timed_out; attempt++) {
+            LOG_DBG("Sending LoRa frame (attempt %u out of %u)", attempt, retries);
             lock.lock();
             _serial._response_queue.clear();
             _send_frame_released(buf);
             fw_response = _wait_response(timeout);
             check_python_errors();
             (void)_verify_response(fw_response);
-            acked = _wait_lora_response(frame);
+            timed_out = _wait_lora_response(frame);
             lock.unlock();
+            LOG_DBG("Message response timed out: %d", timed_out);
         }
 
         responses.emplace_back(fw_response);
