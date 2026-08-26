@@ -406,12 +406,16 @@ class LoraSerial:
                 raise LoraException(c, key)
 
     @lora_serial_command
-    def setting(self, setting_id: SettingId, value: int | None = None) -> int | None:
+    def setting(self, setting_id: SettingId, **kwargs) -> int | None:
         """Set or retrieve a LoRa firmware setting.
 
         Args:
             setting_id: The setting to read or write to.
-            value: The new value of the setting. If None, reads the specified setting.
+            kwargs: Keyword arguments.
+
+        Keyword Args:
+            value: The new setting value.
+            response_timeout: The maximum time to wait for a response.
 
         Returns:
             If writing a setting, None. If reading a setting, the value of the setting.
@@ -420,12 +424,10 @@ class LoraSerial:
             TimeoutError: No response from the firmware within the configured timeout.
             LoraException: Firmware responded with an error code.
         """
-        if value is None:
-            ret, err_code = self._dev.setting_get(setting_id.value)
-            self._check_ret_code(err_code)
-            return ret
-        err_code = self._dev.setting_set(setting_id.value, value)
-        self._check_ret_code(err_code)
+        ret, value = self._dev.setting(id=setting_id.value, **kwargs)
+        self._check_ret_code(ret)
+        if value is not None:
+            return value[0]
         return None
 
     @lora_serial_command
