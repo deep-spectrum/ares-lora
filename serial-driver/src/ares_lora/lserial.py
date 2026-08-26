@@ -481,6 +481,30 @@ class LoraSerial:
         return None
 
     @lora_serial_command
+    def version(self, **kwargs) -> tuple[tuple[int, int, int], tuple[int, int, int], tuple[int, int, int]]:
+        """Retrieves all the firmware version information.
+
+        Args:
+            kwargs: Keyword arguments
+
+        Keyword Args:
+            response_timeout: The maximum time to wait for a response.
+
+        Returns:
+            A tuple of versions. The first tuple is the application version, the second tuple is the ncs version, and the third tuple is the kernel version.
+
+        Raises:
+            TimeoutError: No response from the firmware within the configured timeout.
+            LoraException: Firmware responded with an error code.
+
+        Notes:
+            A version tuple is as follows: (major, minor, patch).
+        """
+        ret = self._dev.version(**kwargs)
+        self._check_ret_code(ret[0])
+        return ret[1]
+
+    @lora_serial_command
     def start(self, sec: int, usec: int, timeout: float = 20.0, broadcast: bool = True,
               destination_id: int | None = None, ack_timeout: float = 5.0) -> None:
         """Send start time over LoRa
@@ -587,22 +611,6 @@ class LoraSerial:
         else:
             self._dev.set_response_timeout(prev_timeout)
         self._check_ret_code(codes)
-
-    @lora_serial_command
-    def version(self) -> tuple[tuple[int, int, int], tuple[int, int, int], tuple[int, int, int]]:
-        """Retrieves all the firmware version information.
-
-        Returns:
-            A tuple of versions. The first tuple is the application version, the second tuple is the ncs version, and the third tuple is the kernel version.
-
-        Raises:
-            TimeoutError: No response from the firmware within the configured timeout.
-            LoraException: Firmware responded with an error code.
-
-        Notes:
-            A version tuple is as follows: (major, minor, patch).
-        """
-        return self._dev.version()
 
     @lora_serial_command
     def ble_state(self, state: BleState = BleState.REQUEST) -> BleState | None:
