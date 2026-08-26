@@ -1,4 +1,4 @@
-from ares_lora_serial_core import _SerialConfigs, _AresSerial, AresTimeout, _AresLoraConfig, AresThreadTerminate
+from ares_lora_serial_core import _AresSerial, AresTimeout, _AresLoraConfig, AresThreadTerminate
 from typing import Callable
 from enum import IntEnum
 from dataclasses import dataclass, asdict
@@ -13,6 +13,7 @@ import threading
 from weakref import WeakSet
 from queue import Queue, Empty
 from datetime import datetime, timedelta
+from pathlib import Path
 
 logger = logging.getLogger("ares_lora")
 
@@ -149,20 +150,20 @@ class LoraLedState(IntEnum):
     FETCH = 4
 
 
-@dataclass
-class LoraSerialConfig:
-    """Configurations for the LoRa serial driver.
-
-    Attributes:
-        port: The serial port to connect to.
-        response_timeout: The amount of time (in seconds) to wait for a response from the firmware.
-        rx_period: How often (in seconds) the serial driver polls the serial receive buffer.
-        serial_timeout: The serial RX timeout (in seconds).
-    """
-    port: str = ""
-    response_timeout: float = 2.0
-    rx_period: float = 0.1
-    serial_timeout: float = 0.1
+# @dataclass
+# class LoraSerialConfig:
+#     """Configurations for the LoRa serial driver.
+#
+#     Attributes:
+#         port: The serial port to connect to.
+#         response_timeout: The amount of time (in seconds) to wait for a response from the firmware.
+#         rx_period: How often (in seconds) the serial driver polls the serial receive buffer.
+#         serial_timeout: The serial RX timeout (in seconds).
+#     """
+#     port: str = ""
+#     response_timeout: float = 2.0
+#     rx_period: float = 0.1
+#     serial_timeout: float = 0.1
 
 
 @dataclass
@@ -204,42 +205,43 @@ _instances = WeakSet()
 def _shutdown_drivers():
     global _instances
     for x in _instances:
+        # noinspection protected-member
         x._stop_device_driver_noexcept()
 
 
 # Need this since the threading module wants to run its shutdown sequence before object deletion...
+# noinspection unresolved-references,protected-member
 threading._register_atexit(_shutdown_drivers)
 
 
 class LoraSerial:
     """LoRa serial driver python implementation. Works only on Linux."""
 
-    def __init__(self, config: LoraSerialConfig = LoraSerialConfig()):
+    def __init__(self, port: str | Path, **kwargs):
         """Initializes the LoRa driver.
 
         Args:
-            config: The configurations for the LoRa driver.
+            port: The port the lora node is connected to
+            kwargs: Keyword arguments
+
+        Keyword Args:
+            serial_timeout: The serial reception timeout
+            rx_period: The period to poll the receive buffer
 
         Raises:
             ValueError: Empty port configuration.
             IOError: Port not found.
         """
-        if not config.port:
+        if isinstance(port, Path):
+            port = str(port)
+
+        if not port:
             raise ValueError("Invalid port")
-        if not check_serial_port(config.port):
-            raise IOError(f"Cannot open port {config.port}: Does not exist")
-        configs = _SerialConfigs(
-            port=config.port,
-            response_timeout=config.response_timeout,
-            rx_period=config.rx_period,
-            serial_timeout=config.serial_timeout,
-        )
+        if not check_serial_port(port):
+            raise IOError(f"Cannot open port {port}: Does not exist")
 
         self._start_hook_lock = threading.Lock()
         self._start_hook: Callable[[int, int], None] | None = None
-
-        self._poll_hook_lock = threading.Lock()
-        self._poll_hook: Callable[[int], None] | None = None
 
         self._log_hook_lock = threading.Lock()
         self._log_hook: Callable[[int, str], None] | None = None
@@ -250,7 +252,7 @@ class LoraSerial:
         self._run_ready_hook_lock = threading.Lock()
         self._run_ready_hook: Callable[[int, bool], None] | None = None
 
-        self._dev = _AresSerial(configs)
+        self._dev = _AresSerial(port, **kwargs)
         self._nodes: dict[int, int] = {}
         self._log_msg: dict[int, LogMessage] = {}
 
@@ -263,7 +265,6 @@ class LoraSerial:
         self._logger = logger
 
         self._start_thread: Thread | None = None
-        self._poll_thread: Thread | None = None
         self._log_thread: Thread | None = None
         self._pkt_rx_thread: Thread | None = None
         self._pkt_tx_thread: Thread | None = None
@@ -301,16 +302,6 @@ class LoraSerial:
                 with self._start_hook_lock:
                     if self._start_hook is not None:
                         self._start_hook(sec, usec)
-
-    def _poll_event_handle(self):
-        while True:
-            try:
-                src_id = self._dev.wait_poll_event()
-            except AresThreadTerminate:
-                break
-            with self._poll_hook_lock:
-                if self._poll_hook is not None:
-                    self._poll_hook(src_id)
 
     def _log_event_handle(self):
         while True:
@@ -900,22 +891,6 @@ class LoraSerial:
         with self._start_hook_lock:
             self._start_hook = hook
 
-    def register_poll_hook(self, hook: Callable[[int], None] | None):
-        """Register a poll event hook.
-
-        Args:
-            hook: The function to call when a poll event occurs. `None` to unregister the hook.
-
-        Notes:
-            The hook signature is [source_id] -> None.
-
-        Warning:
-            Registering or unregistering a hook performs a blocking action. It is highly recommended
-            that hooks should be kept short and fast and offload work to other threads.
-        """
-        with self._poll_hook_lock:
-            self._poll_hook = hook
-
     def register_log_hook(self, hook: Callable[[int, str], None] | None):
         """Register a log event hook.
 
@@ -1010,10 +985,6 @@ class LoraSerial:
         assert isinstance(self._start_thread, Thread)
         self._start_thread.start()
 
-        self._poll_thread = Thread(target=self._poll_event_handle)
-        assert isinstance(self._poll_thread, Thread)
-        self._poll_thread.start()
-
         self._log_thread = Thread(target=self._log_event_handle)
         assert isinstance(self._log_thread, Thread)
         self._log_thread.start()
@@ -1066,10 +1037,6 @@ class LoraSerial:
         if self._start_thread is not None:
             self._start_thread.join()
             self._start_thread = None
-
-        if self._poll_thread is not None:
-            self._poll_thread.join()
-            self._poll_thread = None
 
         if self._log_thread is not None:
             self._log_thread.join()
