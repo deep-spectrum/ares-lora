@@ -343,7 +343,7 @@ class LoraSerial:
     def _pkt_tx_done_event_handle(self):
         while True:
             try:
-                count = self._dev.wait_packet_tx_done_event()
+                count = self._dev.wait_packet_tx_event()
             except AresThreadTerminate:
                 break
 
@@ -353,7 +353,7 @@ class LoraSerial:
     def _abort_event_handler(self):
         while True:
             try:
-                broadcast, source_id = self._dev.wait_abort_event()
+                broadcast, source_id = self._dev.wait_abortion_event()
             except AresThreadTerminate:
                 break
 
@@ -364,7 +364,7 @@ class LoraSerial:
     def _node_ready_event_handler(self):
         while True:
             try:
-                source_id, broadcast = self._dev.wait_node_ready_event()
+                source_id, broadcast = self._dev.wait_run_ready_event()
             except AresThreadTerminate:
                 break
 
@@ -375,7 +375,7 @@ class LoraSerial:
     def _ble_connect_event_handle(self):
         while True:
             try:
-                connected = self._dev.wait_ble_connect_event()
+                connected = self._dev.wait_ble_connection_event()
             except AresThreadTerminate:
                 break
 
