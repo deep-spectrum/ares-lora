@@ -561,13 +561,18 @@ class LoraSerial:
         return None
 
     @lora_serial_command
-    def send_poll(self, node_id: int, poll_response_timeout: float = 30.0, timeout: float = 20.0) -> bool:
+    def poll(self, **kwargs) -> bool:
         """Poll a node on the LoRa network for a heartbeat.
 
         Args:
-            node_id: The node to poll.
-            poll_response_timeout: The amount of time to wait for a response from the target node.
-            timeout: The timeout per a transmission
+            kwargs: Keyword arguments.
+
+        Keyword Args:
+             destination: The destination ID.
+             response_timeout: The maximum time to wait for a response.
+             ack_timeout: Maximum time to wait for a LoRa acknowledgement.
+             broadcast: Flag indicating if the message should be broadcasted.
+             retries: The amount of times to retry if no ACK was received.
 
         Raises:
             ValueError: The node ID is invalid.
@@ -578,19 +583,9 @@ class LoraSerial:
         Returns:
             The ready status of the polled node.
         """
-        if node_id <= 0 or node_id > 65535:
-            raise ValueError("Not a valid node")
-        prev_timeout = self._dev.get_response_timeout()
-        self._dev.set_response_timeout(timeout)
-        try:
-            ready, code = self._dev.send_poll(node_id, poll_response_timeout)
-        except Exception:
-            self._dev.set_response_timeout(prev_timeout)
-            raise
-        else:
-            self._dev.set_response_timeout(prev_timeout)
-        self._check_ret_code(code)
-        return ready
+        ret = self._dev.poll(**kwargs)
+        self._check_ret_code(ret[0])
+        return ret[1][0]
 
     @lora_serial_command
     def send_log(self, log_msg: str, broadcast: bool = False, dst_id: int | None = None, strobe_count: int = 3,
