@@ -454,6 +454,33 @@ class LoraSerial:
         self._check_ret_code(ret[0])
 
     @lora_serial_command
+    def led(self, led_id: int, **kwargs) -> LoraLedState | None:
+        """Set or retrieve the state of the LED.
+
+        Args:
+            led_id: The ID/number of the LED to fetch/set the state of.
+            kwargs: Keyword arguments
+
+        Keyword Args:
+            state: The new LED state
+            response_timeout: The maximum time to wait for a response.
+
+        Returns:
+            The current LED state if state is LoraLedState.FETCH. None otherwise.
+
+        Raises:
+            TimeoutError: No response from the firmware within the configured timeout.
+            LoraException: Firmware responded with an error code.
+        """
+        if led_id > ctypes.c_uint8(-1).value:
+            raise ValueError(f"led_id is {led_id}. Valid range: [0, {ctypes.c_uint8(-1).value}]")
+        ret = self._dev.led(id=led_id, **kwargs)
+        self._check_ret_code(ret[0])
+        if ret[1] is not None:
+            return LoraLedState(ret[1][0])
+        return None
+
+    @lora_serial_command
     def start(self, sec: int, usec: int, timeout: float = 20.0, broadcast: bool = True,
               destination_id: int | None = None, ack_timeout: float = 5.0) -> None:
         """Send start time over LoRa
@@ -488,30 +515,6 @@ class LoraSerial:
         else:
             self._dev.set_response_timeout(prev_timeout)
         self._check_ret_code(ret)
-
-    @lora_serial_command
-    def led(self, led_id: int, state: LoraLedState = LoraLedState.FETCH) -> LoraLedState | None:
-        """Set or retrieve the state of the LED.
-
-        Args:
-            led_id: The ID/number of the LED to fetch/set the state of.
-            state: The new state of the LED. If set to LoraLedState.FETCH, then retrieves the current state of the
-                   LED. (Default: LoraLedState.FETCH)
-
-        Returns:
-            The current LED state if state is LoraLedState.FETCH. None otherwise.
-
-        Raises:
-            TimeoutError: No response from the firmware within the configured timeout.
-            LoraException: Firmware responded with an error code.
-        """
-        if led_id > ctypes.c_uint8(-1).value:
-            raise ValueError(f"led_id is {led_id}. Valid range: [0, {ctypes.c_uint8(-1).value}]")
-        ret, err_code = self._dev.led(led_id, state.value)
-        self._check_ret_code(err_code)
-        if state == LoraLedState.FETCH:
-            return LoraLedState(ret)
-        return None
 
     @lora_serial_command
     def send_poll(self, node_id: int, poll_response_timeout: float = 30.0, timeout: float = 20.0) -> bool:
