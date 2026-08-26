@@ -21,26 +21,60 @@
 
 namespace py = pybind11;
 
+/**
+ * @class FrameDispatcher
+ * Helper class for dispatching frames and listening for their responses.
+ */
 class FrameDispatcher {
   public:
-    FrameDispatcher(AresSerial &serial, bool cmd_specific_supported,
-                    const py::kwargs &kwargs)
+    /**
+     * KWArgs constructor.
+     * @param[in] serial The serial object.
+     * @param[in] cmd_specific_supported Flag indicating if a command specific
+     * response is supported.
+     * @param[in] kwargs The Python keyword arguments.
+     */
+    explicit FrameDispatcher(AresSerial &serial, bool cmd_specific_supported,
+                             const py::kwargs &kwargs)
         : _serial(serial), command_specific_supported(cmd_specific_supported) {
         ares::from_kwargs(kwargs, SP(response_timeout), SP(ack_timeout),
                           SP(retries), SP(broadcast), SP(destination));
     }
-    FrameDispatcher(AresSerial &serial,
-                    std::chrono::milliseconds response_timeout)
+
+    /**
+     * Response constructor.
+     * @param serial The serial object.
+     * @param response_timeout The amount of time to wait for a response.
+     */
+    explicit FrameDispatcher(AresSerial &serial,
+                             std::chrono::milliseconds response_timeout)
         : _serial(serial), response_timeout(response_timeout),
           lora_fields_already_set(true) {}
 
+    /**
+     * Send a frame over serial and retrieve its response.
+     * @tparam T The Tx payload type in the variant.
+     * @param[in] payload The frame payload to send.
+     * @return The response from the firmware.
+     */
     template <typename T> CommandResponse send_frame(T &payload) {
         AresFrame::Frame::TxTypes fucking_bullshit = payload;
         return send_frame(fucking_bullshit);
     }
 
+    /**
+     * Send a frame over serial and retrieve its response.
+     * @param[in] payload The frame payload to send.
+     * @return The response from the firmware.
+     */
     CommandResponse send_frame(AresFrame::Frame::TxTypes &payload);
 
+    /**
+     * Send a frame over serial while the GIL is released.
+     * @tparam T The Tx payload type in the variant.
+     * @param[in] payload The frame payload to send.
+     * @param[in,out] responses The response(s) from firmware.
+     */
     template <typename T>
     void
     send_frame_released(T &payload,
@@ -49,11 +83,25 @@ class FrameDispatcher {
         send_frame_released(fucking_bullshit, responses);
     }
 
+    /**
+     * Send a frame over serial while the GIL is released.
+     * @param[in] payload The frame payload to send.
+     * @param[in,out] responses The response(s) from firmware.
+     */
     void send_frame_released(AresFrame::Frame::TxTypes &payload,
                              std::vector<AresSerial::FrameResponse> &responses);
 
+    /**
+     * Get the frame type that was dispatched.
+     * @return The frame type dispatched.
+     */
     [[nodiscard]] AresFrame::AresFrameType type_dispatched() const;
 
+    /**
+     * Check if the message is a broadcast message.
+     * @return @p true if the message is a broadcast message, @p false
+     * otherwise.
+     */
     [[nodiscard]] bool broadcast_msg() const;
 
   private:
