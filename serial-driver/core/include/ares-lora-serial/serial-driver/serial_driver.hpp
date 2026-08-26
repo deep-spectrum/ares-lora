@@ -531,6 +531,10 @@ class AresSerial {
     BleInfo _ble_info;
 };
 
+/**
+ * Acquire the Python GIL and check if any Python exceptions were thrown.
+ * @throws py::error_already_set
+ */
 void check_python_errors();
 
 #endif // ARES_SERIAL_DRIVER_HPP
