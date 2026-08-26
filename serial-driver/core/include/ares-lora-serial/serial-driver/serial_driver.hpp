@@ -54,10 +54,21 @@ class AresTimeoutError : public std::exception {
     std::string _msg;
 };
 
+/**
+ * @class AresThreadTerminate
+ * Exception for indicating that a thread should terminate its execution.
+ */
 class AresThreadTerminate : public std::exception {
   public:
+    /**
+     * Constructor.
+     */
     AresThreadTerminate() = default;
 
+    /**
+     * Exception message.
+     * @return The exception message.
+     */
     [[nodiscard]] const char *what() const noexcept override {
         return "Thread terminate signal";
     }
@@ -109,40 +120,179 @@ struct AresLoraConfig {
     [[nodiscard]] AresFrame::Frame generate_frame() const;
 };
 
+/**
+ * @class AresSerial
+ * Serial driver class.
+ */
 class AresSerial {
   public:
+    /**
+     * Constructor.
+     * @param port The serial port the device is on.
+     * @param kwargs Keyword arguments.
+     */
     explicit AresSerial(const std::string &port, const py::kwargs &kwargs);
 
+    /**
+     * Destructor.
+     */
     ~AresSerial();
 
-    // mcu
+    /**
+     * @defgroup mcu Microcontroller commands.
+     * @{
+     */
+
+    /**
+     * Retrieve or save a setting to the microcontroller flash.
+     * @param[in] kwargs Python keyword arguments.
+     * @return tuple[error code, value | None]
+     */
     py::tuple setting(const py::kwargs &kwargs);
+
+    /**
+     * Reconfigure the LoRa radio.
+     * @param[in] config The new LoRa configurations.
+     * @param[in] kwargs Python keyword arguments.
+     * @return tuple[error code, None]
+     */
     py::tuple lora_config(const AresLoraConfig &config,
                           const py::kwargs &kwargs);
+
+    /**
+     * Set or retrieve the LED action.
+     * @param[in] kwargs Python keyword arguments.
+     * @return tuple[error code, state | None]
+     */
     py::tuple led(const py::kwargs &kwargs);
+
+    /**
+     * Retrieve the firmware version.
+     * @param[in] kwargs Python keyword arguments.
+     * @return tuple[error code, tuple[versions]]
+     */
     py::tuple version(const py::kwargs &kwargs);
+
+    /**
+     * Reboot the microcontroller.
+     * @param[in] kwargs Python keyword arguments.
+     * @return tuple[error code, None]
+     */
     py::tuple reboot(const py::kwargs &kwargs);
 
-    // lora
+    /**
+     * @}
+     */
+
+    /**
+     * @defgroup lora LoRa commands.
+     * @{
+     */
+
+    /**
+     * Send the start message over LoRa.
+     * @param[in] second The second to start on
+     * @param[in] usec The microsecond to start on.
+     * @param[in] kwargs Python keyword arguments.
+     * @return tuple[tuple[code], tuple[bool] | None]
+     */
     py::tuple start(int64_t second, uint64_t usec, const py::kwargs &kwargs);
+
+    /**
+     * Poll a node for ready status.
+     * @param[in] kwargs Python keyword arguments.
+     * @return tuple[tuple[code], tuple[bool] | None]
+     */
     py::tuple poll(const py::kwargs &kwargs);
+
+    /**
+     *  Send a log message over LoRa.
+     * @param[in] kwargs Python keyword arguments.
+     * @return tuple[tuple[code], tuple[bool] | None]
+     */
     py::tuple log(const py::kwargs &kwargs);
+
+    /**
+     * Send an abort message.
+     * @param[in] kwargs Python keyword arguments.
+     * @return tuple[tuple[code], tuple[bool] | None]
+     */
     py::tuple abort(const py::kwargs &kwargs);
+
+    /**
+     * Send node configurations over LoRa.
+     * @param[in] kwargs Python keyword arguments.
+     * @return dict[config, bool]
+     */
     py::dict node_config(const py::kwargs &kwargs);
+
+    /**
+     * Poll a node for its configurations over LoRa.
+     * @param[in] args Python arguments.
+     * @param[in] kwargs Python keyword arguments.
+     * @return dict[config, value]
+     */
     py::dict node_config_poll(const py::args &args, const py::kwargs &kwargs);
+
+    /**
+     * Notify a node that the run is ready.
+     * @param[in] kwargs Python keyword arguments.
+     * @return tuple[tuple[code], tuple[bool]]
+     */
     py::tuple notify_run_ready(const py::kwargs &kwargs);
 
-    // ble
+    /**
+     * @}
+     */
+
+    /**
+     * @defgroup ble BLE commands.
+     * @{
+     */
+
+    /**
+     * Set or retrieve the BLE state.
+     * @param[in] kwargs Python keyword arguments.
+     * @return tuple[tuple[code], tuple[state|None] | None]
+     */
     py::tuple ble_state(const py::kwargs &kwargs);
+
+    /**
+     * Force the BLE to disconnect.
+     * @param[in] kwargs Python keyword arguments.
+     * @return tuple[tuple[code], None]
+     */
     py::tuple ble_disconnect(const py::kwargs &kwargs);
     // TODO: This needs some more thought put into it.
     // py::tuple ble_send_image(const py::bytes &image);
 
-    // getters/setters
+    /**
+     * @}
+     */
+
+    /**
+     * Set the ready flag.
+     * @param[in] new_state The new state.
+     */
     void set_ready(bool new_state);
+
+    /**
+     * Retrieve the ready state.
+     * @return The current ready state.
+     */
     [[nodiscard]] bool get_ready();
 
-    // Driver logging
+    /**
+     * Register logging redirects.
+     *
+     * @param[in] dbg Debug message callback.
+     * @param[in] info Info message callback.
+     * @param[in] warn Warning message callback.
+     * @param[in] error Error message callback.
+     * @param[in] crit Critical message callback.
+     * @param[in] get_level Get level callback.
+     * @param[in] set_level Set level callback.
+     */
     void register_logger_callbacks(
         const std::function<void(const std::string &)> &dbg,
         const std::function<void(const std::string &)> &info,
@@ -151,23 +301,86 @@ class AresSerial {
         const std::function<void(const std::string &)> &crit,
         const std::function<long()> &get_level,
         const std::function<void(long)> &set_level);
+
+    /**
+     * Set the logging level for the core module.
+     * @param[in] level The new logging level.
+     */
     void set_logging_level(uint32_t level);
+
+    /**
+     * Retrieve the current logger level.
+     * @return The current log level.
+     */
     long get_log_level();
 
-    // Event waiting
+    /**
+     * Wait for a start message to be received.
+     * @return tuple[seconds, useconds, src_id, broadcast, seq_cnt, packet_id]
+     */
     py::tuple wait_start_event();
+
+    /**
+     * Wait for a log message to be received.
+     * @return tuple[src_id, log_id, chunk, num_chunks, msg]
+     */
     py::tuple wait_log_event();
+
+    /**
+     * Wait for any LoRa packet reception.
+     * @return tuple[seq_cnt, packet_id, source_id]
+     */
     py::tuple wait_packet_rx_event();
+
+    /**
+     * Wait for LoRa transmission to finish.
+     * @return tx_count
+     */
     uint32_t wait_packet_tx_event();
+
+    /**
+     * Wait for a BLE connection event to be received.
+     * @return @p true if a BLE connection was established, @p false otherwise.
+     */
     bool wait_ble_connection_event();
+
+    /**
+     * Wait for BLE service subscription status changes.
+     * @return tuple[subscription statuses, ...]
+     */
     py::tuple wait_ble_subscribe_event();
+
+    /**
+     * Wait in the waiting room of unplanned parenthood.
+     * @return tuple[broadcast, src_id]
+     */
     py::tuple wait_abortion_event();
+
+    /**
+     * Wait for the event indicating that the run is ready.
+     * @return tuple[src_id, broadcast]
+     */
     py::tuple wait_run_ready_event();
 
-    // driver utilities
+    /**
+     * Start the driver.
+     */
     void start_driver();
+
+    /**
+     * Stop the driver.
+     */
     void stop_driver();
+
+    /**
+     * Retrieve the node configurations.
+     * @return dict[config, value]
+     */
     py::dict get_node_config();
+
+    /**
+     * Cancel the event queues.
+     */
     void cancel_events();
 
     friend class FrameDispatcher;
