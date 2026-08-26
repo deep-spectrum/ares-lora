@@ -505,6 +505,30 @@ class LoraSerial:
         return ret[1]
 
     @lora_serial_command
+    def reboot(self, **kwargs):
+        """Reboot the connected device.
+
+        Args:
+            kwargs: Keyword arguments.
+
+        Keyword Args:
+            delay: The amount of seconds to delay the reboot by
+            response_timeout: The maximum time to wait for a response.
+
+        Raises:
+            TimeoutError: No response from the firmware within the configured timeout.
+            LoraException: Firmware responded with an error code.
+
+        Notes:
+            If the reboot was a success, then the driver needs to be started again. This will
+            automatically stop the driver. If the port is unable to be reopened, then a new
+            driver instance will be needed.
+        """
+        ret = self._dev.reboot(**kwargs)
+        self.stop_driver()
+        self._check_ret_code(ret[0])
+
+    @lora_serial_command
     def start(self, sec: int, usec: int, timeout: float = 20.0, broadcast: bool = True,
               destination_id: int | None = None, ack_timeout: float = 5.0) -> None:
         """Send start time over LoRa
@@ -656,26 +680,6 @@ class LoraSerial:
         """
         codes = self._dev.ble_send_image(data)
         self._check_ret_code(codes)
-
-    @lora_serial_command
-    def reboot(self, delay: int):
-        """Reboot the connected device.
-
-        Args:
-            delay: The amount of seconds to wait for the reboot to occur.
-
-        Raises:
-            TimeoutError: No response from the firmware within the configured timeout.
-            LoraException: Firmware responded with an error code.
-
-        Notes:
-            If the reboot was a success, then the driver needs to be started again. This will
-            automatically stop the driver. If the port is unable to be reopened, then a new
-            driver instance will be needed.
-        """
-        code = self._dev.reboot(delay)
-        self._check_ret_code(code)
-        self._stop_driver()
 
     @lora_serial_command
     def abort(self, broadcast: bool = True, destination_id: int | None = None, ack_timeout: float = 5.0,
