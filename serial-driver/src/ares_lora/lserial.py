@@ -431,6 +431,29 @@ class LoraSerial:
         return None
 
     @lora_serial_command
+    def lora_config(self, config: LoraConfig, **kwargs):
+        """Configure the LoRa modem.
+
+        Args:
+            config: The LoRa modem configurations.
+            kwargs: Keyword arguments
+
+        Keyword Args:
+            response_timeout: The maximum time to wait for a response.
+
+        Raises:
+            TimeoutError: No response from the firmware within the configured timeout.
+            LoraException: Firmware responded with an error code.
+        """
+        args = asdict(config)
+        for key in args.keys():
+            if not isinstance(args[key], int):
+                args[key] = args[key].value
+        configs_ = _AresLoraConfig(**args)
+        ret = self._dev.lora_config(configs_, **kwargs)
+        self._check_ret_code(ret[0])
+
+    @lora_serial_command
     def start(self, sec: int, usec: int, timeout: float = 20.0, broadcast: bool = True,
               destination_id: int | None = None, ack_timeout: float = 5.0) -> None:
         """Send start time over LoRa
@@ -464,25 +487,6 @@ class LoraSerial:
             raise
         else:
             self._dev.set_response_timeout(prev_timeout)
-        self._check_ret_code(ret)
-
-    @lora_serial_command
-    def lora_config(self, config: LoraConfig):
-        """Configure the LoRa modem.
-
-        Args:
-            config: The LoRa modem configurations.
-
-        Raises:
-            TimeoutError: No response from the firmware within the configured timeout.
-            LoraException: Firmware responded with an error code.
-        """
-        args = asdict(config)
-        for key in args.keys():
-            if not isinstance(args[key], int):
-                args[key] = args[key].value
-        configs_ = _AresLoraConfig(**args)
-        ret = self._dev.lora_config(configs_)
         self._check_ret_code(ret)
 
     @lora_serial_command
