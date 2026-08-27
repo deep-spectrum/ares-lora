@@ -758,10 +758,10 @@ class LoraSerial:
             TimeoutError: No response from the firmware within the configured timeout.
             LoraException: Firmware responded with an error code.
         """
-        ret, err_code = self._dev.ble_state(state.value)
-        self._check_ret_code(err_code)
+        ret = self._dev.ble_state(state=state.value)
+        self._check_ret_code(ret[0])
         if state == BleState.REQUEST:
-            return BleState(ret)
+            return BleState(ret[1][0])
         return None
 
     @lora_serial_command
