@@ -715,7 +715,34 @@ class LoraSerial:
         for config, value in ret_.items():
             codes[config] = value[0][0]
             ret[config] = value[1][0]
+        self._check_ret_code(codes)
         return ret
+
+    @lora_serial_command
+    def notify_run_ready(self, **kwargs) -> bool | None:
+        """Send a notification over LoRa to tell that the nodes should get ready to collect data.
+
+        Args:
+            kwargs: Keyword arguments
+
+        Keyword Args:
+            destination: The destination ID.
+            response_timeout: The maximum time to wait for a response.
+            ack_timeout: Maximum time to wait for a LoRa acknowledgement.
+            broadcast: Flag indicating if the message should be broadcasted.
+            retries: The amount of times to retry if no ACK was received.
+
+        Raises:
+            TimeoutError: No response from the firmware within the configured timeout.
+            TimeoutError: No acknowledgement from the destination node.
+            ValueError: The node ID is invalid.
+            LoraException: Firmware responded with an error code.
+        """
+        ret = self._dev.notify_run_ready(**kwargs)
+        self._check_ret_code(ret[0])
+        if ret[1] is not None:
+            return ret[1][0]
+        return None
 
     @lora_serial_command
     def ble_state(self, state: BleState = BleState.REQUEST) -> BleState | None:
@@ -761,38 +788,6 @@ class LoraSerial:
         """
         codes = self._dev.ble_send_image(data)
         self._check_ret_code(codes)
-
-    @lora_serial_command
-    def notify_run_ready(self, broadcast: bool = True, destination_id: int | None = None, timeout: float = 20.0,
-                         ack_timeout: float = 5.0):
-        """Send a notification over LoRa to tell that the nodes should get ready to collect data.
-
-        Args:
-            broadcast: Flag indicating if the message should be broadcasted or not.
-            destination_id: The node to send the message to if the message is not to be broadcasted.
-            ack_timeout: The amount of time to wait for an acknowledgement from the destination node.
-            timeout: The amount of time to wait for a response from the firmware.
-
-        Raises:
-            TimeoutError: No response from the firmware within the configured timeout.
-            TimeoutError: No acknowledgement from the destination node.
-            ValueError: The node ID is invalid.
-            LoraException: Firmware responded with an error code.
-        """
-        if not broadcast and (destination_id is None or destination_id <= 0):
-            raise ValueError("Direct messages must have a valid destination specified")
-        if destination_id is None:
-            destination_id = 0
-        prev_timeout = self._dev.get_response_timeout()
-        self._dev.set_response_timeout(timeout)
-        try:
-            ret = self._dev.notify_run_ready(broadcast, destination_id, ack_timeout)
-        except Exception:
-            self._dev.set_response_timeout(prev_timeout)
-            raise
-        else:
-            self._dev.set_response_timeout(prev_timeout)
-        self._check_ret_code(ret)
 
     def wait_connection_changed_event(self, block: bool = True, timeout: float | None = None) -> bool:
         """Wait for a connection event from BLE.
