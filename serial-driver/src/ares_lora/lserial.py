@@ -775,19 +775,19 @@ class LoraSerial:
         ret = self._dev.ble_disconnect()
         self._check_ret_code(ret[0])
 
-    @lora_serial_command
-    def ble_send(self, data: bytes):
-        """Send data over the BLE connection.
-
-        Args:
-            data: Data to send over BLE.
-
-        Raises:
-            TimeoutError: No response from the firmware within the configured timeout.
-            LoraException: Firmware responded with an error code.
-        """
-        codes = self._dev.ble_send_image(data)
-        self._check_ret_code(codes)
+    # @lora_serial_command
+    # def ble_send(self, data: bytes):
+    #     """Send data over the BLE connection.
+    #
+    #     Args:
+    #         data: Data to send over BLE.
+    #
+    #     Raises:
+    #         TimeoutError: No response from the firmware within the configured timeout.
+    #         LoraException: Firmware responded with an error code.
+    #     """
+    #     codes = self._dev.ble_send_image(data)
+    #     self._check_ret_code(codes)
 
     def wait_connection_changed_event(self, block: bool = True, timeout: float | None = None) -> bool:
         """Wait for a connection event from BLE.
@@ -1126,72 +1126,72 @@ class LoraSerial:
         return self._dev.node_configs
 
 
-class BleTransfer:
-    """Context manager for transferring data over BLE. Only works on Linux."""
-
-    def __init__(self, serial: LoraSerial, timeout: float = 60.0, exit_timeout: float = 1.0):
-        """Initializes the BleTransfer instance.
-
-        Args:
-            serial: The LoRaSerial instance to transfer data over.
-            timeout: The amount of time allowed to wait for a connection and for all the required attributes to be subscribed to.
-            exit_timeout: The amount of time to wait for the central device to disconnect before turning off BLE forcefully.
-
-        Raises:
-            ValueError: One or more of the timeout values are invalid.
-        """
-        self._dev = serial
-
-        if timeout < 0:
-            raise ValueError("Timeout must be positive")
-        if exit_timeout < 0:
-            raise ValueError("Timeout must be positive")
-
-        self._timeout = timeout
-        self._exit_timeout = exit_timeout
-
-    def _wait_connect_event(self):
-        try:
-            self._dev.wait_connection_changed_event(True, self._timeout)
-        except Empty:
-            raise TimeoutError("Could not establish BLE connection")
-
-    def _wait_subscriptions(self):
-        try:
-            subs = (False,)
-            timeout_time = datetime.now() + timedelta(seconds=self._timeout)
-            while not all(subs) and datetime.now() < timeout_time:
-                subs = self._dev.wait_subscription_change_event(True, self._timeout)
-            if not all(subs):
-                raise TimeoutError("Central device did not subscribe to all required attributes")
-        except Empty:
-            raise TimeoutError("Central device did not subscribe to all required attributes")
-
-    def __enter__(self):
-        if self._dev.ble_state() == BleState.ON:
-            raise RuntimeError("BLE must be disabled before using this context manager")
-        self._dev.clear_ble_events()
-        self._dev.ble_state(BleState.ON)
-        try:
-            self._wait_connect_event()
-            self._wait_subscriptions()
-        except:
-            self._dev.ble_state(BleState.OFF)
-            raise
-        return self
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        try:
-            # Wait for central device to disconnect
-            self._dev.wait_connection_changed_event(True, self._exit_timeout)
-        except Empty:
-            pass
-        self._dev.ble_state(BleState.OFF)
-
-    def write(self, data: bytes):
-        """Write data over the BLE connection.
-
-        Args:
-            data: The data to send over BLE. Automatically chunked.
-        """
-        self._dev.ble_send(data)
+# class BleTransfer:
+#     """Context manager for transferring data over BLE. Only works on Linux."""
+#
+#     def __init__(self, serial: LoraSerial, timeout: float = 60.0, exit_timeout: float = 1.0):
+#         """Initializes the BleTransfer instance.
+#
+#         Args:
+#             serial: The LoRaSerial instance to transfer data over.
+#             timeout: The amount of time allowed to wait for a connection and for all the required attributes to be subscribed to.
+#             exit_timeout: The amount of time to wait for the central device to disconnect before turning off BLE forcefully.
+#
+#         Raises:
+#             ValueError: One or more of the timeout values are invalid.
+#         """
+#         self._dev = serial
+#
+#         if timeout < 0:
+#             raise ValueError("Timeout must be positive")
+#         if exit_timeout < 0:
+#             raise ValueError("Timeout must be positive")
+#
+#         self._timeout = timeout
+#         self._exit_timeout = exit_timeout
+#
+#     def _wait_connect_event(self):
+#         try:
+#             self._dev.wait_connection_changed_event(True, self._timeout)
+#         except Empty:
+#             raise TimeoutError("Could not establish BLE connection")
+#
+#     def _wait_subscriptions(self):
+#         try:
+#             subs = (False,)
+#             timeout_time = datetime.now() + timedelta(seconds=self._timeout)
+#             while not all(subs) and datetime.now() < timeout_time:
+#                 subs = self._dev.wait_subscription_change_event(True, self._timeout)
+#             if not all(subs):
+#                 raise TimeoutError("Central device did not subscribe to all required attributes")
+#         except Empty:
+#             raise TimeoutError("Central device did not subscribe to all required attributes")
+#
+#     def __enter__(self):
+#         if self._dev.ble_state() == BleState.ON:
+#             raise RuntimeError("BLE must be disabled before using this context manager")
+#         self._dev.clear_ble_events()
+#         self._dev.ble_state(BleState.ON)
+#         try:
+#             self._wait_connect_event()
+#             self._wait_subscriptions()
+#         except:
+#             self._dev.ble_state(BleState.OFF)
+#             raise
+#         return self
+#
+#     def __exit__(self, exc_type, exc_val, exc_tb):
+#         try:
+#             # Wait for central device to disconnect
+#             self._dev.wait_connection_changed_event(True, self._exit_timeout)
+#         except Empty:
+#             pass
+#         self._dev.ble_state(BleState.OFF)
+#
+#     def write(self, data: bytes):
+#         """Write data over the BLE connection.
+#
+#         Args:
+#             data: The data to send over BLE. Automatically chunked.
+#         """
+#         self._dev.ble_send(data)
