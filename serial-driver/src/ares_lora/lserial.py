@@ -653,6 +653,38 @@ class LoraSerial:
         return None
 
     @lora_serial_command
+    def send_node_configs(self, **kwargs):
+        """Send node configurations over LoRa.
+
+        Args:
+            kwargs: Keyword arguments.
+
+        Keyword Args:
+            destination: The destination ID.
+            response_timeout: The maximum time to wait for a response.
+            ack_timeout: Maximum time to wait for a LoRa acknowledgement.
+            retries: The amount of times to retry if no ACK was received.
+            folder_dt (datetime): The save folder timestamp for naming purposes.
+            bandwidth (float): The bandwidth for the collection run.
+            center_freq (float): The center frequency for the collection run.
+            duration (int): The duration (in seconds) of the run.
+            ref_level (float): The reference level of the run.
+
+        Raises:
+            TimeoutError: No response from the firmware within the configured timeout.
+            TimeoutError: No acknowledgement from the destination node.
+            LoraException: Firmware responded with an error code.
+        """
+        results: dict[str, tuple[tuple[int], tuple[bool]]] = self._dev.node_config(**kwargs)
+        ret:dict[str, bool] = {}
+        codes:dict[str, int] = {}
+        for config, result in results.items():
+            ret[config] = result[1][0]
+            codes[config] = result[0][0]
+        self._check_ret_code(codes)
+        return ret
+
+    @lora_serial_command
     def ble_state(self, state: BleState = BleState.REQUEST) -> BleState | None:
         """Retrieve or update the BLE state.
 
@@ -696,40 +728,6 @@ class LoraSerial:
         """
         codes = self._dev.ble_send_image(data)
         self._check_ret_code(codes)
-
-    @lora_serial_command
-    def send_node_configs(self, destination_id: int, timeout: float = 20.0, ack_timeout: float = 5.0,
-                          **kwargs: float | int | datetime):
-        """Send node configurations over LoRa.
-
-        Args:
-            destination_id: The node id to send the node configurations to.
-            timeout: The firmware response timeout.
-            ack_timeout: The LoRa message acknowledgement timeout.
-            **kwargs: Keyword arguments for the node configurations.
-
-        Keyword Args:
-            folder_dt (datetime): The save folder timestamp for naming purposes.
-            bandwidth (float): The bandwidth for the collection run.
-            center_freq (float): The center frequency for the collection run.
-            duration (int): The duration (in seconds) of the run.
-            ref_level (float): The reference level of the run.
-
-        Raises:
-            TimeoutError: No response from the firmware within the configured timeout.
-            TimeoutError: No acknowledgement from the destination node.
-            LoraException: Firmware responded with an error code.
-        """
-        prev_timeout = self._dev.get_response_timeout()
-        self._dev.set_response_timeout(timeout)
-        try:
-            ret: dict[str, int] = self._dev.node_config(destination_id, ack_timeout, **kwargs)
-        except Exception:
-            self._dev.set_response_timeout(prev_timeout)
-            raise
-        else:
-            self._dev.set_response_timeout(prev_timeout)
-        self._check_ret_code(ret)
 
     @lora_serial_command
     def poll_node_config(self, node_id: int, timeout: float = 20.0, ack_timeout: float = 5.0, *args: str) -> dict[
