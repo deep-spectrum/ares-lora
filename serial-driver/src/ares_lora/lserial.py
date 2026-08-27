@@ -773,7 +773,7 @@ class LoraSerial:
             LoraException: Firmware responded with an error code.
         """
         ret = self._dev.ble_disconnect()
-        self._check_ret_code(ret)
+        self._check_ret_code(ret[0])
 
     @lora_serial_command
     def ble_send(self, data: bytes):
