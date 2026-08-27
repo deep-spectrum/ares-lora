@@ -8,3 +8,4 @@ cmake-build*
 /docs/serial-driver/cpp-api/
 /docs/firmware/firmware-docs/
 .gdb_history
+site/

@@ -217,7 +217,7 @@ threading._register_atexit(_shutdown_drivers)
 class LoraSerial:
     """LoRa serial driver python implementation. Works only on Linux."""
 
-    def __init__(self, port: str | Path, **kwargs):
+    def __init__(self, port: str | Path, **kwargs: float):
         """Initializes the LoRa driver.
 
         Args:
@@ -225,8 +225,8 @@ class LoraSerial:
             kwargs: Keyword arguments
 
         Keyword Args:
-            serial_timeout: The serial reception timeout
-            rx_period: The period to poll the receive buffer
+            serial_timeout (float): The serial reception timeout
+            rx_period (float): The period to poll the receive buffer
 
         Raises:
             ValueError: Empty port configuration.
@@ -406,7 +406,7 @@ class LoraSerial:
                 raise LoraException(c, key)
 
     @lora_serial_command
-    def setting(self, setting_id: SettingId, **kwargs) -> int | None:
+    def setting(self, setting_id: SettingId, **kwargs: int | float) -> int | None:
         """Set or retrieve a LoRa firmware setting.
 
         Args:
@@ -414,8 +414,8 @@ class LoraSerial:
             kwargs: Keyword arguments.
 
         Keyword Args:
-            value: The new setting value.
-            response_timeout: The maximum time to wait for a response.
+            value (int): The new setting value.
+            response_timeout (float): The maximum time to wait for a response.
 
         Returns:
             If writing a setting, None. If reading a setting, the value of the setting.
@@ -431,7 +431,7 @@ class LoraSerial:
         return None
 
     @lora_serial_command
-    def lora_config(self, config: LoraConfig, **kwargs):
+    def lora_config(self, config: LoraConfig, **kwargs: float):
         """Configure the LoRa modem.
 
         Args:
@@ -439,7 +439,7 @@ class LoraSerial:
             kwargs: Keyword arguments
 
         Keyword Args:
-            response_timeout: The maximum time to wait for a response.
+            response_timeout (float): The maximum time to wait for a response.
 
         Raises:
             TimeoutError: No response from the firmware within the configured timeout.
@@ -454,7 +454,7 @@ class LoraSerial:
         self._check_ret_code(ret[0])
 
     @lora_serial_command
-    def led(self, led_id: int, **kwargs) -> LoraLedState | None:
+    def led(self, led_id: int, **kwargs: LoraLedState | float | int) -> LoraLedState | None:
         """Set or retrieve the state of the LED.
 
         Args:
@@ -462,8 +462,8 @@ class LoraSerial:
             kwargs: Keyword arguments
 
         Keyword Args:
-            state: The new LED state
-            response_timeout: The maximum time to wait for a response.
+            state (LoraLedState | int): The new LED state
+            response_timeout (float): The maximum time to wait for a response.
 
         Returns:
             The current LED state if state is LoraLedState.FETCH. None otherwise.
@@ -481,14 +481,14 @@ class LoraSerial:
         return None
 
     @lora_serial_command
-    def version(self, **kwargs) -> tuple[tuple[int, int, int], tuple[int, int, int], tuple[int, int, int]]:
+    def version(self, **kwargs: float) -> tuple[tuple[int, int, int], tuple[int, int, int], tuple[int, int, int]]:
         """Retrieves all the firmware version information.
 
         Args:
             kwargs: Keyword arguments
 
         Keyword Args:
-            response_timeout: The maximum time to wait for a response.
+            response_timeout (float): The maximum time to wait for a response.
 
         Returns:
             A tuple of versions. The first tuple is the application version, the second tuple is the ncs version, and the third tuple is the kernel version.
@@ -505,15 +505,15 @@ class LoraSerial:
         return ret[1]
 
     @lora_serial_command
-    def reboot(self, **kwargs):
+    def reboot(self, **kwargs: int | float):
         """Reboot the connected device.
 
         Args:
             kwargs: Keyword arguments.
 
         Keyword Args:
-            delay: The amount of seconds to delay the reboot by
-            response_timeout: The maximum time to wait for a response.
+            delay (int): The amount of seconds to delay the reboot by
+            response_timeout (float): The maximum time to wait for a response.
 
         Raises:
             TimeoutError: No response from the firmware within the configured timeout.
@@ -529,7 +529,7 @@ class LoraSerial:
         self._check_ret_code(ret[0])
 
     @lora_serial_command
-    def start(self, sec: int, usec: int, **kwargs) -> bool | None:
+    def start(self, sec: int, usec: int, **kwargs: int | float | bool) -> bool | None:
         """Send start time over LoRa
 
         Args:
@@ -538,11 +538,11 @@ class LoraSerial:
             kwargs: Keyword arguments
 
         Keyword Args:
-             destination: The destination ID.
-             response_timeout: The maximum time to wait for a response.
-             ack_timeout: Maximum time to wait for a LoRa acknowledgement.
-             broadcast: Flag indicating if the message should be broadcasted.
-             retries: The amount of times to retry if no ACK was received.
+             destination (int): The destination ID.
+             response_timeout (float): The maximum time to wait for a response.
+             ack_timeout (float): Maximum time to wait for a LoRa acknowledgement.
+             broadcast (bool): Flag indicating if the message should be broadcasted.
+             retries (int): The amount of times to retry if no ACK was received.
 
         Returns:
             `None` if a broadcast message. `True` if the message was acknowledged, `False` otherwise.
@@ -561,18 +561,17 @@ class LoraSerial:
         return None
 
     @lora_serial_command
-    def poll(self, **kwargs) -> bool:
+    def poll(self, **kwargs: int | float) -> bool:
         """Poll a node on the LoRa network for a heartbeat.
 
         Args:
             kwargs: Keyword arguments.
 
         Keyword Args:
-             destination: The destination ID.
-             response_timeout: The maximum time to wait for a response.
-             ack_timeout: Maximum time to wait for a LoRa acknowledgement.
-             broadcast: Flag indicating if the message should be broadcasted.
-             retries: The amount of times to retry if no ACK was received.
+             destination (int): The destination ID.
+             response_timeout (float): The maximum time to wait for a response.
+             ack_timeout (float): Maximum time to wait for a LoRa acknowledgement.
+             retries (int): The amount of times to retry if no ACK was received.
 
         Raises:
             ValueError: The node ID is invalid.
@@ -588,19 +587,19 @@ class LoraSerial:
         return ret[1][0]
 
     @lora_serial_command
-    def log(self, **kwargs) -> bool | None:
+    def log(self, **kwargs: str | int | float | bool) -> bool | None:
         """Send a log message over LoRa.
 
         Args:
             kwargs: Keyword arguments
 
         Keyword Args:
-            message: The message to send.
-            destination: The destination ID.
-            response_timeout: The maximum time to wait for a response.
-            ack_timeout: Maximum time to wait for a LoRa acknowledgement.
-            broadcast: Flag indicating if the message should be broadcasted.
-            retries: The amount of times to retry if no ACK was received.
+            message (str): The message to send.
+            destination (int): The destination ID.
+            response_timeout (float): The maximum time to wait for a response.
+            ack_timeout (float): Maximum time to wait for a LoRa acknowledgement.
+            broadcast (bool): Flag indicating if the message should be broadcasted.
+            retries (int): The amount of times to retry if no ACK was received.
 
         Returns:
             `None` if a broadcast message. `True` if all chunks of the log message were ACK'ed, `False` otherwise.
@@ -624,19 +623,18 @@ class LoraSerial:
         return None
 
     @lora_serial_command
-    def abort(self, **kwargs) -> bool | None:
+    def abort(self, **kwargs: int | float | bool) -> bool | None:
         """Send an abortion message over LoRa.
 
         Args:
             kwargs: Keyword arguments
 
         Keyword Args:
-            message: The message to send.
-            destination: The destination ID.
-            response_timeout: The maximum time to wait for a response.
-            ack_timeout: Maximum time to wait for a LoRa acknowledgement.
-            broadcast: Flag indicating if the message should be broadcasted.
-            retries: The amount of times to retry if no ACK was received.
+            destination (int): The destination ID.
+            response_timeout (float): The maximum time to wait for a response.
+            ack_timeout (float): Maximum time to wait for a LoRa acknowledgement.
+            broadcast (bool): Flag indicating if the message should be broadcasted.
+            retries (int): The amount of times to retry if no ACK was received.
 
         Returns:
             `None` if a broadcast message. `True` if the message was ACK'ed, `False` otherwise.
@@ -653,22 +651,25 @@ class LoraSerial:
         return None
 
     @lora_serial_command
-    def send_node_configs(self, **kwargs) -> dict[str, bool]:
+    def send_node_configs(self, **kwargs: float | int | datetime) -> dict[str, bool]:
         """Send node configurations over LoRa.
 
         Args:
             kwargs: Keyword arguments.
 
         Keyword Args:
-            destination: The destination ID.
-            response_timeout: The maximum time to wait for a response.
-            ack_timeout: Maximum time to wait for a LoRa acknowledgement.
-            retries: The amount of times to retry if no ACK was received.
+            destination (int): The destination ID.
+            response_timeout (float): The maximum time to wait for a response.
+            ack_timeout (float): Maximum time to wait for a LoRa acknowledgement.
+            retries (int): The amount of times to retry if no ACK was received.
             folder_dt (datetime): The save folder timestamp for naming purposes.
             bandwidth (float): The bandwidth for the collection run.
             center_freq (float): The center frequency for the collection run.
             duration (int): The duration (in seconds) of the run.
             ref_level (float): The reference level of the run.
+
+        Returns:
+            A dictionary of configs sent over LoRa and a flag indicating if the config was received by the other node.
 
         Raises:
             TimeoutError: No response from the firmware within the configured timeout.
@@ -685,7 +686,7 @@ class LoraSerial:
         return ret
 
     @lora_serial_command
-    def poll_node_config(self, *args: str, **kwargs) -> dict[str, float | int | datetime | None]:
+    def poll_node_config(self, *args: str, **kwargs: float | int) -> dict[str, float | int | datetime | None]:
         """Poll a node for its configurations.
 
         Args:
@@ -694,13 +695,13 @@ class LoraSerial:
             **kwargs: Keyword arguments
 
         Keyword Args:
-            destination: The destination ID.
-            response_timeout: The maximum time to wait for a response.
-            ack_timeout: Maximum time to wait for a LoRa acknowledgement.
-            retries: The amount of times to retry if no ACK was received.
+            destination (int): The destination ID.
+            response_timeout (float): The maximum time to wait for a response.
+            ack_timeout (float): Maximum time to wait for a LoRa acknowledgement.
+            retries (int): The amount of times to retry if no ACK was received.
 
         Returns:
-            dict[str, float | int | datetime]: If a value is None, then polling for that configuration failed.
+            dict[str, float | int | datetime]: If a value is `None`, then polling for that configuration failed.
 
             The keys are the same values as args. Any invalid args will not be present.
 
@@ -719,18 +720,21 @@ class LoraSerial:
         return ret
 
     @lora_serial_command
-    def notify_run_ready(self, **kwargs) -> bool | None:
+    def notify_run_ready(self, **kwargs: int | float | bool) -> bool | None:
         """Send a notification over LoRa to tell that the nodes should get ready to collect data.
 
         Args:
             kwargs: Keyword arguments
 
         Keyword Args:
-            destination: The destination ID.
-            response_timeout: The maximum time to wait for a response.
-            ack_timeout: Maximum time to wait for a LoRa acknowledgement.
-            broadcast: Flag indicating if the message should be broadcasted.
-            retries: The amount of times to retry if no ACK was received.
+            destination (int): The destination ID.
+            response_timeout (float): The maximum time to wait for a response.
+            ack_timeout (float): Maximum time to wait for a LoRa acknowledgement.
+            broadcast (bool): Flag indicating if the message should be broadcasted.
+            retries (int): The amount of times to retry if no ACK was received.
+
+        Returns:
+            `None` if a broadcast message. `True` if the message was acknowledged, `False` otherwise.
 
         Raises:
             TimeoutError: No response from the firmware within the configured timeout.
