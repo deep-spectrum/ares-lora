@@ -653,7 +653,7 @@ class LoraSerial:
         return None
 
     @lora_serial_command
-    def send_node_configs(self, **kwargs):
+    def send_node_configs(self, **kwargs) -> dict[str, bool]:
         """Send node configurations over LoRa.
 
         Args:
@@ -682,6 +682,39 @@ class LoraSerial:
             ret[config] = result[1][0]
             codes[config] = result[0][0]
         self._check_ret_code(codes)
+        return ret
+
+    @lora_serial_command
+    def poll_node_config(self, *args: str, **kwargs) -> dict[str, float | int | datetime | None]:
+        """Poll a node for its configurations.
+
+        Args:
+            *args: The configurations to poll for.
+                Valid arguments are "folder_dt", "bandwidth", "center_freq", "duration", and "ref_level".
+            **kwargs: Keyword arguments
+
+        Keyword Args:
+            destination: The destination ID.
+            response_timeout: The maximum time to wait for a response.
+            ack_timeout: Maximum time to wait for a LoRa acknowledgement.
+            retries: The amount of times to retry if no ACK was received.
+
+        Returns:
+            dict[str, float | int | datetime]: If a value is None, then polling for that configuration failed.
+
+            The keys are the same values as args. Any invalid args will not be present.
+
+        Raises:
+            TimeoutError: No response from the firmware within the configured timeout.
+            TimeoutError: No acknowledgement from the destination node.
+            LoraException: Firmware responded with an error code.
+        """
+        ret_: dict[str, tuple[tuple[int], tuple[float | int | datetime | None]]] = self._dev.node_config_poll(*args, **kwargs)
+        codes: dict[str, int] = {}
+        ret: dict[str, float | int | datetime | None] = {}
+        for config, value in ret_.items():
+            codes[config] = value[0][0]
+            ret[config] = value[1][0]
         return ret
 
     @lora_serial_command
@@ -728,46 +761,6 @@ class LoraSerial:
         """
         codes = self._dev.ble_send_image(data)
         self._check_ret_code(codes)
-
-    @lora_serial_command
-    def poll_node_config(self, node_id: int, timeout: float = 20.0, ack_timeout: float = 5.0, *args: str) -> dict[
-        str, float | int | datetime | None]:
-        """Poll a node for its configurations.
-
-        Args:
-            node_id: The node ID to poll configurations from.
-            timeout: The firmware response timeout.
-            ack_timeout: The LoRa message acknowledgement timeout.
-            *args: The configurations to poll for.
-                Valid arguments are "folder_dt", "bandwidth", "center_freq", "duration", and "ref_level".
-
-        Returns:
-            dict[str, float | int | datetime]: If a value is None, then polling for that configuration failed.
-
-            The keys are the same values as args. Any invalid args will not be present.
-
-        Raises:
-            TimeoutError: No response from the firmware within the configured timeout.
-            TimeoutError: No acknowledgement from the destination node.
-            LoraException: Firmware responded with an error code.
-        """
-        prev_timeout = self._dev.get_response_timeout()
-        self._dev.set_response_timeout(timeout)
-        try:
-            ret_: dict[str, tuple[int, float | int | datetime]] = self._dev.poll_node_configs(node_id, ack_timeout,
-                                                                                              *args)
-        except Exception:
-            self._dev.set_response_timeout(prev_timeout)
-            raise
-        else:
-            self._dev.set_response_timeout(prev_timeout)
-        codes: dict[str, int] = {}
-        ret: dict[str, float | int | datetime] = {}
-        for key, value in ret_.items():
-            codes[key] = value[0]
-            ret[key] = value[1]
-        self._check_ret_code(codes)
-        return ret
 
     @lora_serial_command
     def notify_run_ready(self, broadcast: bool = True, destination_id: int | None = None, timeout: float = 20.0,

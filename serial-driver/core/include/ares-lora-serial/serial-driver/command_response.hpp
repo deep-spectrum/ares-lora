@@ -104,7 +104,11 @@ CommandResponse::get_additional_response(const std::string &exc_msg) const {
             }
             resp.emplace_back(specific_ret(std::any_cast<T>(i)));
         } else {
-            resp.emplace_back(specific_ret(std::any_cast<T>(i)));
+            if (i.type() == typeid(T)) {
+                resp.emplace_back(specific_ret(std::any_cast<T>(i)));
+            } else {
+                resp.emplace_back(py::none());
+            }
         }
     }
 
