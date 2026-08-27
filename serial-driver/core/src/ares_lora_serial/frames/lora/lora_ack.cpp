@@ -28,4 +28,8 @@ void LoraAck::deserialize(const uint8_t *buffer, std::size_t len) {
 
     ares::deserialize(buffer, id, message_type);
 }
+
+bool LoraAck::operator==(const LoraAck &rhs) const {
+    return id == rhs.id && message_type == rhs.message_type;
+}
 } // namespace AresFrame

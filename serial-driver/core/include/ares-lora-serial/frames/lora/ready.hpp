@@ -11,6 +11,9 @@
 #ifndef ARES_READY_HPP
 #define ARES_READY_HPP
 
+#include <ares-lora-serial/frames/frame_types.hpp>
+#include <ares-lora-serial/frames/lora/lora_ack.hpp>
+#include <ares-lora-serial/frames/lora/lora_base.hpp>
 #include <ares-lora-serial/frames/payload_base.hpp>
 
 namespace AresFrame {
@@ -18,7 +21,10 @@ namespace AresFrame {
  * @struct NodeReady
  * Payload for node ready notifications.
  */
-struct NodeReady : Internal::FramePayloadBase {
+struct NodeReady : Internal::FramePayloadBase, Internal::LoraBase {
+    static constexpr AresFrameType frame_type = NODE_READY;
+    using response_type = LoraAck;
+
     /**
      * Constructor.
      */
@@ -62,6 +68,12 @@ struct NodeReady : Internal::FramePayloadBase {
      * @param len The size of the payload.
      */
     void deserialize(const uint8_t *buffer, std::size_t len) override;
+
+    /**
+     * Retrieve the expected response message.
+     * @return The expected response message.
+     */
+    [[nodiscard]] response_type expected_response() const;
 
   private:
     static constexpr size_t _payload_size = 3;

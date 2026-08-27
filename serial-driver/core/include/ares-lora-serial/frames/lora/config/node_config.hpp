@@ -11,15 +11,22 @@
 #ifndef ARES_NODE_CONFIG_HPP
 #define ARES_NODE_CONFIG_HPP
 
+#include <ares-lora-serial/frames/frame_types.hpp>
 #include <ares-lora-serial/frames/lora/config/common.hpp>
+#include <ares-lora-serial/frames/lora/lora_ack.hpp>
+#include <ares-lora-serial/frames/lora/lora_base.hpp>
 #include <ares-lora-serial/frames/payload_base.hpp>
+#include <utility>
 
 namespace AresFrame {
 /**
  * @struct NodeConfig
  * Payload data for AresFrame::NODE_CONFIG frames
  */
-struct NodeConfig : Internal::FramePayloadBase {
+struct NodeConfig : Internal::FramePayloadBase, Internal::LoraBase {
+    static constexpr AresFrameType frame_type = NODE_CONFIG;
+    using response_type = LoraAck;
+
     /**
      * Constructor.
      */
@@ -33,7 +40,7 @@ struct NodeConfig : Internal::FramePayloadBase {
      */
     explicit NodeConfig(uint16_t id_, NodeConfigType type_,
                         NodeConfigData config_)
-        : id(id_), type(type_), config(config_) {}
+        : id(id_), type(type_), config(std::move(config_)) {}
 
     /**
      * On transmission, the node id to send the configuration to. On
@@ -69,6 +76,12 @@ struct NodeConfig : Internal::FramePayloadBase {
      * @param len The size of the payload.
      */
     void deserialize(const uint8_t *buffer, std::size_t len) override;
+
+    /**
+     * Retrieve the expected response message.
+     * @return The expected response message.
+     */
+    [[nodiscard]] response_type expected_response() const;
 
   private:
     static constexpr size_t _payload_size = 3 + Internal::NodeConfigDataSizeof;

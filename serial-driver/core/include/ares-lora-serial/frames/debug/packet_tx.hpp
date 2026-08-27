@@ -11,6 +11,7 @@
 #ifndef ARES_PACKET_TX_HPP
 #define ARES_PACKET_TX_HPP
 
+#include <ares-lora-serial/frames/frame_types.hpp>
 #include <ares-lora-serial/frames/payload_base.hpp>
 
 namespace AresFrame {
@@ -20,6 +21,8 @@ namespace AresFrame {
  * Data for AresFrame::PKT_TX frames.
  */
 struct PktTx : Internal::FramePayloadBase {
+    static constexpr AresFrameType frame_type = PKT_TX;
+
     /**
      * Transmit count.
      */

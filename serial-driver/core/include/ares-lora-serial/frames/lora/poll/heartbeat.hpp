@@ -11,6 +11,8 @@
 #ifndef ARES_HEARTBEAT_HPP
 #define ARES_HEARTBEAT_HPP
 
+#include <ares-lora-serial/frames/frame_types.hpp>
+#include <ares-lora-serial/frames/lora/lora_base.hpp>
 #include <ares-lora-serial/frames/payload_base.hpp>
 
 namespace AresFrame {
@@ -20,7 +22,9 @@ namespace AresFrame {
  *
  * Data for AresFrame::HEARTBEAT frames.
  */
-struct Heartbeat : Internal::FramePayloadBase {
+struct Heartbeat : Internal::FramePayloadBase, Internal::LoraBase {
+    static constexpr AresFrameType frame_type = HEARTBEAT;
+
     /**
      * Constructor.
      */
@@ -61,6 +65,13 @@ struct Heartbeat : Internal::FramePayloadBase {
      * @param len The size of the payload.
      */
     void deserialize(const uint8_t *buffer, std::size_t len) override;
+
+    /**
+     * Equivalence operator.
+     * @param[in] rhs The other object to compare against.
+     * @return `true` if all applicable fields are equal, `false` otherwise.
+     */
+    bool operator==(const Heartbeat &rhs) const;
 
   private:
     static constexpr std::size_t _payload_size = 3;

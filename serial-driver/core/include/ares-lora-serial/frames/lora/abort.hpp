@@ -11,6 +11,9 @@
 #ifndef ARES_ABORT_HPP
 #define ARES_ABORT_HPP
 
+#include <ares-lora-serial/frames/frame_types.hpp>
+#include <ares-lora-serial/frames/lora/lora_ack.hpp>
+#include <ares-lora-serial/frames/lora/lora_base.hpp>
 #include <ares-lora-serial/frames/payload_base.hpp>
 
 namespace AresFrame {
@@ -18,7 +21,10 @@ namespace AresFrame {
  * @struct Abort
  * Payload data for AresFrame::ABORT frames.
  */
-struct Abort : Internal::FramePayloadBase {
+struct Abort : Internal::FramePayloadBase, Internal::LoraBase {
+    static constexpr AresFrameType frame_type = ABORT;
+    using response_type = LoraAck;
+
     /**
      * Constructor.
      */
@@ -62,6 +68,12 @@ struct Abort : Internal::FramePayloadBase {
      * @param len The size of the payload.
      */
     void deserialize(const uint8_t *buffer, std::size_t len) override;
+
+    /**
+     * Retrieve the expected response message.
+     * @return The expected response message.
+     */
+    [[nodiscard]] response_type expected_response() const;
 
   private:
     static constexpr size_t _payload_size = 3;

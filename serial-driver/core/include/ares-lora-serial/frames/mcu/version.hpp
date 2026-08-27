@@ -11,6 +11,7 @@
 #ifndef ARES_VERSION_HPP
 #define ARES_VERSION_HPP
 
+#include <ares-lora-serial/frames/frame_types.hpp>
 #include <ares-lora-serial/frames/payload_base.hpp>
 
 namespace AresFrame {
@@ -20,6 +21,8 @@ namespace AresFrame {
  * Data for AresFrame::VERSION frames.
  */
 struct Version : Internal::FramePayloadBase {
+    static constexpr AresFrameType frame_type = VERSION;
+
     /**
      * The application version.
      */

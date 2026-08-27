@@ -28,4 +28,8 @@ void Start::deserialize(const uint8_t *buffer, std::size_t len) {
 
     ares::deserialize(buffer, sec, usec, id, broadcast, seq_cnt, packet_id);
 }
+
+Start::response_type Start::expected_response() const {
+    return response_type{id, frame_type};
+}
 } // namespace AresFrame

@@ -11,6 +11,7 @@
 #ifndef ARES_BLE_CHUNKS_HPP
 #define ARES_BLE_CHUNKS_HPP
 
+#include <ares-lora-serial/frames/frame_types.hpp>
 #include <ares-lora-serial/frames/payload_base.hpp>
 
 namespace AresFrame {
@@ -21,6 +22,8 @@ namespace AresFrame {
  * Payload data for AresFrame::BLE_CHUNK frames.
  */
 struct BleChunk : Internal::FramePayloadBase {
+    static constexpr AresFrameType frame_type = BLE_CHUNK;
+
     /**
      * Constructor.
      * @param num_chunks_ Number of chunks.

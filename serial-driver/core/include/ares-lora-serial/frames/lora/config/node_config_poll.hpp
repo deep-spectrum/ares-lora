@@ -11,7 +11,10 @@
 #ifndef ARES_NODE_CONFIG_POLL_HPP
 #define ARES_NODE_CONFIG_POLL_HPP
 
+#include <ares-lora-serial/frames/frame_types.hpp>
 #include <ares-lora-serial/frames/lora/config/common.hpp>
+#include <ares-lora-serial/frames/lora/config/node_config_response.hpp>
+#include <ares-lora-serial/frames/lora/lora_base.hpp>
 #include <ares-lora-serial/frames/payload_base.hpp>
 
 namespace AresFrame {
@@ -19,7 +22,10 @@ namespace AresFrame {
  * @struct NodeConfigPoll
  * Payload for AresFrame::NODE_CONFIG_POLL frames
  */
-struct NodeConfigPoll : Internal::FramePayloadBase {
+struct NodeConfigPoll : Internal::FramePayloadBase, Internal::LoraBase {
+    static constexpr AresFrameType frame_type = NODE_CONFIG_POLL;
+    using response_type = NodeConfigResponse;
+
     /**
      * Constructor.
      */
@@ -62,6 +68,12 @@ struct NodeConfigPoll : Internal::FramePayloadBase {
      * @param len The size of the payload.
      */
     void deserialize(const uint8_t *buffer, std::size_t len) override;
+
+    /**
+     * Retrieve the expected response message.
+     * @return The expected response message.
+     */
+    [[nodiscard]] response_type expected_response() const;
 
   private:
     static constexpr size_t _payload_size = 3;

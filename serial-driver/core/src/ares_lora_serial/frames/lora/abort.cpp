@@ -31,4 +31,8 @@ void Abort::deserialize(const uint8_t *buffer, std::size_t len) {
     uint8_t flags;
     ares::deserialize(buffer, flags, id);
 }
+
+Abort::response_type Abort::expected_response() const {
+    return response_type{id, frame_type};
+}
 } // namespace AresFrame

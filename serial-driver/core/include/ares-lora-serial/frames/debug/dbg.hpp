@@ -11,6 +11,7 @@
 #ifndef ARES_DBG_HPP
 #define ARES_DBG_HPP
 
+#include <ares-lora-serial/frames/frame_types.hpp>
 #include <ares-lora-serial/frames/payload_base.hpp>
 
 namespace AresFrame {
@@ -21,6 +22,8 @@ namespace AresFrame {
  * Data for AresFrame::DBG frames.
  */
 struct Dbg : Internal::FramePayloadBase {
+    static constexpr AresFrameType frame_type = DBG;
+
     /**
      * Error code from firmware.
      */

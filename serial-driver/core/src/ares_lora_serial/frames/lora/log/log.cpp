@@ -64,4 +64,8 @@ void Log::deserialize(const uint8_t *buffer, std::size_t len) {
 bool Log::new_frame() { return _msg_split.size() > (_idx + 1); }
 
 size_t Log::num_frames() const { return _num_parts; }
+
+Log::response_type Log::expected_response() const {
+    return response_type{static_cast<uint8_t>(_part), _num_parts, log_id, id};
+}
 } // namespace AresFrame

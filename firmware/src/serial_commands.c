@@ -297,6 +297,21 @@ static void handle_log(const struct ares_serial *serial,
     send_lora_transmission(serial, frame, &packet, frame->payload.LOG.tx_cnt);
 }
 
+static void handle_log_ack(const struct ares_serial *serial,
+                           struct ares_frame *frame) {
+    struct ares_packet packet = {
+        .type = ARES_PKT_TYPE_DIRECT,
+        .destination_id = frame->payload.LOG_ACK.id,
+        .payload = {.type = ARES_PKT_PAYLOAD_LOG_ACK,
+                    .payload.LOG_ACK = {
+                        .log_id = frame->payload.LOG_ACK.log_id,
+                        .part = frame->payload.LOG_ACK.part,
+                        .num_parts = frame->payload.LOG_ACK.num_parts,
+                    }}};
+
+    send_lora_transmission(serial, frame, &packet, 1);
+}
+
 static void handle_version(const struct ares_serial *serial,
                            struct ares_frame *frame) {
     frame->payload.VERSION.app = (uint32_t)APP_VERSION_NUMBER;
@@ -518,6 +533,7 @@ static struct ares_serial_command commands[] = {
     {ARES_FRAME_HEARTBEAT, handle_heartbeat},
     {ARES_FRAME_POLL, handle_poll},
     {ARES_FRAME_LOG, handle_log},
+    {ARES_FRAME_LOG_ACK, handle_log_ack},
     {ARES_FRAME_VERSION, handle_version},
     {ARES_FRAME_BLE_STATE, handle_ble_state},
     {ARES_FRAME_BLE_DISCONNECT, handle_ble_disconnect},

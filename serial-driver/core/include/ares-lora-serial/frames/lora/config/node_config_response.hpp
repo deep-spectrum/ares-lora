@@ -11,15 +11,20 @@
 #ifndef ARES_NODE_CONFIG_RESPONSE_HPP
 #define ARES_NODE_CONFIG_RESPONSE_HPP
 
+#include <ares-lora-serial/frames/frame_types.hpp>
 #include <ares-lora-serial/frames/lora/config/common.hpp>
+#include <ares-lora-serial/frames/lora/lora_base.hpp>
 #include <ares-lora-serial/frames/payload_base.hpp>
+#include <utility>
 
 namespace AresFrame {
 /**
  * @struct NodeConfigResponse
  * Payload data for AresFrame::NODE_CONFIG_RESPONSE frames.
  */
-struct NodeConfigResponse : Internal::FramePayloadBase {
+struct NodeConfigResponse : Internal::FramePayloadBase, Internal::LoraBase {
+    static constexpr AresFrameType frame_type = NODE_CONFIG_RESP;
+
     /**
      * Constructor.
      */
@@ -33,7 +38,7 @@ struct NodeConfigResponse : Internal::FramePayloadBase {
      */
     explicit NodeConfigResponse(uint16_t id, NodeConfigType type,
                                 NodeConfigData config)
-        : id(id), type(type), config(config) {}
+        : id(id), type(type), config(std::move(config)) {}
 
     /**
      * On transmission, the node id to send the configuration to. On
@@ -69,6 +74,13 @@ struct NodeConfigResponse : Internal::FramePayloadBase {
      * @param len The size of the payload.
      */
     void deserialize(const uint8_t *buffer, std::size_t len) override;
+
+    /**
+     * Equivalence operator.
+     * @param[in] rhs The other object to compare against.
+     * @return `true` if all applicable fields are equal, `false` otherwise.
+     */
+    bool operator==(const NodeConfigResponse &rhs) const;
 
   private:
     static constexpr size_t _payload_size = 3 + Internal::NodeConfigDataSizeof;

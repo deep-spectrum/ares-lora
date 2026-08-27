@@ -11,6 +11,7 @@
 #ifndef ARES_BLE_SUBSCRIBED_HPP
 #define ARES_BLE_SUBSCRIBED_HPP
 
+#include <ares-lora-serial/frames/frame_types.hpp>
 #include <ares-lora-serial/frames/payload_base.hpp>
 
 namespace AresFrame {
@@ -20,6 +21,8 @@ namespace AresFrame {
  * Payload data for AresFrame::BLE_SUBSCRIBED frames.
  */
 struct BleSubscribed : Internal::FramePayloadBase {
+    static constexpr AresFrameType frame_type = BLE_SUBSCRIBED;
+
     /**
      * Flag indicating if the chunks attribute has been subscribed to.
      */

@@ -11,6 +11,9 @@
 #ifndef ARES_LOG_HPP
 #define ARES_LOG_HPP
 
+#include <ares-lora-serial/frames/frame_types.hpp>
+#include <ares-lora-serial/frames/lora/log/log_ack.hpp>
+#include <ares-lora-serial/frames/lora/lora_base.hpp>
 #include <ares-lora-serial/frames/payload_base.hpp>
 
 namespace AresFrame {
@@ -20,7 +23,10 @@ namespace AresFrame {
  *
  * Data for AresFrame::LOG frames.
  */
-struct Log : Internal::FramePayloadBase {
+struct Log : Internal::FramePayloadBase, Internal::LoraBase {
+    static constexpr AresFrameType frame_type = LOG;
+    using response_type = LogAck;
+
     /**
      * Constructor.
      * @param broadcast Flag indicating if the message should be
@@ -115,6 +121,12 @@ struct Log : Internal::FramePayloadBase {
      * @return Number of frames.
      */
     [[nodiscard]] size_t num_frames() const override;
+
+    /**
+     * Retrieve the expected response message.
+     * @return The expected response message.
+     */
+    [[nodiscard]] response_type expected_response() const;
 
   private:
     std::vector<std::string> _msg_split;

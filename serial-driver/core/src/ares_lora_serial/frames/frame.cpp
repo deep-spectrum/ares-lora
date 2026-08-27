@@ -44,8 +44,21 @@ static size_t retrieve_payload_len(const uint8_t *data) {
     return len;
 }
 
-Frame::Frame(AresFrameType type, const TxTypes &tx_payload)
-    : _direction(TX), _type(type) {
+static AresFrameType get_frame_type(const Frame::TxTypes &v) {
+    return std::visit(
+        [](const auto &value) {
+            using T = std::decay_t<decltype(value)>;
+            if constexpr (std::is_same_v<T, std::monostate>) {
+                return DRIVER_STOP;
+            } else {
+                return value.frame_type;
+            }
+        },
+        v);
+}
+
+Frame::Frame(const TxTypes &tx_payload)
+    : _direction(TX), _type(get_frame_type(tx_payload)) {
     _tx_payload = tx_payload;
 }
 

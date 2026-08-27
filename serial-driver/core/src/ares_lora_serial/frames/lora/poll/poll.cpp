@@ -28,4 +28,8 @@ void Poll::deserialize(const uint8_t *buffer, std::size_t len) {
 
     ares::deserialize(buffer, id);
 }
+
+Poll::response_type Poll::expected_response() const {
+    return response_type{false, id};
+}
 } // namespace AresFrame

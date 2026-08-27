@@ -11,6 +11,8 @@
 #ifndef ARES_LOG_ACK_HPP
 #define ARES_LOG_ACK_HPP
 
+#include <ares-lora-serial/frames/frame_types.hpp>
+#include <ares-lora-serial/frames/lora/lora_base.hpp>
 #include <ares-lora-serial/frames/payload_base.hpp>
 
 namespace AresFrame {
@@ -20,15 +22,19 @@ namespace AresFrame {
  *
  * Data for AresFrame::LOG_ACK frames.
  */
-struct LogAck : Internal::FramePayloadBase {
+struct LogAck : Internal::FramePayloadBase, Internal::LoraBase {
+    static constexpr AresFrameType frame_type = LOG_ACK;
+
     /**
      * Constructor.
      * @param part See LogAck::part
      * @param num_parts See LogAck::num_parts
+     * @param log_id See LogAck::log_id
      * @param id See LogAck::id
      */
-    explicit LogAck(uint8_t part, uint8_t num_parts, uint16_t id)
-        : part(part), num_parts(num_parts), id(id) {}
+    explicit LogAck(uint8_t part, uint8_t num_parts, uint16_t log_id,
+                    uint16_t id)
+        : part(part), num_parts(num_parts), id(id), log_id(log_id) {}
 
     /**
      * Default constructor.
@@ -66,11 +72,23 @@ struct LogAck : Internal::FramePayloadBase {
     }
 
     /**
+     * Encode into a buffer.
+     * @param buffer The buffer to place data into.
+     */
+    void serialize(std::vector<uint8_t> &buffer) override;
+
+    /**
      * Decode the payload from a serial buffer.
      * @param buffer Pointer to buffer that contains encoded payload
      * @param len The size of the payload.
      */
     void deserialize(const uint8_t *buffer, std::size_t len) override;
+
+    /**
+     * Payload size.
+     * @return The payload size.
+     */
+    size_t payload_size() override;
 
   private:
     static constexpr size_t _payload_size = 6;

@@ -11,6 +11,7 @@
 #ifndef ARES_SETTING_HPP
 #define ARES_SETTING_HPP
 
+#include <ares-lora-serial/frames/frame_types.hpp>
 #include <ares-lora-serial/frames/payload_base.hpp>
 
 namespace AresFrame {
@@ -20,6 +21,8 @@ namespace AresFrame {
  * Data for AresFrame::SETTING frames.
  */
 struct Setting : Internal::FramePayloadBase {
+    static constexpr AresFrameType frame_type = SETTING;
+
     /**
      * Constructor.
      */

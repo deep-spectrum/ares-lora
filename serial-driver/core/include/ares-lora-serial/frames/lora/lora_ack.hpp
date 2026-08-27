@@ -12,6 +12,7 @@
 #define ARES_LORA_ACK_HPP
 
 #include <ares-lora-serial/frames/frame_types.hpp>
+#include <ares-lora-serial/frames/lora/lora_base.hpp>
 #include <ares-lora-serial/frames/payload_base.hpp>
 
 namespace AresFrame {
@@ -19,7 +20,9 @@ namespace AresFrame {
  * @struct LoraAck
  * Payload data for AresFrame::LORA_ACK frames.
  */
-struct LoraAck : Internal::FramePayloadBase {
+struct LoraAck : Internal::FramePayloadBase, Internal::LoraBase {
+    static constexpr AresFrameType frame_type = LORA_ACK;
+
     /**
      * Constructor.
      */
@@ -62,6 +65,13 @@ struct LoraAck : Internal::FramePayloadBase {
      * @param len The size of the payload.
      */
     void deserialize(const uint8_t *buffer, std::size_t len) override;
+
+    /**
+     * Equivalence operator.
+     * @param[in] rhs The other object to compare against.
+     * @return `true` if all applicable fields are equal, `false` otherwise.
+     */
+    bool operator==(const LoraAck &rhs) const;
 
   private:
     static constexpr size_t _payload_size = 4;

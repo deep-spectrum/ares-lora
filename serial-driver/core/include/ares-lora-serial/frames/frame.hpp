@@ -63,7 +63,7 @@ class Frame {
         std::variant<std::monostate, Setting, Start, LoraConfig, Led, Heartbeat,
                      Poll, Log, Version, BleState, BleChunk, BleImage,
                      BleDisconnect, Reboot, Abort, NodeConfig, NodeConfigPoll,
-                     NodeConfigResponse, NodeReady, LoraAck>;
+                     NodeConfigResponse, NodeReady, LoraAck, LogAck>;
 
     /**
      * @typedef RxTypes
@@ -85,11 +85,18 @@ class Frame {
                                        FramingError, Led, Version, BleState>;
 
     /**
+     * @typedef AckTypes
+     *
+     * A variant of the different acknowledgement frame types for LoRa.
+     */
+    using AckTypes = std::variant<std::monostate, LoraAck, LogAck, Heartbeat,
+                                  NodeConfigResponse>;
+
+    /**
      * Construct a transmit from.
-     * @param type The frame type.
      * @param tx_payload The structured payload of the frame.
      */
-    explicit Frame(AresFrameType type, const TxTypes &tx_payload);
+    explicit Frame(const TxTypes &tx_payload);
 
     /**
      * Constructor for decoding a received frame.
@@ -224,28 +231,28 @@ class Frame {
     uint16_t _payload_size();
 
     const std::map<AresFrameType, std::function<RxTypes()>> _rx_map = {
-        {SETTING, []() { return Setting(); }},
-        {START, []() { return Start(); }},
-        {ACK, []() { return Ack(); }},
-        {FRAMING_ERROR, []() { return FramingError(); }},
-        {LED, []() { return Led(); }},
-        {HEARTBEAT, []() { return Heartbeat(); }},
-        {POLL, []() { return Poll(); }},
-        {LOG, []() { return Log(); }},
-        {VERSION, []() { return Version(); }},
-        {LOG_ACK, []() { return LogAck(); }},
-        {DBG, []() { return Dbg(); }},
-        {PKT_RX, []() { return PktRx(); }},
-        {PKT_TX, []() { return PktTx(); }},
-        {BLE_STATE, []() { return BleState(); }},
-        {BLE_CONNECTED, []() { return BleConnect(); }},
-        {BLE_SUBSCRIBED, []() { return BleSubscribed(); }},
-        {LORA_ACK, []() { return LoraAck(); }},
-        {ABORT, []() { return LoraAck(); }},
-        {NODE_CONFIG, []() { return NodeConfig(); }},
-        {NODE_CONFIG_POLL, []() { return NodeConfigPoll(); }},
-        {NODE_CONFIG_RESP, []() { return NodeConfigResponse(); }},
-        {NODE_READY, []() { return NodeReady(); }},
+        {SETTING, [] { return Setting(); }},
+        {START, [] { return Start(); }},
+        {ACK, [] { return Ack(); }},
+        {FRAMING_ERROR, [] { return FramingError(); }},
+        {LED, [] { return Led(); }},
+        {HEARTBEAT, [] { return Heartbeat(); }},
+        {POLL, [] { return Poll(); }},
+        {LOG, [] { return Log(); }},
+        {VERSION, [] { return Version(); }},
+        {LOG_ACK, [] { return LogAck(); }},
+        {DBG, [] { return Dbg(); }},
+        {PKT_RX, [] { return PktRx(); }},
+        {PKT_TX, [] { return PktTx(); }},
+        {BLE_STATE, [] { return BleState(); }},
+        {BLE_CONNECTED, [] { return BleConnect(); }},
+        {BLE_SUBSCRIBED, [] { return BleSubscribed(); }},
+        {LORA_ACK, [] { return LoraAck(); }},
+        {ABORT, [] { return Abort(); }},
+        {NODE_CONFIG, [] { return NodeConfig(); }},
+        {NODE_CONFIG_POLL, [] { return NodeConfigPoll(); }},
+        {NODE_CONFIG_RESP, [] { return NodeConfigResponse(); }},
+        {NODE_READY, [] { return NodeReady(); }},
     };
 };
 
