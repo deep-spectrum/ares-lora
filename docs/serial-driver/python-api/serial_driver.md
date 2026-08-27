@@ -12,6 +12,4 @@
 
 ::: ares_lora.LoraLedState
 
-::: ares_lora.LoraSerialConfig
-
 ::: ares_lora.LoraSerial
