@@ -588,7 +588,7 @@ class LoraSerial:
         return ret[1][0]
 
     @lora_serial_command
-    def log(self, **kwargs):
+    def log(self, **kwargs) -> bool | None:
         """Send a log message over LoRa.
 
         Args:
@@ -601,6 +601,9 @@ class LoraSerial:
             ack_timeout: Maximum time to wait for a LoRa acknowledgement.
             broadcast: Flag indicating if the message should be broadcasted.
             retries: The amount of times to retry if no ACK was received.
+
+        Returns:
+            `None` if a broadcast message. `True` if all chunks of the log message were ACK'ed, `False` otherwise.
 
         Raises:
             ValueError: The strobe count is invalid.
@@ -617,8 +620,37 @@ class LoraSerial:
         ret = self._dev.log(**kwargs)
         self._check_ret_code(ret[0])
         if ret[1] is not None:
-            if not all(ret[1]):
-                raise ConnectionError("Not all messages acknowledged")
+            return all(ret[1])
+        return None
+
+    @lora_serial_command
+    def abort(self, **kwargs) -> bool | None:
+        """Send an abortion message over LoRa.
+
+        Args:
+            kwargs: Keyword arguments
+
+        Keyword Args:
+            message: The message to send.
+            destination: The destination ID.
+            response_timeout: The maximum time to wait for a response.
+            ack_timeout: Maximum time to wait for a LoRa acknowledgement.
+            broadcast: Flag indicating if the message should be broadcasted.
+            retries: The amount of times to retry if no ACK was received.
+
+        Returns:
+            `None` if a broadcast message. `True` if the message was ACK'ed, `False` otherwise.
+
+        Raises:
+            TimeoutError: No response from the firmware within the configured timeout.
+            ValueError: The node ID is invalid.
+            LoraException: Firmware responded with an error code.
+        """
+        ret = self._dev.abort(**kwargs)
+        self._check_ret_code(ret[0])
+        if ret[1] is not None:
+            return ret[1][0]
+        return None
 
     @lora_serial_command
     def ble_state(self, state: BleState = BleState.REQUEST) -> BleState | None:
@@ -664,38 +696,6 @@ class LoraSerial:
         """
         codes = self._dev.ble_send_image(data)
         self._check_ret_code(codes)
-
-    @lora_serial_command
-    def abort(self, broadcast: bool = True, destination_id: int | None = None, ack_timeout: float = 5.0,
-              timeout: float = 20.0):
-        """Send an abortion message over LoRa.
-
-        Args:
-            broadcast: Flag indicating if the message should be broadcasted or not.
-            destination_id: The node to send the message to if the message is not to be broadcasted.
-            ack_timeout: The amount of time to wait for an acknowledgement from the destination node.
-            timeout: The amount of time to wait for a response from the firmware.
-
-        Raises:
-            TimeoutError: No response from the firmware within the configured timeout.
-            TimeoutError: No acknowledgement from the destination node.
-            ValueError: The node ID is invalid.
-            LoraException: Firmware responded with an error code.
-        """
-        if not broadcast and (destination_id is None or destination_id <= 0):
-            raise ValueError("Direct messages must have a valid destination specified")
-        if destination_id is None:
-            destination_id = 0
-        prev_timeout = self._dev.get_response_timeout()
-        self._dev.set_response_timeout(timeout)
-        try:
-            ret = self._dev.abort(broadcast, destination_id, ack_timeout)
-        except Exception:
-            self._dev.set_response_timeout(prev_timeout)
-            raise
-        else:
-            self._dev.set_response_timeout(prev_timeout)
-        self._check_ret_code(ret)
 
     @lora_serial_command
     def send_node_configs(self, destination_id: int, timeout: float = 20.0, ack_timeout: float = 5.0,

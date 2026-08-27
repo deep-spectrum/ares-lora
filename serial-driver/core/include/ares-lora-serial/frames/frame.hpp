@@ -248,7 +248,7 @@ class Frame {
         {BLE_CONNECTED, [] { return BleConnect(); }},
         {BLE_SUBSCRIBED, [] { return BleSubscribed(); }},
         {LORA_ACK, [] { return LoraAck(); }},
-        {ABORT, [] { return LoraAck(); }},
+        {ABORT, [] { return Abort(); }},
         {NODE_CONFIG, [] { return NodeConfig(); }},
         {NODE_CONFIG_POLL, [] { return NodeConfigPoll(); }},
         {NODE_CONFIG_RESP, [] { return NodeConfigResponse(); }},
