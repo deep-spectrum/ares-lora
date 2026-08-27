@@ -588,17 +588,19 @@ class LoraSerial:
         return ret[1][0]
 
     @lora_serial_command
-    def send_log(self, log_msg: str, broadcast: bool = False, dst_id: int | None = None, strobe_count: int = 3,
-                 timeout: float = 15.0):
+    def log(self, **kwargs):
         """Send a log message over LoRa.
 
         Args:
-            log_msg: The log message to send over LoRa.
-            broadcast: Flag indicating if the message should be broadcasted to all nodes on the network.
-            dst_id: The destination for the log message. Ignored if the broadcast flag is set.
-            strobe_count: The number of times to send the broadcast message. The number of attempts per chunk if a
-                          directed message.
-            timeout: The timeout per a transmission.
+            kwargs: Keyword arguments
+
+        Keyword Args:
+            message: The message to send.
+            destination: The destination ID.
+            response_timeout: The maximum time to wait for a response.
+            ack_timeout: Maximum time to wait for a LoRa acknowledgement.
+            broadcast: Flag indicating if the message should be broadcasted.
+            retries: The amount of times to retry if no ACK was received.
 
         Raises:
             ValueError: The strobe count is invalid.
@@ -612,20 +614,11 @@ class LoraSerial:
               master node. If the master node has not been claimed, then the broadcast flag will be overridden to
               be `True`.
         """
-        if strobe_count <= 0:
-            raise ValueError("strobe_count must be a positive, non-zero integer")
-        if dst_id is None:
-            dst_id = 0
-        prev_timeout = self._dev.get_response_timeout()
-        self._dev.set_response_timeout(timeout)
-        try:
-            codes = self._dev.send_log(log_msg, broadcast, strobe_count, dst_id)
-        except Exception:
-            self._dev.set_response_timeout(prev_timeout)
-            raise
-        else:
-            self._dev.set_response_timeout(prev_timeout)
-        self._check_ret_code(codes)
+        ret = self._dev.log(**kwargs)
+        self._check_ret_code(ret[0])
+        if ret[1] is not None:
+            if not all(ret[1]):
+                raise ConnectionError("Not all messages acknowledged")
 
     @lora_serial_command
     def ble_state(self, state: BleState = BleState.REQUEST) -> BleState | None:

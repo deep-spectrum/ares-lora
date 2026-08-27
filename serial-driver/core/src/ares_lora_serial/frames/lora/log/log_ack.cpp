@@ -25,3 +25,5 @@ void AresFrame::LogAck::deserialize(const uint8_t *buffer, std::size_t len) {
 
     ares::deserialize(buffer, part, num_parts, id, log_id);
 }
+
+std::size_t AresFrame::LogAck::payload_size() { return _payload_size; }

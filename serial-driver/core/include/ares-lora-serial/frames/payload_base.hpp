@@ -24,7 +24,7 @@ using std::size_t;
  * @class NotSupported
  * Not supported exception.
  */
-class NotSupported : std::exception {
+class NotSupported : public std::exception {
   public:
     /**
      * Constructor.

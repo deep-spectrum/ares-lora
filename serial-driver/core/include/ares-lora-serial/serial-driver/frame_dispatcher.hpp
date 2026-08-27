@@ -138,7 +138,7 @@ class FrameDispatcher {
     void _send_lora_expecting_response_released(
         AresFrame::Frame &frame, const std::chrono::milliseconds &timeout,
         std::vector<AresSerial::FrameResponse> &responses);
-    bool _wait_lora_response(AresFrame::Frame &frame);
+    bool _wait_lora_response(AresFrame::Frame &frame, bool final_try);
 
     [[nodiscard]] AresSerial::FrameResponse
     _wait_response(const std::chrono::milliseconds &timeout) const;

@@ -84,6 +84,12 @@ struct LogAck : Internal::FramePayloadBase, Internal::LoraBase {
      */
     void deserialize(const uint8_t *buffer, std::size_t len) override;
 
+    /**
+     * Payload size.
+     * @return The payload size.
+     */
+    size_t payload_size() override;
+
   private:
     static constexpr size_t _payload_size = 6;
 };

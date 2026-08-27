@@ -195,14 +195,15 @@ void FrameDispatcher::_send_lora_expecting_response_released(
         bool timed_out = true;
 
         for (size_t attempt = 0u; attempt <= retries && timed_out; attempt++) {
-            LOG_DBG("Sending LoRa frame (attempt %u out of %u)", attempt, retries);
+            LOG_DBG("Sending LoRa frame (attempt %u out of %u)", attempt,
+                    retries);
             lock.lock();
             _serial._response_queue.clear();
             _send_frame_released(buf);
             fw_response = _wait_response(timeout);
             check_python_errors();
             (void)_verify_response(fw_response);
-            timed_out = _wait_lora_response(frame);
+            timed_out = _wait_lora_response(frame, attempt == retries);
             lock.unlock();
             LOG_DBG("Message response timed out: %d", timed_out);
         }
@@ -226,6 +227,8 @@ get_expected_response(const AresFrame::Frame::TxTypes &payload) {
 
 bool compare_ack(const AresFrame::Frame::AckTypes &expected,
                  const AresFrame::Frame::AckTypes &received) {
+    LOG_DBG("Expected type: %d, received type: %d", expected.index(),
+            received.index());
     if (expected.index() != received.index()) {
         return false;
     }
@@ -238,7 +241,8 @@ bool compare_ack(const AresFrame::Frame::AckTypes &expected,
         expected);
 }
 
-bool FrameDispatcher::_wait_lora_response(AresFrame::Frame &frame) {
+bool FrameDispatcher::_wait_lora_response(AresFrame::Frame &frame,
+                                          bool final_try) {
     AresFrame::Frame::AckTypes expected =
         get_expected_response(frame.tx_payload());
     AresFrame::Frame::AckTypes received = std::monostate();
@@ -261,7 +265,7 @@ bool FrameDispatcher::_wait_lora_response(AresFrame::Frame &frame) {
 
     if (!timed_out) {
         _lora_responses.emplace_back(received);
-    } else {
+    } else if (final_try) {
         _lora_responses.emplace_back(std::monostate());
     }
 
