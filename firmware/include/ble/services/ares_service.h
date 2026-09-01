@@ -49,6 +49,12 @@
 #define BT_UUID_ARES_SRV_CONFIG_RESP_VAL                                       \
     BT_UUID_128_ENCODE(0xf2765f24, 0xd570, 0x48cf, 0xa6b7, 0x985ff6af492c)
 
+#define BT_UUID_ARES_SRV_START_VAL                                             \
+    BT_UUID_128_ENCODE(0xf2765f25, 0xd570, 0x48cf, 0xa6b7, 0x985ff6af492c)
+
+#define BT_UUID_ARES_SRV_NEIGHBOR_STATE_VAL                                    \
+    BT_UUID_128_ENCODE(0xf2765f26, 0xd570, 0x48cf, 0xa6b7, 0x985ff6af492c)
+
 #define BT_UUID_ARES_SRV BT_UUID_DECLARE_128(BT_UUID_ARES_SRV_VAL)
 #define BT_UUID_ARES_SRV_BANDWIDTH                                             \
     BT_UUID_DECLARE_128(BT_UUID_ARES_SRV_BANDWIDTH_VAL)
@@ -64,6 +70,9 @@
     BT_UUID_DECLARE_128(BT_UUID_ARES_SRV_CONFIG_READ_VAL)
 #define BT_UUID_ARES_SRV_CONFIG_RESP                                           \
     BT_UUID_DECLARE_128(BT_UUID_ARES_SRV_CONFIG_RESP_VAL)
+#define BT_UUID_ARES_SRV_START BT_UUID_DECLARE_128(BT_UUID_ARES_SRV_START_VAL)
+#define BT_UUID_ARES_SRV_NEIGHBOR_STATE                                        \
+    BT_UUID_DECLARE_128(BT_UUID_ARES_SRV_NEIGHBOR_STATE_VAL)
 
 enum ares_srv_configs {
     ARES_CONFIG_BANDWIDTH,
@@ -156,6 +165,20 @@ struct ares_service_cb {
      * @param[in] err The error code.
      */
     void (*config_response_ind_cb)(struct bt_conn *conn, uint8_t err);
+
+    /**
+     * @brief Callback for indication to start the data collection run.
+     * @param[in] conn Pointer to the bt_conn instance the write occurred on.
+     */
+    void (*start)(struct bt_conn *conn);
+
+    /**
+     * @brief Callback for indicating that the neighbor state characteristic has
+     * been subscribed to.
+     *
+     * @param[in] enabled `true` if subscribed to to, `false` otherwise.
+     */
+    void (*neighbor_state_enabled)(bool enabled);
 };
 
 /**

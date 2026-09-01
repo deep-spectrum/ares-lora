@@ -20,6 +20,7 @@ LOG_MODULE_REGISTER(ares_ble_service);
 
 enum {
     ARES_CONFIG_RESP_ENABLED,
+    ARES_NEIGHBOR_STATE_ENABLED,
 };
 
 struct ares_srv_ctx {
@@ -46,6 +47,26 @@ ares_service_config_resp_cfg_changed(const struct bt_gatt_attr *attr,
         atomic_set_bit(&srv_ctx.state, ARES_CONFIG_RESP_ENABLED);
     } else {
         atomic_clear_bit(&srv_ctx.state, ARES_CONFIG_RESP_ENABLED);
+    }
+}
+
+static void
+ares_service_neighbor_update_cfg_changed(const struct bt_gatt_attr *attr,
+                                         uint16_t value) {
+    ARG_UNUSED(attr);
+    bool enabled = value == BT_GATT_CCC_NOTIFY;
+
+    LOG_DBG("Notification for neighbor updates has been turned %s",
+            enabled ? "on" : "off");
+
+    if (srv_ctx.ares_service_cb.neighbor_state_enabled != NULL) {
+        srv_ctx.ares_service_cb.neighbor_state_enabled(enabled);
+    }
+
+    if (enabled) {
+        atomic_set_bit(&srv_ctx.state, ARES_NEIGHBOR_STATE_ENABLED);
+    } else {
+        atomic_clear_bit(&srv_ctx.state, ARES_NEIGHBOR_STATE_ENABLED);
     }
 }
 
@@ -179,6 +200,27 @@ static ssize_t write_config_read(struct bt_conn *conn,
     return ret;
 }
 
+static ssize_t write_start(struct bt_conn *conn,
+                           const struct bt_gatt_attr *attr, const void *buf,
+                           uint16_t len, uint16_t offset, uint8_t flags) {
+    ARG_UNUSED(flags);
+    ARG_UNUSED(offset);
+    ARG_UNUSED(buf);
+    struct ares_srv_ctx *ctx = attr->user_data;
+    ssize_t ret = BT_GATT_ERR(BT_ATT_ERR_NOT_SUPPORTED);
+
+    if (len != 0) {
+        return BT_GATT_ERR(BT_ATT_ERR_INVALID_ATTRIBUTE_LEN);
+    }
+
+    if (ctx->ares_service_cb.start != NULL) {
+        ctx->ares_service_cb.start(conn);
+        ret = len;
+    }
+
+    return ret;
+}
+
 BT_GATT_SERVICE_DEFINE(
     ares_srv_svc, BT_GATT_PRIMARY_SERVICE(BT_UUID_ARES_SRV),
     BT_GATT_CHARACTERISTIC(BT_UUID_ARES_SRV_BANDWIDTH, BT_GATT_CHRC_WRITE,
@@ -199,6 +241,12 @@ BT_GATT_SERVICE_DEFINE(
     BT_GATT_CHARACTERISTIC(BT_UUID_ARES_SRV_CONFIG_RESP, BT_GATT_CHRC_INDICATE,
                            BT_GATT_PERM_NONE, NULL, NULL, NULL),
     BT_GATT_CCC(ares_service_config_resp_cfg_changed,
+                BT_GATT_PERM_READ | BT_GATT_PERM_WRITE),
+    BT_GATT_CHARACTERISTIC(BT_UUID_ARES_SRV_START, BT_GATT_CHRC_WRITE,
+                           BT_GATT_PERM_WRITE, NULL, write_start, &srv_ctx),
+    BT_GATT_CHARACTERISTIC(BT_UUID_ARES_SRV_NEIGHBOR_STATE, BT_GATT_CHRC_NOTIFY,
+                           BT_GATT_PERM_NONE, NULL, NULL, NULL),
+    BT_GATT_CCC(ares_service_neighbor_update_cfg_changed,
                 BT_GATT_PERM_READ | BT_GATT_PERM_WRITE), );
 
 int bt_ares_srv_init(const struct ares_service_cb *cb) {
