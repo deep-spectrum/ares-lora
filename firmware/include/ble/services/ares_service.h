@@ -169,27 +169,15 @@ struct ares_service_cb {
 int bt_ares_srv_init(const struct ares_service_cb *cb);
 
 /**
- * Indicate how many chunks are going to be sent.
  *
- * @param[in] chunks The value to indicate.
+ * @param conn Pointer to the bt_conn to send the indication on.
+ * @param data The configuration data.
+ * @param len Length of the data.
  *
- * @return @p -EACCESS if the indication has not been subscribed to
- * @return @p 0 on success
+ * @return @p -EACCESS if the indication has not been subscribed to.
+ * @return @p 0 on success.
  * @return negative error code otherwise.
  */
-int bt_ares_srv_ind_chunks(uint64_t chunks);
-
-/**
- * Indicate an image chunk over BLE.
- *
- * @param[in] bytes The data to send over BLE.
- * @param[in] num_bytes The number of bytes that is in the data.
- *
- * @return @p -EACCESS if the indication has not been subscribed to
- * @return @p -EINVAL if @p bytes is @p NULL
- * @return @p 0 on success
- * @return negative error code otherwise.
- */
-int bt_ares_srv_ind_image_chunk(const uint8_t *bytes, size_t num_bytes);
+int bt_ares_config_response(struct bt_conn *conn, const void *data, size_t len);
 
 #endif // ARES_ARES_SERVICE_H
