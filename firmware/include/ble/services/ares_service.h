@@ -169,8 +169,9 @@ struct ares_service_cb {
     /**
      * @brief Callback for indication to start the data collection run.
      * @param[in] conn Pointer to the bt_conn instance the write occurred on.
+     * @param[in] delay Number of seconds into the future.
      */
-    void (*start)(struct bt_conn *conn);
+    void (*start)(struct bt_conn *conn, uint32_t delay);
 
     /**
      * @brief Callback for indicating that the neighbor state characteristic has
@@ -192,15 +193,29 @@ struct ares_service_cb {
 int bt_ares_srv_init(const struct ares_service_cb *cb);
 
 /**
+ * @brief Send the configuration response.
  *
- * @param conn Pointer to the bt_conn to send the indication on.
- * @param data The configuration data.
- * @param len Length of the data.
+ * @param[in] conn Pointer to the bt_conn to send the indication on.
+ * @param[in] data The configuration data.
+ * @param[in] len Length of the data.
  *
  * @return @p -EACCESS if the indication has not been subscribed to.
  * @return @p 0 on success.
  * @return negative error code otherwise.
  */
 int bt_ares_config_response(struct bt_conn *conn, const void *data, size_t len);
+
+/**
+ * @brief Send neighbor state information.
+ *
+ * @param[in] conn Pointer to the bt_conn to send the notification on.
+ * @param[in] data Binary data representation of the neighbor states.
+ * @param[in] len The length of the data.
+ *
+ * @return @p -EACCESS if the indication has not been subscribed to.
+ * @return @p 0 on success.
+ * @return negative error code otherwise.
+ */
+int bt_ares_notify_neighbor_state(struct bt_conn *conn, const void *data, size_t len);
 
 #endif // ARES_ARES_SERVICE_H

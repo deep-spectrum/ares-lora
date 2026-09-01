@@ -204,17 +204,12 @@ static ssize_t write_start(struct bt_conn *conn,
                            const struct bt_gatt_attr *attr, const void *buf,
                            uint16_t len, uint16_t offset, uint8_t flags) {
     ARG_UNUSED(flags);
-    ARG_UNUSED(offset);
-    ARG_UNUSED(buf);
     struct ares_srv_ctx *ctx = attr->user_data;
-    ssize_t ret = BT_GATT_ERR(BT_ATT_ERR_NOT_SUPPORTED);
+    ssize_t ret = write_config_common(attr, len, offset, sizeof(uint32_t));
 
-    if (len != 0) {
-        return BT_GATT_ERR(BT_ATT_ERR_INVALID_ATTRIBUTE_LEN);
-    }
-
-    if (ctx->ares_service_cb.start != NULL) {
-        ctx->ares_service_cb.start(conn);
+    if (ctx->ares_service_cb.start != NULL && ret == BT_GATT_ERR(BT_ATT_ERR_NOT_SUPPORTED)) {
+        uint32_t delay = *((uint32_t *)buf);
+        ctx->ares_service_cb.start(conn, delay);
         ret = len;
     }
 
@@ -285,8 +280,20 @@ int bt_ares_config_response(struct bt_conn *conn, const void *data,
         return -EINVAL;
     }
 
-    ind_params.attr = &ares_srv_svc.attrs[5];
+    ind_params.attr = &ares_srv_svc.attrs[16];
     ind_params.data = data;
     ind_params.len = len;
     return bt_gatt_indicate(conn, &ind_params);
+}
+
+int bt_ares_notify_neighbor_state(struct bt_conn *conn, const void *data, size_t len) {
+    if (!atomic_test_bit(&srv_ctx.state, ARES_NEIGHBOR_STATE_ENABLED)) {
+        return -EACCES;
+    }
+
+    if (data == NULL) {
+        return -EINVAL;
+    }
+
+    return bt_gatt_notify(conn, &ares_srv_svc.attrs[21], data, len);
 }
