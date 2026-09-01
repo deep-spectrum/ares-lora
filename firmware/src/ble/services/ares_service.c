@@ -19,59 +19,44 @@
 LOG_MODULE_REGISTER(ares_ble_service);
 
 enum {
-    CHUNKS_ENABLED,
-    IMAGE_ENABLED,
+    CONFIG_RESP_ENABLED,
 };
 
-static struct ares_service_cb ares_service_cb;
-static atomic_t state;
+struct ares_srv_ctx {
+    struct ares_service_cb ares_service_cb;
+    atomic_t state;
+};
 
-static void ares_service_chunk_cfg_changed(const struct bt_gatt_attr *attr,
-                                           uint16_t value) {
+static struct ares_srv_ctx srv_ctx;
+
+static void ares_service_config_resp_cfg_changed(const struct bt_gatt_attr *attr, uint16_t value) {
     ARG_UNUSED(attr);
     bool enabled = value == BT_GATT_CCC_INDICATE;
 
-    LOG_DBG("Indication for chunks has been turned %s", enabled ? "on" : "off");
+    LOG_DBG("Indication for config response has been turned %s", enabled ? "on" : "off");
 
-    if (ares_service_cb.num_chunks_ind_enabled != NULL) {
-        ares_service_cb.num_chunks_ind_enabled(enabled);
+    if (srv_ctx.ares_service_cb.config_response_ind_enabled != NULL) {
+        srv_ctx.ares_service_cb.config_response_ind_enabled(enabled);
     }
 
     if (enabled) {
-        atomic_set_bit(&state, CHUNKS_ENABLED);
+        atomic_set_bit(&srv_ctx.state, CONFIG_RESP_ENABLED);
     } else {
-        atomic_clear_bit(&state, CHUNKS_ENABLED);
-    }
-}
-
-static void ares_service_image_cfg_changed(const struct bt_gatt_attr *attr,
-                                           uint16_t value) {
-    ARG_UNUSED(attr);
-    bool enabled = value == BT_GATT_CCC_INDICATE;
-
-    LOG_DBG("Indication for image has been turned %s", enabled ? "on" : "off");
-
-    if (ares_service_cb.image_ind_enabled != NULL) {
-        ares_service_cb.image_ind_enabled(enabled);
-    }
-
-    if (enabled) {
-        atomic_set_bit(&state, IMAGE_ENABLED);
-    } else {
-        atomic_clear_bit(&state, IMAGE_ENABLED);
+        atomic_clear_bit(&srv_ctx.state, CONFIG_RESP_ENABLED);
     }
 }
 
 BT_GATT_SERVICE_DEFINE(
     ares_srv_svc, BT_GATT_PRIMARY_SERVICE(BT_UUID_ARES_SRV),
-    BT_GATT_CHARACTERISTIC(BT_UUID_ARES_SRV_CHUNKS, BT_GATT_CHRC_INDICATE,
-                           BT_GATT_PERM_NONE, NULL, NULL, NULL),
-    BT_GATT_CCC(ares_service_chunk_cfg_changed,
-                BT_GATT_PERM_READ | BT_GATT_PERM_WRITE),
-    BT_GATT_CHARACTERISTIC(BT_UUID_ARES_SRV_IMAGE, BT_GATT_CHRC_INDICATE,
-                           BT_GATT_PERM_NONE, NULL, NULL, NULL),
-    BT_GATT_CCC(ares_service_image_cfg_changed,
-                BT_GATT_PERM_READ | BT_GATT_PERM_WRITE));
+    BT_GATT_CHARACTERISTIC(BT_UUID_ARES_SRV_BANDWIDTH, BT_GATT_CHRC_WRITE, BT_GATT_PERM_WRITE, NULL, /* TODO: write */ NULL, /* TODO: context */ NULL),
+    BT_GATT_CHARACTERISTIC(BT_UUID_ARES_SRV_CENTER_FREQ, BT_GATT_CHRC_WRITE, BT_GATT_PERM_WRITE, NULL, /* TODO: write */ NULL, /* TODO: context */ NULL),
+    BT_GATT_CHARACTERISTIC(BT_UUID_ARES_SRV_REF_LEVEL, BT_GATT_CHRC_WRITE, BT_GATT_PERM_WRITE, NULL, /* TODO: write */ NULL, /* TODO: context */ NULL),
+    BT_GATT_CHARACTERISTIC(BT_UUID_ARES_SRV_DURATION, BT_GATT_CHRC_WRITE, BT_GATT_PERM_WRITE, NULL, /* TODO: write */ NULL, /* TODO: context */ NULL),
+    BT_GATT_CHARACTERISTIC(BT_UUID_ARES_SRV_DESCRIPTION, BT_GATT_CHRC_WRITE, BT_GATT_PERM_WRITE, NULL, /* TODO: write */ NULL, /* TODO: context */ NULL),
+    BT_GATT_CHARACTERISTIC(BT_UUID_ARES_SRV_CONFIG_READ, BT_GATT_CHRC_WRITE, BT_GATT_PERM_WRITE, NULL, /* TODO: write */ NULL, /* TODO: context */ NULL),
+    BT_GATT_CHARACTERISTIC(BT_UUID_ARES_SRV_CONFIG_RESP, BT_GATT_CHRC_INDICATE, BT_GATT_PERM_NONE, NULL, NULL, NULL),
+    BT_GATT_CCC(ares_service_config_resp_cfg_changed, BT_GATT_PERM_READ | BT_GATT_PERM_WRITE),
+    );
 
 int bt_ares_srv_init(const struct ares_service_cb *cb) {
     if (cb == NULL) {

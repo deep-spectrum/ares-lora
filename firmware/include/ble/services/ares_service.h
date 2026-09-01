@@ -23,33 +23,79 @@
     BT_UUID_128_ENCODE(0xf2765f1d, 0xd570, 0x48cf, 0xa6b7, 0x985ff6af492c)
 
 /**
- * @brief Ares number of chunks UUID.
+ * @brief Ares bandwidth UUID.
  */
-#define BT_UUID_ARES_SRV_CHUNKS_VAL                                            \
+#define BT_UUID_ARES_SRV_BANDWIDTH_VAL                                         \
     BT_UUID_128_ENCODE(0xf2765f1e, 0xd570, 0x48cf, 0xa6b7, 0x985ff6af492c)
 
 /**
- * @brief Ares image UUID.
+ * @brief Ares center frequency UUID.
  */
-#define BT_UUID_ARES_SRV_IMAGE_VAL                                             \
+#define BT_UUID_ARES_SRV_CENTER_FREQ_VAL                                       \
     BT_UUID_128_ENCODE(0xf2765f1f, 0xd570, 0x48cf, 0xa6b7, 0x985ff6af492c)
 
-#define BT_UUID_ARES_SRV        BT_UUID_DECLARE_128(BT_UUID_ARES_SRV_VAL)
-#define BT_UUID_ARES_SRV_CHUNKS BT_UUID_DECLARE_128(BT_UUID_ARES_SRV_CHUNKS_VAL)
-#define BT_UUID_ARES_SRV_IMAGE  BT_UUID_DECLARE_128(BT_UUID_ARES_SRV_IMAGE_VAL)
+#define BT_UUID_ARES_SRV_REF_LEVEL_VAL                                         \
+    BT_UUID_128_ENCODE(0xf2765f20, 0xd570, 0x48cf, 0xa6b7, 0x985ff6af492c)
+
+#define BT_UUID_ARES_SRV_DURATION_VAL                                          \
+    BT_UUID_128_ENCODE(0xf2765f21, 0xd570, 0x48cf, 0xa6b7, 0x985ff6af492c)
+
+#define BT_UUID_ARES_SRV_DESCRIPTION_VAL                                       \
+    BT_UUID_128_ENCODE(0xf2765f22, 0xd570, 0x48cf, 0xa6b7, 0x985ff6af492c)
+
+#define BT_UUID_ARES_SRV_CONFIG_READ_VAL                                       \
+    BT_UUID_128_ENCODE(0xf2765f23, 0xd570, 0x48cf, 0xa6b7, 0x985ff6af492c)
+
+#define BT_UUID_ARES_SRV_CONFIG_RESP_VAL                                       \
+    BT_UUID_128_ENCODE(0xf2765f24, 0xd570, 0x48cf, 0xa6b7, 0x985ff6af492c)
+
+#define BT_UUID_ARES_SRV BT_UUID_DECLARE_128(BT_UUID_ARES_SRV_VAL)
+#define BT_UUID_ARES_SRV_BANDWIDTH                                             \
+    BT_UUID_DECLARE_128(BT_UUID_ARES_SRV_BANDWIDTH_VAL)
+#define BT_UUID_ARES_SRV_CENTER_FREQ                                           \
+    BT_UUID_DECLARE_128(BT_UUID_ARES_SRV_CENTER_FREQ_VAL)
+#define BT_UUID_ARES_SRV_REF_LEVEL                                             \
+    BT_UUID_DECLARE_128(BT_UUID_ARES_SRV_REF_LEVEL_VAL)
+#define BT_UUID_ARES_SRV_DURATION                                              \
+    BT_UUID_DECLARE_128(BT_UUID_ARES_SRV_DURATION_VAL)
+#define BT_UUID_ARES_SRV_DESCRIPTION                                           \
+    BT_UUID_DECLARE_128(BT_UUID_ARES_SRV_DESCRIPTION_VAL)
+#define BT_UUID_ARES_SRV_CONFIG_READ                                           \
+    BT_UUID_DECLARE_128(BT_UUID_ARES_SRV_CONFIG_READ_VAL)
+#define BT_UUID_ARES_SRV_CONFIG_RESP                                           \
+    BT_UUID_DECLARE_128(BT_UUID_ARES_SRV_CONFIG_RESP_VAL)
+
+enum ares_srv_configs {
+    ARES_CONFIG_BANDWIDTH,
+    ARES_CONFIG_CENTER_FREQ,
+    ARES_CONFIG_REF_LEVEL,
+    ARES_CONFIG_DURATION,
+    ARES_CONFIG_DESCRIPTION,
+
+    ARES_CONFIG_INVALID,
+};
 
 /**
  * @struct ares_service_cb
  * @brief Service callback configurations.
  */
 struct ares_service_cb {
+    void (*bandwidth_update)(struct bt_conn *conn, uint64_t bandwidth);
+    void (*center_frequency_update)(struct bt_conn *conn, uint64_t center_freq);
+    void (*reference_level_update)(struct bt_conn *conn, uint64_t ref_level);
+    void (*duration_update)(struct bt_conn *conn, uint32_t duration);
+    void (*description_update)(struct bt_conn *conn, const void *buf, uint16_t len, uint16_t offset);
+    void (*config_read)(struct bt_conn *conn, enum ares_srv_configs config);
+    void (*config_response_ind_enabled)(bool enabled);
+    void (*config_response_ind_cb)(struct bt_conn *conn, uint8_t err);
+
     /**
      * @brief Callback for indicating that the chunks characteristic has been
      * subscribed to.
      *
      * @param[in] enabled `true` if subscribed to to, `false` otherwise.
      */
-    void (*num_chunks_ind_enabled)(bool enabled);
+    //void (*num_chunks_ind_enabled)(bool enabled);
 
     /**
      * @brief Callback for indicating that the image characteristic has been
@@ -57,7 +103,7 @@ struct ares_service_cb {
      *
      * @param[in] enabled `true` if subscribed to to, `false` otherwise.
      */
-    void (*image_ind_enabled)(bool enabled);
+    //void (*image_ind_enabled)(bool enabled);
 
     /**
      * @brief Indication complete callback for chunk characteristic.
@@ -66,7 +112,7 @@ struct ares_service_cb {
      * carried out on.
      * @param[in] err The error code.
      */
-    void (*num_chunks_ind_cb)(struct bt_conn *conn, uint8_t err);
+    //void (*num_chunks_ind_cb)(struct bt_conn *conn, uint8_t err);
 
     /**
      * @brief Indication complete callback for image characteristic.
@@ -75,7 +121,7 @@ struct ares_service_cb {
      * carried out on.
      * @param[in] err The error code.
      */
-    void (*image_ind_cb)(struct bt_conn *conn, uint8_t err);
+    //void (*image_ind_cb)(struct bt_conn *conn, uint8_t err);
 };
 
 /**
