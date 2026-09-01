@@ -80,48 +80,82 @@ enum ares_srv_configs {
  * @brief Service callback configurations.
  */
 struct ares_service_cb {
+    /**
+     * @brief Callback for updating the bandwidth value.
+     *
+     * @param[in] conn Pointer to the bt_conn instance the write occurred on.
+     * @param[in] bandwidth The new bandwidth.
+     *
+     * @note The bandwidth is supposed to be an 8-bit float.
+     */
     void (*bandwidth_update)(struct bt_conn *conn, uint64_t bandwidth);
+
+    /**
+     * @brief Callback for updating the center frequency value.
+     *
+     * @param[in] conn Pointer to the bt_conn instance the write occurred on.
+     * @param[in] center_freq The new center frequency.
+     *
+     * @note The center frequency is supposed to be an 8-bit float.
+     */
     void (*center_frequency_update)(struct bt_conn *conn, uint64_t center_freq);
+
+    /**
+     * @brief Callback for updating the reference level value.
+     *
+     * @param[in] conn Pointer to the bt_conn instance the write occurred on.
+     * @param[in] ref_level The new reference level.
+     *
+     * @note The reference level is supposed to be an 8-bit float.
+     */
     void (*reference_level_update)(struct bt_conn *conn, uint64_t ref_level);
+
+    /**
+     * @brief Callback for updating the duration value.
+     *
+     * @param[in] conn Pointer to the bt_conn instance the write occurred on.
+     * @param[in] duration The new duration.
+     *
+     * @note The duration is in seconds.
+     */
     void (*duration_update)(struct bt_conn *conn, uint32_t duration);
-    void (*description_update)(struct bt_conn *conn, const void *buf, uint16_t len, uint16_t offset);
+
+    /**
+     * @brief Callback for updating the test description.
+     *
+     * @param[in] conn Pointer to the bt_conn instance the write occurred on.
+     * @param[in] buf Pointer to buffer that contains the description.
+     * @param[in] len The length of the buffer.
+     */
+    void (*description_update)(struct bt_conn *conn, const void *buf,
+                               uint16_t len);
+
+    /**
+     * @brief Callback for indicating a configuration needs to be read.
+     *
+     * @param[in] conn Pointer to the bt_conn instance the write occurred on.
+     * @param[in] config The config to be read.
+     *
+     * @note The response should be carried out with the response indication.
+     */
     void (*config_read)(struct bt_conn *conn, enum ares_srv_configs config);
+
+    /**
+     * @brief Callback for indicating that the config response has been
+     * subscribed to.
+     *
+     * @param[in] enabled `true` if subscribed to to, `false` otherwise.
+     */
     void (*config_response_ind_enabled)(bool enabled);
+
+    /**
+     * @brief Indication complete callback for config response characteristic.
+     *
+     * @param[in] conn Pointer to the bt_conn instance the indication was
+     * carried out on.
+     * @param[in] err The error code.
+     */
     void (*config_response_ind_cb)(struct bt_conn *conn, uint8_t err);
-
-    /**
-     * @brief Callback for indicating that the chunks characteristic has been
-     * subscribed to.
-     *
-     * @param[in] enabled `true` if subscribed to to, `false` otherwise.
-     */
-    //void (*num_chunks_ind_enabled)(bool enabled);
-
-    /**
-     * @brief Callback for indicating that the image characteristic has been
-     * subscribed to.
-     *
-     * @param[in] enabled `true` if subscribed to to, `false` otherwise.
-     */
-    //void (*image_ind_enabled)(bool enabled);
-
-    /**
-     * @brief Indication complete callback for chunk characteristic.
-     *
-     * @param[in] conn Pointer to the bt_conn instance the indication was
-     * carried out on.
-     * @param[in] err The error code.
-     */
-    //void (*num_chunks_ind_cb)(struct bt_conn *conn, uint8_t err);
-
-    /**
-     * @brief Indication complete callback for image characteristic.
-     *
-     * @param[in] conn Pointer to the bt_conn instance the indication was
-     * carried out on.
-     * @param[in] err The error code.
-     */
-    //void (*image_ind_cb)(struct bt_conn *conn, uint8_t err);
 };
 
 /**
