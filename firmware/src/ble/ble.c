@@ -16,6 +16,7 @@
 #include <zephyr/bluetooth/gatt.h>
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
+#include <zephyr/net_buf.h>
 
 LOG_MODULE_REGISTER(ble_app);
 
@@ -34,6 +35,14 @@ enum {
     BLE_SIGNAL_LAST,
 };
 
+#define CONFIG_ARES_BLE_NUM_NET_BUFS 4
+#define CONFIG_ARES_BLE_NETBUF_SIZE  1536
+
+NET_BUF_POOL_DEFINE(ares_tx_netbuf, CONFIG_ARES_BLE_NUM_NET_BUFS,
+                    CONFIG_ARES_BLE_NETBUF_SIZE, 0, NULL);
+NET_BUF_POOL_DEFINE(ares_rx_netbuf, CONFIG_ARES_BLE_NUM_NET_BUFS,
+                    CONFIG_ARES_BLE_NETBUF_SIZE, 0, NULL);
+
 struct ble_conn_info {
     struct k_poll_signal signals[BLE_SIGNAL_LAST];
     struct k_poll_event events[BLE_SIGNAL_LAST];
@@ -42,6 +51,9 @@ struct ble_conn_info {
     atomic_t state;
     size_t payload_mtu_size;
     struct bt_conn *conn;
+
+    struct net_buf *desc_buf;
+    struct net_buf *config_resp;
 };
 
 static char adv_name[16] = "Ares";
@@ -205,7 +217,15 @@ static void description_update(struct bt_conn *conn, const void *buf,
     __ASSERT_NO_MSG(atomic_test_bit(connection_info.state, BLE_INITIALIZED));
     ARG_UNUSED(conn);
 
-    // TODO
+    if (connection_info.desc_buf == NULL) {
+        connection_info.desc_buf = net_buf_alloc(&ares_rx_netbuf, K_NO_WAIT);
+        if (connection_info.desc_buf == NULL) {
+            return;
+        }
+    }
+
+    net_buf_add_mem(connection_info.desc_buf, buf, len);
+    // TODO: Submit work
 }
 
 static void config_read_handler(struct bt_conn *conn,
@@ -361,7 +381,9 @@ static int check_response_size(uint32_t type, size_t len) {
         break;
     }
     case ARES_CONFIG_DESCRIPTION: {
-        // todo: check against a config
+        if (len >= (size_t)CONFIG_ARES_BLE_NETBUF_SIZE) {
+            ret = -ENOMEM;
+        }
         break;
     }
     default: {
@@ -389,6 +411,7 @@ int ares_send_config_response(uint32_t type, const void *config, size_t len) {
     // todo: allocate buffer & copy data
     // todo: send data
 
+    // TODO: This is no longer needed with netbufs
     k_poll(&connection_info.events[BLE_SIGNAL_CONFIG_RESP_IND], 1, K_FOREVER);
     k_poll_signal_check(&connection_info.signals[BLE_SIGNAL_CONFIG_RESP_IND],
                         &signaled, &ret);

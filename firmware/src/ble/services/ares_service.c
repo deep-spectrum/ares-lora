@@ -70,10 +70,12 @@ ares_service_neighbor_update_cfg_changed(const struct bt_gatt_attr *attr,
     }
 }
 
-static ssize_t write_config_common(const struct bt_gatt_attr *attr,
+static ssize_t write_config_common(struct bt_conn *conn,
+                                   const struct bt_gatt_attr *attr,
                                    uint16_t len, uint16_t offset,
                                    uint16_t type_size) {
     ARG_UNUSED(attr);
+    ARG_UNUSED(conn);
     LOG_DBG("Attribute write, handle: %u, conn %p", attr->handle, conn);
 
     if (len != type_size) {
@@ -94,7 +96,8 @@ static ssize_t write_bandwidth(struct bt_conn *conn,
                                uint16_t len, uint16_t offset, uint8_t flags) {
     ARG_UNUSED(flags);
     struct ares_srv_ctx *ctx = attr->user_data;
-    ssize_t ret = write_config_common(attr, len, offset, sizeof(uint64_t));
+    ssize_t ret =
+        write_config_common(conn, attr, len, offset, sizeof(uint64_t));
 
     if (ctx->ares_service_cb.bandwidth_update != NULL &&
         ret == BT_GATT_ERR(BT_ATT_ERR_NOT_SUPPORTED)) {
@@ -112,7 +115,8 @@ static ssize_t write_center_frequency(struct bt_conn *conn,
                                       uint16_t offset, uint8_t flags) {
     ARG_UNUSED(flags);
     struct ares_srv_ctx *ctx = attr->user_data;
-    ssize_t ret = write_config_common(attr, len, offset, sizeof(uint64_t));
+    ssize_t ret =
+        write_config_common(conn, attr, len, offset, sizeof(uint64_t));
 
     if (ctx->ares_service_cb.center_frequency_update != NULL &&
         ret == BT_GATT_ERR(BT_ATT_ERR_NOT_SUPPORTED)) {
@@ -129,7 +133,8 @@ static ssize_t write_ref_level(struct bt_conn *conn,
                                uint16_t len, uint16_t offset, uint8_t flags) {
     ARG_UNUSED(flags);
     struct ares_srv_ctx *ctx = attr->user_data;
-    ssize_t ret = write_config_common(attr, len, offset, sizeof(uint64_t));
+    ssize_t ret =
+        write_config_common(conn, attr, len, offset, sizeof(uint64_t));
 
     if (ctx->ares_service_cb.reference_level_update != NULL &&
         ret == BT_GATT_ERR(BT_ATT_ERR_NOT_SUPPORTED)) {
@@ -146,7 +151,8 @@ static ssize_t write_duration(struct bt_conn *conn,
                               uint16_t len, uint16_t offset, uint8_t flags) {
     ARG_UNUSED(flags);
     struct ares_srv_ctx *ctx = attr->user_data;
-    ssize_t ret = write_config_common(attr, len, offset, sizeof(uint32_t));
+    ssize_t ret =
+        write_config_common(conn, attr, len, offset, sizeof(uint32_t));
 
     if (ctx->ares_service_cb.duration_update != NULL &&
         ret == BT_GATT_ERR(BT_ATT_ERR_NOT_SUPPORTED)) {
@@ -182,8 +188,8 @@ static ssize_t write_config_read(struct bt_conn *conn,
                                  uint8_t flags) {
     ARG_UNUSED(flags);
     struct ares_srv_ctx *ctx = attr->user_data;
-    ssize_t ret =
-        write_config_common(attr, len, offset, sizeof(enum ares_srv_configs));
+    ssize_t ret = write_config_common(conn, attr, len, offset,
+                                      sizeof(enum ares_srv_configs));
 
     if (ctx->ares_service_cb.config_read != NULL &&
         ret == BT_GATT_ERR(BT_ATT_ERR_NOT_SUPPORTED)) {
@@ -205,7 +211,8 @@ static ssize_t write_start(struct bt_conn *conn,
                            uint16_t len, uint16_t offset, uint8_t flags) {
     ARG_UNUSED(flags);
     struct ares_srv_ctx *ctx = attr->user_data;
-    ssize_t ret = write_config_common(attr, len, offset, sizeof(uint32_t));
+    ssize_t ret =
+        write_config_common(conn, attr, len, offset, sizeof(uint32_t));
 
     if (ctx->ares_service_cb.start != NULL &&
         ret == BT_GATT_ERR(BT_ATT_ERR_NOT_SUPPORTED)) {

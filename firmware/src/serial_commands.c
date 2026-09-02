@@ -375,15 +375,15 @@ static void handle_ble_disconnect(const struct ares_serial *serial,
 
 static void handle_ble_chunks(const struct ares_serial *serial,
                               struct ares_frame *frame) {
-    int ret = ares_ble_indicate_chunks(frame->payload.BLE_CHUNKS);
-    send_ack_frame(serial, frame, ret);
+    // int ret = ares_ble_indicate_chunks(frame->payload.BLE_CHUNKS);
+    send_ack_frame(serial, frame, 0);
 }
 
 static void handle_ble_image_chunk(const struct ares_serial *serial,
                                    struct ares_frame *frame) {
-    int ret = ares_ble_send_chunk(frame->payload.BLE_IMAGE_CHUNK.buf,
-                                  frame->payload.BLE_IMAGE_CHUNK.len);
-    send_ack_frame(serial, frame, ret);
+    // int ret = ares_ble_send_chunk(frame->payload.BLE_IMAGE_CHUNK.buf,
+    //                               frame->payload.BLE_IMAGE_CHUNK.len);
+    send_ack_frame(serial, frame, 0);
 }
 
 static void handle_reboot(const struct ares_serial *serial,
@@ -510,8 +510,6 @@ static int initialize_ble(const struct ares_serial *serial) {
             .connected = ble_connected,
             .disconnected = ble_disconnected,
             .mtu_size_changed = mtu_size_change,
-            .chunks_enabled = chunks_enabled,
-            .image_enabled = image_enabled,
         }};
 
     connect_work.serial = serial;
