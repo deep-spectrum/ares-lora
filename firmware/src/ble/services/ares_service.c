@@ -207,7 +207,8 @@ static ssize_t write_start(struct bt_conn *conn,
     struct ares_srv_ctx *ctx = attr->user_data;
     ssize_t ret = write_config_common(attr, len, offset, sizeof(uint32_t));
 
-    if (ctx->ares_service_cb.start != NULL && ret == BT_GATT_ERR(BT_ATT_ERR_NOT_SUPPORTED)) {
+    if (ctx->ares_service_cb.start != NULL &&
+        ret == BT_GATT_ERR(BT_ATT_ERR_NOT_SUPPORTED)) {
         uint32_t delay = *((uint32_t *)buf);
         ctx->ares_service_cb.start(conn, delay);
         ret = len;
@@ -286,7 +287,8 @@ int bt_ares_config_response(struct bt_conn *conn, const void *data,
     return bt_gatt_indicate(conn, &ind_params);
 }
 
-int bt_ares_notify_neighbor_state(struct bt_conn *conn, const void *data, size_t len) {
+int bt_ares_notify_neighbor_state(struct bt_conn *conn, const void *data,
+                                  size_t len) {
     if (!atomic_test_bit(&srv_ctx.state, ARES_NEIGHBOR_STATE_ENABLED)) {
         return -EACCES;
     }

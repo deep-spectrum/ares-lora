@@ -29,8 +29,7 @@ enum {
 };
 
 enum {
-    BLE_SIGNAL_CHUNK_IND,
-    BLE_SIGNAL_IMAGE_IND,
+    BLE_SIGNAL_CONFIG_RESP_IND,
 
     BLE_SIGNAL_LAST,
 };
@@ -90,21 +89,14 @@ static void advertising_start(void) { k_work_submit(&adv_work); }
 
 static void recycled_cb(void) { advertising_start(); }
 
-static void chunks_indicate_callback(struct bt_conn *conn, uint8_t err) {
+static void config_response_indicate_callback(struct bt_conn *conn,
+                                              uint8_t err) {
     __ASSERT_NO_MSG(conn == connection_info.conn);
     __ASSERT_NO_MSG(atomic_test_bit(connection_info.state, BLE_INITIALIZED));
     ARG_UNUSED(conn);
 
-    k_poll_signal_raise(&connection_info.signals[BLE_SIGNAL_CHUNK_IND], err);
-}
-
-static void image_indicate_callback(struct bt_conn *conn, uint8_t err) {
-    __ASSERT_NO_MSG(conn == connection_info.conn);
-    __ASSERT_NO_MSG(atomic_test_bit(connection_info.state, BLE_INITIALIZED) &&
-                    atomic_test_bit(connection_info.state, BLE_CONNECTED));
-    ARG_UNUSED(conn);
-
-    k_poll_signal_raise(&connection_info.signals[BLE_SIGNAL_IMAGE_IND], err);
+    k_poll_signal_raise(&connection_info.signals[BLE_SIGNAL_CONFIG_RESP_IND],
+                        err);
 }
 
 static void exchange_mtu_cb(struct bt_conn *conn, uint8_t att_err,
@@ -174,9 +166,10 @@ BT_CONN_CB_DEFINE(conn_cb) = {
 
 int ares_init_ble(const struct ares_ble_init_data *init_data) {
     struct ares_service_cb service_cb = {
-        .num_chunks_ind_cb = chunks_indicate_callback,
-        .image_ind_cb = image_indicate_callback,
+
     };
+
+    uint32_t x = BT_CONN_LE_TX_POWER_PHY_1M;
     int err;
 
     if (init_data == NULL) {

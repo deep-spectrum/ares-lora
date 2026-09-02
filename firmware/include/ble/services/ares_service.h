@@ -34,24 +34,45 @@
 #define BT_UUID_ARES_SRV_CENTER_FREQ_VAL                                       \
     BT_UUID_128_ENCODE(0xf2765f1f, 0xd570, 0x48cf, 0xa6b7, 0x985ff6af492c)
 
+/**
+ * Ares reference level UUID.
+ */
 #define BT_UUID_ARES_SRV_REF_LEVEL_VAL                                         \
     BT_UUID_128_ENCODE(0xf2765f20, 0xd570, 0x48cf, 0xa6b7, 0x985ff6af492c)
 
+/**
+ * Ares duration UUID.
+ */
 #define BT_UUID_ARES_SRV_DURATION_VAL                                          \
     BT_UUID_128_ENCODE(0xf2765f21, 0xd570, 0x48cf, 0xa6b7, 0x985ff6af492c)
 
+/**
+ * Ares description UUID.
+ */
 #define BT_UUID_ARES_SRV_DESCRIPTION_VAL                                       \
     BT_UUID_128_ENCODE(0xf2765f22, 0xd570, 0x48cf, 0xa6b7, 0x985ff6af492c)
 
+/**
+ * Ares config read UUID.
+ */
 #define BT_UUID_ARES_SRV_CONFIG_READ_VAL                                       \
     BT_UUID_128_ENCODE(0xf2765f23, 0xd570, 0x48cf, 0xa6b7, 0x985ff6af492c)
 
+/**
+ * Ares config response UUID.
+ */
 #define BT_UUID_ARES_SRV_CONFIG_RESP_VAL                                       \
     BT_UUID_128_ENCODE(0xf2765f24, 0xd570, 0x48cf, 0xa6b7, 0x985ff6af492c)
 
+/**
+ * Ares start UUID.
+ */
 #define BT_UUID_ARES_SRV_START_VAL                                             \
     BT_UUID_128_ENCODE(0xf2765f25, 0xd570, 0x48cf, 0xa6b7, 0x985ff6af492c)
 
+/**
+ * Ares neighbor state UUID.
+ */
 #define BT_UUID_ARES_SRV_NEIGHBOR_STATE_VAL                                    \
     BT_UUID_128_ENCODE(0xf2765f26, 0xd570, 0x48cf, 0xa6b7, 0x985ff6af492c)
 
@@ -216,6 +237,7 @@ int bt_ares_config_response(struct bt_conn *conn, const void *data, size_t len);
  * @return @p 0 on success.
  * @return negative error code otherwise.
  */
-int bt_ares_notify_neighbor_state(struct bt_conn *conn, const void *data, size_t len);
+int bt_ares_notify_neighbor_state(struct bt_conn *conn, const void *data,
+                                  size_t len);
 
 #endif // ARES_ARES_SERVICE_H
