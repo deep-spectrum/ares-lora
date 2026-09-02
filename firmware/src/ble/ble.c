@@ -89,16 +89,6 @@ static void advertising_start(void) { k_work_submit(&adv_work); }
 
 static void recycled_cb(void) { advertising_start(); }
 
-static void config_response_indicate_callback(struct bt_conn *conn,
-                                              uint8_t err) {
-    __ASSERT_NO_MSG(conn == connection_info.conn);
-    __ASSERT_NO_MSG(atomic_test_bit(connection_info.state, BLE_INITIALIZED));
-    ARG_UNUSED(conn);
-
-    k_poll_signal_raise(&connection_info.signals[BLE_SIGNAL_CONFIG_RESP_IND],
-                        err);
-}
-
 static void exchange_mtu_cb(struct bt_conn *conn, uint8_t att_err,
                             struct bt_gatt_exchange_params *params) {
     ARG_UNUSED(params);
@@ -164,12 +154,89 @@ BT_CONN_CB_DEFINE(conn_cb) = {
     .recycled = recycled_cb,
 };
 
+static void config_response_indicate_callback(struct bt_conn *conn,
+                                              uint8_t err) {
+    __ASSERT_NO_MSG(conn == connection_info.conn);
+    __ASSERT_NO_MSG(atomic_test_bit(connection_info.state, BLE_INITIALIZED));
+    ARG_UNUSED(conn);
+
+    k_poll_signal_raise(&connection_info.signals[BLE_SIGNAL_CONFIG_RESP_IND],
+                        err);
+}
+
+static void bandwidth_update(struct bt_conn *conn, uint64_t bandwidth) {
+    __ASSERT_NO_MSG(conn == connection_info.conn);
+    __ASSERT_NO_MSG(atomic_test_bit(connection_info.state, BLE_INITIALIZED));
+    ARG_UNUSED(conn);
+
+    callbacks.config_update(ARES_CONFIG_BANDWIDTH, bandwidth);
+}
+
+static void center_frequency_update(struct bt_conn *conn,
+                                    uint64_t center_freq) {
+    __ASSERT_NO_MSG(conn == connection_info.conn);
+    __ASSERT_NO_MSG(atomic_test_bit(connection_info.state, BLE_INITIALIZED));
+    ARG_UNUSED(conn);
+
+    callbacks.config_update(ARES_CONFIG_CENTER_FREQ, center_freq);
+}
+
+static void reference_level_update(struct bt_conn *conn, uint64_t ref_level) {
+    __ASSERT_NO_MSG(conn == connection_info.conn);
+    __ASSERT_NO_MSG(atomic_test_bit(connection_info.state, BLE_INITIALIZED));
+    ARG_UNUSED(conn);
+
+    callbacks.config_update(ARES_CONFIG_REF_LEVEL, ref_level);
+}
+
+static void duration_update(struct bt_conn *conn, uint32_t duration) {
+    __ASSERT_NO_MSG(conn == connection_info.conn);
+    __ASSERT_NO_MSG(atomic_test_bit(connection_info.state, BLE_INITIALIZED));
+    ARG_UNUSED(conn);
+    uint64_t val = 0;
+    val = duration;
+
+    callbacks.config_update(ARES_CONFIG_DURATION, val);
+}
+
+static void description_update(struct bt_conn *conn, const void *buf,
+                               uint16_t len) {
+    __ASSERT_NO_MSG(conn == connection_info.conn);
+    __ASSERT_NO_MSG(atomic_test_bit(connection_info.state, BLE_INITIALIZED));
+    ARG_UNUSED(conn);
+
+    // TODO
+}
+
+static void config_read_handler(struct bt_conn *conn,
+                                enum ares_srv_configs config) {
+    __ASSERT_NO_MSG(conn == connection_info.conn);
+    __ASSERT_NO_MSG(atomic_test_bit(connection_info.state, BLE_INITIALIZED));
+    ARG_UNUSED(conn);
+
+    callbacks.config_request(config);
+}
+
+static void start_handler(struct bt_conn *conn, uint32_t delay) {
+    __ASSERT_NO_MSG(conn == connection_info.conn);
+    __ASSERT_NO_MSG(atomic_test_bit(connection_info.state, BLE_INITIALIZED));
+    ARG_UNUSED(conn);
+
+    callbacks.start(delay);
+}
+
 int ares_init_ble(const struct ares_ble_init_data *init_data) {
     struct ares_service_cb service_cb = {
-
+        .bandwidth_update = bandwidth_update,
+        .center_frequency_update = center_frequency_update,
+        .reference_level_update = reference_level_update,
+        .duration_update = duration_update,
+        .description_update = description_update,
+        .config_read = config_read_handler,
+        .config_response_ind_cb = config_response_indicate_callback,
+        .start = start_handler,
     };
 
-    uint32_t x = BT_CONN_LE_TX_POWER_PHY_1M;
     int err;
 
     if (init_data == NULL) {
@@ -190,8 +257,8 @@ int ares_init_ble(const struct ares_ble_init_data *init_data) {
 
     k_sem_init(&connection_info.adv_name_sem, 1, 1);
 
-    service_cb.num_chunks_ind_enabled = callbacks.chunks_enabled;
-    service_cb.image_ind_enabled = callbacks.image_enabled;
+    service_cb.config_response_ind_enabled = callbacks.config_response_enabled;
+    service_cb.neighbor_state_enabled = callbacks.neighbor_state_enabled;
 
     bt_ares_srv_init(&service_cb);
 
@@ -232,7 +299,7 @@ int ares_disable_ble(void) {
         if (ret != 0) {
             LOG_ERR("bt_le_adv_stop(): %d", ret);
         }
-        // TODO: Bugfix clear advertising flag
+        atomic_clear_bit(&connection_info.state, BLE_ADVERTISING);
     }
 
     return ret;
@@ -272,29 +339,41 @@ int ares_set_ble_node(uint32_t node_id) {
     return 0;
 }
 
-int ares_ble_indicate_chunks(uint64_t chunks) {
-    int ret;
-    unsigned int signaled;
+#define ARES_BLE_CHECK_MSG_LEN(ret, len, type)                                 \
+    do {                                                                       \
+        if (len != sizeof(type)) {                                             \
+            ret = -EBADMSG;                                                    \
+        }                                                                      \
+    } while (false)
 
-    if (!atomic_test_bit(&connection_info.state, BLE_INITIALIZED)) {
-        return -ECANCELED;
+static int check_response_size(uint32_t type, size_t len) {
+    int ret = 0;
+
+    switch (type) {
+    case ARES_CONFIG_BANDWIDTH:
+    case ARES_CONFIG_CENTER_FREQ:
+    case ARES_CONFIG_REF_LEVEL: {
+        ARES_BLE_CHECK_MSG_LEN(ret, len, uint64_t);
+        break;
     }
-
-    ret = bt_ares_srv_ind_chunks(chunks);
-    if (ret != 0) {
-        return ret;
+    case ARES_CONFIG_DURATION: {
+        ARES_BLE_CHECK_MSG_LEN(ret, len, uint32_t);
+        break;
     }
-
-    k_poll(&connection_info.events[BLE_SIGNAL_CHUNK_IND], 1, K_FOREVER);
-    k_poll_signal_check(&connection_info.signals[BLE_SIGNAL_CHUNK_IND],
-                        &signaled, &ret);
-
-    __ASSERT_NO_MSG(signaled);
+    case ARES_CONFIG_DESCRIPTION: {
+        // todo: check against a config
+        break;
+    }
+    default: {
+        ret = -EINVAL;
+        break;
+    }
+    }
 
     return ret;
 }
 
-int ares_ble_send_chunk(const uint8_t *chunk, size_t num_bytes) {
+int ares_send_config_response(uint32_t type, const void *config, size_t len) {
     int ret;
     unsigned int signaled;
 
@@ -302,20 +381,44 @@ int ares_ble_send_chunk(const uint8_t *chunk, size_t num_bytes) {
         return -ECANCELED;
     }
 
-    if (num_bytes > connection_info.payload_mtu_size) {
-        return -ENOBUFS;
-    }
-
-    ret = bt_ares_srv_ind_image_chunk(chunk, num_bytes);
-    if (ret != 0) {
+    ret = check_response_size(type, len);
+    if (ret < 0) {
         return ret;
     }
 
-    k_poll(&connection_info.events[BLE_SIGNAL_IMAGE_IND], 1, K_FOREVER);
-    k_poll_signal_check(&connection_info.signals[BLE_SIGNAL_IMAGE_IND],
+    // todo: allocate buffer & copy data
+    // todo: send data
+
+    k_poll(&connection_info.events[BLE_SIGNAL_CONFIG_RESP_IND], 1, K_FOREVER);
+    k_poll_signal_check(&connection_info.signals[BLE_SIGNAL_CONFIG_RESP_IND],
                         &signaled, &ret);
+    k_poll_signal_reset(&connection_info.signals[BLE_SIGNAL_CONFIG_RESP_IND]);
+    connection_info.events[BLE_SIGNAL_CONFIG_RESP_IND].state =
+        K_POLL_STATE_NOT_READY;
 
     __ASSERT_NO_MSG(signaled);
+    // todo: deallocate buffer
 
     return ret;
+}
+
+int ares_send_neighbor_states(uint8_t num_neighbors, const void *data,
+                              size_t len) {
+    size_t buf_len;
+    if (!atomic_test_bit(&connection_info.state, BLE_INITIALIZED)) {
+        return -ECANCELED;
+    }
+
+    buf_len = (size_t)num_neighbors * 3;
+    if (buf_len != len) {
+        return -EBADMSG;
+    }
+
+    buf_len += sizeof(num_neighbors);
+
+    // todo: Allocate & copy data
+    // todo: send data
+    // todo: deallocate
+
+    return 0;
 }
