@@ -184,8 +184,13 @@ struct ares_service_cb {
      * @param[in] conn Pointer to the bt_conn instance the indication was
      * carried out on.
      * @param[in] err The error code.
+     * @param[in] buf Pointer to the network buffer that was sent.
+     *
+     * @note If this callback is not defined/NULL, then the network buffer has
+     * to be unreferenced after the function call.
      */
-    void (*config_response_ind_cb)(struct bt_conn *conn, uint8_t err);
+    void (*config_response_ind_cb)(struct bt_conn *conn, uint8_t err,
+                                   struct net_buf *buf);
 
     /**
      * @brief Callback for indication to start the data collection run.
@@ -217,14 +222,17 @@ int bt_ares_srv_init(const struct ares_service_cb *cb);
  * @brief Send the configuration response.
  *
  * @param[in] conn Pointer to the bt_conn to send the indication on.
- * @param[in] data The configuration data.
- * @param[in] len Length of the data.
+ * @param[in] net_buf Pointer to the network buffer that contains the data to be
+ * sent.
  *
  * @return @p -EACCESS if the indication has not been subscribed to.
+ * @return @p -ENOMEM if unable to allocate internal memory for indication.
  * @return @p 0 on success.
  * @return negative error code otherwise.
+ *
+ * @note This function will increment the reference count of the network buffer.
  */
-int bt_ares_config_response(struct bt_conn *conn, const void *data, size_t len);
+int bt_ares_config_response(struct bt_conn *conn, struct net_buf *net_buf);
 
 /**
  * @brief Send neighbor state information.

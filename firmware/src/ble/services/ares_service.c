@@ -8,13 +8,13 @@
  * @author Tom Schmitz \<tschmitz@andrew.cmu.edu\>
  */
 
+#include <ble/services/ares_service.h>
 #include <zephyr/bluetooth/gatt.h>
 #include <zephyr/bluetooth/uuid.h>
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
+#include <zephyr/net_buf.h>
 #include <zephyr/sys/byteorder.h>
-
-#include <ble/services/ares_service.h>
 
 LOG_MODULE_REGISTER(ares_ble_service);
 
@@ -27,6 +27,14 @@ struct ares_srv_ctx {
     struct ares_service_cb ares_service_cb;
     atomic_t state;
 };
+
+struct ares_srv_indicate_params {
+    struct bt_gatt_indicate_params params;
+    struct net_buf *user_buf;
+    struct net_buf *buf;
+};
+
+NET_BUF_POOL_DEFINE(ares_srv_tx_pool, 4, 64, 0, NULL);
 
 static struct ares_srv_ctx srv_ctx;
 
@@ -265,33 +273,55 @@ int bt_ares_srv_init(const struct ares_service_cb *cb) {
 static void config_response_ind_cb(struct bt_conn *conn,
                                    struct bt_gatt_indicate_params *params,
                                    uint8_t err) {
-    ARG_UNUSED(params);
+    struct ares_srv_indicate_params *srv_params =
+        CONTAINER_OF(params, struct ares_srv_indicate_params, params);
 
     LOG_DBG("Indication %s\n", err != 0U ? "fail" : "success");
 
     if (srv_ctx.ares_service_cb.config_response_ind_cb != NULL) {
-        srv_ctx.ares_service_cb.config_response_ind_cb(conn, err);
+        srv_ctx.ares_service_cb.config_response_ind_cb(conn, err,
+                                                       srv_params->user_buf);
     }
+
+    net_buf_unref(srv_params->user_buf);
+    net_buf_unref(srv_params->buf);
 }
 
-int bt_ares_config_response(struct bt_conn *conn, const void *data,
-                            size_t len) {
-    static struct bt_gatt_indicate_params ind_params = {
-        .func = config_response_ind_cb,
-    };
+int bt_ares_config_response(struct bt_conn *conn, struct net_buf *net_buf) {
+    struct net_buf *buf;
+    struct ares_srv_indicate_params params;
+    int ret;
 
     if (!atomic_test_bit(&srv_ctx.state, ARES_CONFIG_RESP_ENABLED)) {
         return -EACCES;
     }
 
-    if (data == NULL) {
+    if (net_buf == NULL) {
         return -EINVAL;
     }
 
-    ind_params.attr = &ares_srv_svc.attrs[16];
-    ind_params.data = data;
-    ind_params.len = len;
-    return bt_gatt_indicate(conn, &ind_params);
+    buf = net_buf_alloc(&ares_srv_tx_pool, K_MSEC(100));
+    if (buf == NULL) {
+        return -ENOMEM;
+    }
+
+    params.buf = buf;
+    params.user_buf = net_buf_ref(net_buf);
+    params.params.func = config_response_ind_cb;
+    params.params.attr = &ares_srv_svc.attrs[16];
+    params.params.data = net_buf->data;
+    params.params.len = net_buf->len;
+
+    net_buf_add_mem(buf, &params, sizeof(params));
+
+    ret = bt_gatt_indicate(
+        conn, &((struct ares_srv_indicate_params *)buf->data)->params);
+    if (ret < 0) {
+        net_buf_unref(net_buf);
+        net_buf_unref(buf);
+    }
+
+    return ret;
 }
 
 int bt_ares_notify_neighbor_state(struct bt_conn *conn, const void *data,

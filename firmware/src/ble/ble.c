@@ -166,14 +166,14 @@ BT_CONN_CB_DEFINE(conn_cb) = {
     .recycled = recycled_cb,
 };
 
-static void config_response_indicate_callback(struct bt_conn *conn,
-                                              uint8_t err) {
+static void config_response_indicate_callback(struct bt_conn *conn, uint8_t err,
+                                              struct net_buf *buf) {
     __ASSERT_NO_MSG(conn == connection_info.conn);
     __ASSERT_NO_MSG(atomic_test_bit(connection_info.state, BLE_INITIALIZED));
     ARG_UNUSED(conn);
 
-    k_poll_signal_raise(&connection_info.signals[BLE_SIGNAL_CONFIG_RESP_IND],
-                        err);
+    net_buf_unref(buf);
+    // TODO: Notify driver of ATT error
 }
 
 static void bandwidth_update(struct bt_conn *conn, uint64_t bandwidth) {
@@ -397,7 +397,8 @@ static int check_response_size(uint32_t type, size_t len) {
 
 int ares_send_config_response(uint32_t type, const void *config, size_t len) {
     int ret;
-    unsigned int signaled;
+    struct net_buf *buffer;
+    uint16_t len_ = (uint16_t)len;
 
     if (!atomic_test_bit(&connection_info.state, BLE_INITIALIZED)) {
         return -ECANCELED;
@@ -408,19 +409,19 @@ int ares_send_config_response(uint32_t type, const void *config, size_t len) {
         return ret;
     }
 
-    // todo: allocate buffer & copy data
-    // todo: send data
+    buffer = net_buf_alloc(&ares_tx_netbuf, K_MSEC(100));
+    if (buffer == NULL) {
+        return -ENOMEM;
+    }
 
-    // TODO: This is no longer needed with netbufs
-    k_poll(&connection_info.events[BLE_SIGNAL_CONFIG_RESP_IND], 1, K_FOREVER);
-    k_poll_signal_check(&connection_info.signals[BLE_SIGNAL_CONFIG_RESP_IND],
-                        &signaled, &ret);
-    k_poll_signal_reset(&connection_info.signals[BLE_SIGNAL_CONFIG_RESP_IND]);
-    connection_info.events[BLE_SIGNAL_CONFIG_RESP_IND].state =
-        K_POLL_STATE_NOT_READY;
+    net_buf_add_mem(buffer, &type, sizeof(type));
+    net_buf_add_mem(buffer, &len_, sizeof(len_));
+    net_buf_add_mem(buffer, config, len);
 
-    __ASSERT_NO_MSG(signaled);
-    // todo: deallocate buffer
+    ret = bt_ares_config_response(connection_info.conn, buffer);
+    if (ret < 0) {
+        net_buf_unref(buffer);
+    }
 
     return ret;
 }
@@ -428,6 +429,9 @@ int ares_send_config_response(uint32_t type, const void *config, size_t len) {
 int ares_send_neighbor_states(uint8_t num_neighbors, const void *data,
                               size_t len) {
     size_t buf_len;
+    struct net_buf *buf;
+    int ret;
+
     if (!atomic_test_bit(&connection_info.state, BLE_INITIALIZED)) {
         return -ECANCELED;
     }
@@ -439,9 +443,17 @@ int ares_send_neighbor_states(uint8_t num_neighbors, const void *data,
 
     buf_len += sizeof(num_neighbors);
 
-    // todo: Allocate & copy data
-    // todo: send data
-    // todo: deallocate
+    buf = net_buf_alloc(&ares_tx_netbuf, K_MSEC(100));
+    if (buf == NULL) {
+        return -ENOMEM;
+    }
 
-    return 0;
+    net_buf_add_mem(buf, &buf_len, sizeof(buf_len));
+    net_buf_add_mem(buf, data, len);
+
+    ret = bt_ares_notify_neighbor_state(connection_info.conn, buf->data,
+                                        buf->len);
+
+    net_buf_unref(buf);
+    return ret;
 }
