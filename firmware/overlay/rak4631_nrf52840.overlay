@@ -1,6 +1,6 @@
 / {
 	chosen {
-		zephyr,console = &cdc_acm_uart0;
+		ares,serial-uart = &cdc_acm_uart0;
 		zephyr,uart-mcumgr = &cdc_acm_uart1;
 	};
 

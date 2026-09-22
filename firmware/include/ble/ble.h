@@ -109,6 +109,15 @@ struct ares_ble_callbacks {
      * time by.
      */
     void (*start)(uint32_t start_delay);
+
+    /**
+     * Config read response indication error handler.
+     *
+     * @param[in] err The ATT error code.
+     *
+     * @note This is only called on ATT errors.
+     */
+    void (*send_config_response_error)(uint8_t err);
 };
 
 /**
