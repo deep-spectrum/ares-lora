@@ -73,7 +73,8 @@ static struct ble_conn_info connection_info;
 static struct ares_ble_callbacks callbacks;
 
 static void config_response_indicate_work(struct k_work *work) {
-    struct config_response_ind_err_work *cwork = CONTAINER_OF(work, struct config_response_ind_err_work, work);
+    struct config_response_ind_err_work *cwork =
+        CONTAINER_OF(work, struct config_response_ind_err_work, work);
 
     if (callbacks.send_config_response_error != NULL) {
         callbacks.send_config_response_error(cwork->err);
@@ -191,7 +192,8 @@ static void bandwidth_update(struct bt_conn *conn, uint64_t bandwidth) {
     __ASSERT_NO_MSG(conn == connection_info.conn);
     __ASSERT_NO_MSG(atomic_test_bit(connection_info.state, BLE_INITIALIZED));
     ARG_UNUSED(conn);
-    LOG_DBG("Bandwidth update thread priority: %d", k_thread_priority_get(k_current_get()));
+    LOG_DBG("Bandwidth update thread priority: %d",
+            k_thread_priority_get(k_current_get()));
 
     callbacks.config_update(ARES_CONFIG_BANDWIDTH, bandwidth);
 }
@@ -201,7 +203,8 @@ static void center_frequency_update(struct bt_conn *conn,
     __ASSERT_NO_MSG(conn == connection_info.conn);
     __ASSERT_NO_MSG(atomic_test_bit(connection_info.state, BLE_INITIALIZED));
     ARG_UNUSED(conn);
-    LOG_DBG("Center frequency update thread priority: %d", k_thread_priority_get(k_current_get()));
+    LOG_DBG("Center frequency update thread priority: %d",
+            k_thread_priority_get(k_current_get()));
 
     callbacks.config_update(ARES_CONFIG_CENTER_FREQ, center_freq);
 }
@@ -210,7 +213,8 @@ static void reference_level_update(struct bt_conn *conn, uint64_t ref_level) {
     __ASSERT_NO_MSG(conn == connection_info.conn);
     __ASSERT_NO_MSG(atomic_test_bit(connection_info.state, BLE_INITIALIZED));
     ARG_UNUSED(conn);
-    LOG_DBG("Reference level update thread priority: %d", k_thread_priority_get(k_current_get()));
+    LOG_DBG("Reference level update thread priority: %d",
+            k_thread_priority_get(k_current_get()));
 
     callbacks.config_update(ARES_CONFIG_REF_LEVEL, ref_level);
 }
@@ -219,7 +223,8 @@ static void duration_update(struct bt_conn *conn, uint32_t duration) {
     __ASSERT_NO_MSG(conn == connection_info.conn);
     __ASSERT_NO_MSG(atomic_test_bit(connection_info.state, BLE_INITIALIZED));
     ARG_UNUSED(conn);
-    LOG_DBG("duration update thread priority: %d", k_thread_priority_get(k_current_get()));
+    LOG_DBG("duration update thread priority: %d",
+            k_thread_priority_get(k_current_get()));
     uint64_t val = 0;
     val = duration;
 
@@ -231,7 +236,8 @@ static void description_update(struct bt_conn *conn, const void *buf,
     __ASSERT_NO_MSG(conn == connection_info.conn);
     __ASSERT_NO_MSG(atomic_test_bit(connection_info.state, BLE_INITIALIZED));
     ARG_UNUSED(conn);
-    LOG_DBG("Description update thread priority: %d", k_thread_priority_get(k_current_get()));
+    LOG_DBG("Description update thread priority: %d",
+            k_thread_priority_get(k_current_get()));
 
     if (connection_info.desc_buf == NULL) {
         connection_info.desc_buf = net_buf_alloc(&ares_rx_netbuf, K_NO_WAIT);
@@ -249,7 +255,8 @@ static void config_read_handler(struct bt_conn *conn,
     __ASSERT_NO_MSG(conn == connection_info.conn);
     __ASSERT_NO_MSG(atomic_test_bit(connection_info.state, BLE_INITIALIZED));
     ARG_UNUSED(conn);
-    LOG_DBG("Config read thread priority: %d", k_thread_priority_get(k_current_get()));
+    LOG_DBG("Config read thread priority: %d",
+            k_thread_priority_get(k_current_get()));
 
     callbacks.config_request(config);
 }
@@ -258,7 +265,8 @@ static void start_handler(struct bt_conn *conn, uint32_t delay) {
     __ASSERT_NO_MSG(conn == connection_info.conn);
     __ASSERT_NO_MSG(atomic_test_bit(connection_info.state, BLE_INITIALIZED));
     ARG_UNUSED(conn);
-    LOG_DBG("Start thread priority: %d", k_thread_priority_get(k_current_get()));
+    LOG_DBG("Start thread priority: %d",
+            k_thread_priority_get(k_current_get()));
 
     callbacks.start(delay);
 }
@@ -285,7 +293,8 @@ int ares_init_ble(const struct ares_ble_init_data *init_data) {
         return -EALREADY;
     }
 
-    k_work_init(&connection_info.conf_resp_work.work, config_response_indicate_work);
+    k_work_init(&connection_info.conf_resp_work.work,
+                config_response_indicate_work);
 
     callbacks = init_data->cb;
 
