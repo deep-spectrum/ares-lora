@@ -18,7 +18,7 @@
 #include <zephyr/logging/log.h>
 #include <zephyr/net_buf.h>
 
-LOG_MODULE_REGISTER(ble_app);
+LOG_MODULE_REGISTER(ble_app, CONFIG_BLE_APP_LOG_LEVEL);
 
 #define NAME_SD_IDX 0
 
