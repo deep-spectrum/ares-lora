@@ -99,6 +99,27 @@ static ssize_t write_config_common(struct bt_conn *conn,
     return BT_GATT_ERR(BT_ATT_ERR_NOT_SUPPORTED);
 }
 
+static ssize_t process_response(enum ares_srv_write_response resp,
+                                uint16_t len) {
+    if (resp == ARES_WRITE_SUCCESS) {
+        return len;
+    }
+
+    switch (resp) {
+    case ARES_WRITE_SUCCESS: {
+        return len;
+    }
+    case ARES_WRITE_FAILED: {
+        return BT_GATT_ERR(BT_ATT_ERR_WRITE_REQ_REJECTED);
+    }
+    case ARES_WRITE_BUSY: {
+        return BT_GATT_ERR(BT_ATT_ERR_PREPARE_QUEUE_FULL);
+    }
+    }
+
+    return BT_GATT_ERR(BT_ATT_ERR_UNLIKELY);
+}
+
 static ssize_t write_bandwidth(struct bt_conn *conn,
                                const struct bt_gatt_attr *attr, const void *buf,
                                uint16_t len, uint16_t offset, uint8_t flags) {
@@ -110,8 +131,9 @@ static ssize_t write_bandwidth(struct bt_conn *conn,
     if (ctx->ares_service_cb.bandwidth_update != NULL &&
         ret == BT_GATT_ERR(BT_ATT_ERR_NOT_SUPPORTED)) {
         uint64_t bw = *((uint64_t *)buf);
-        ctx->ares_service_cb.bandwidth_update(conn, bw);
-        ret = len;
+        enum ares_srv_write_response resp =
+            ctx->ares_service_cb.bandwidth_update(conn, bw);
+        ret = process_response(resp, len);
     }
 
     return ret;
@@ -129,8 +151,8 @@ static ssize_t write_center_frequency(struct bt_conn *conn,
     if (ctx->ares_service_cb.center_frequency_update != NULL &&
         ret == BT_GATT_ERR(BT_ATT_ERR_NOT_SUPPORTED)) {
         uint64_t freq = *((uint64_t *)buf);
-        ctx->ares_service_cb.center_frequency_update(conn, freq);
-        ret = len;
+        ret = process_response(
+            ctx->ares_service_cb.center_frequency_update(conn, freq), len);
     }
 
     return ret;
@@ -147,8 +169,8 @@ static ssize_t write_ref_level(struct bt_conn *conn,
     if (ctx->ares_service_cb.reference_level_update != NULL &&
         ret == BT_GATT_ERR(BT_ATT_ERR_NOT_SUPPORTED)) {
         uint64_t ref_level = *((uint64_t *)buf);
-        ctx->ares_service_cb.reference_level_update(conn, ref_level);
-        ret = len;
+        ret = process_response(
+            ctx->ares_service_cb.reference_level_update(conn, ref_level), len);
     }
 
     return ret;
@@ -165,8 +187,8 @@ static ssize_t write_duration(struct bt_conn *conn,
     if (ctx->ares_service_cb.duration_update != NULL &&
         ret == BT_GATT_ERR(BT_ATT_ERR_NOT_SUPPORTED)) {
         uint32_t duration = *((uint32_t *)buf);
-        ctx->ares_service_cb.duration_update(conn, duration);
-        ret = len;
+        ret = process_response(
+            ctx->ares_service_cb.duration_update(conn, duration), len);
     }
 
     return ret;

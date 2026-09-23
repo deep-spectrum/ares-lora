@@ -105,6 +105,13 @@ enum ares_srv_configs {
     ARES_CONFIG_INVALID,
 };
 
+enum ares_srv_write_response {
+    ARES_WRITE_SUCCESS,
+    ARES_WRITE_FAILED,
+    ARES_WRITE_BUSY,
+    ARES_WRITE_REJECTED = ARES_WRITE_FAILED,
+};
+
 /**
  * @struct ares_service_cb
  * @brief Service callback configurations.
@@ -118,7 +125,8 @@ struct ares_service_cb {
      *
      * @note The bandwidth is supposed to be an 8-bit float.
      */
-    void (*bandwidth_update)(struct bt_conn *conn, uint64_t bandwidth);
+    enum ares_srv_write_response (*bandwidth_update)(struct bt_conn *conn,
+                                                     uint64_t bandwidth);
 
     /**
      * @brief Callback for updating the center frequency value.
@@ -128,7 +136,8 @@ struct ares_service_cb {
      *
      * @note The center frequency is supposed to be an 8-bit float.
      */
-    void (*center_frequency_update)(struct bt_conn *conn, uint64_t center_freq);
+    enum ares_srv_write_response (*center_frequency_update)(
+        struct bt_conn *conn, uint64_t center_freq);
 
     /**
      * @brief Callback for updating the reference level value.
@@ -138,7 +147,8 @@ struct ares_service_cb {
      *
      * @note The reference level is supposed to be an 8-bit float.
      */
-    void (*reference_level_update)(struct bt_conn *conn, uint64_t ref_level);
+    enum ares_srv_write_response (*reference_level_update)(struct bt_conn *conn,
+                                                           uint64_t ref_level);
 
     /**
      * @brief Callback for updating the duration value.
@@ -148,7 +158,8 @@ struct ares_service_cb {
      *
      * @note The duration is in seconds.
      */
-    void (*duration_update)(struct bt_conn *conn, uint32_t duration);
+    enum ares_srv_write_response (*duration_update)(struct bt_conn *conn,
+                                                    uint32_t duration);
 
     /**
      * @brief Callback for updating the test description.

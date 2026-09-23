@@ -29,6 +29,13 @@ enum {
     BLE_CONNECTED,
 };
 
+// todo
+#define CONFIG_ARES_BLE_WORKQ_PRIO       1
+#define CONFIG_ARES_BLE_WORKQ_STACK_SIZE 1024
+
+K_THREAD_STACK_DEFINE(ble_workq_stack, CONFIG_ARES_BLE_WORKQ_STACK_SIZE);
+
+// todo
 #define CONFIG_ARES_BLE_NUM_NET_BUFS 4
 #define CONFIG_ARES_BLE_NETBUF_SIZE  1536
 
@@ -42,6 +49,23 @@ struct config_response_ind_err_work {
     struct k_work work;
 };
 
+struct config_write_work {
+    struct k_sem sem;
+    uint64_t value;
+    const enum ares_srv_configs config;
+    struct k_work work;
+};
+
+#define Z_ARES_CONFIG_WRITE_WORK_INITIALIZER(name, _config, _handler)          \
+    {                                                                          \
+        .config = (_config), .work = Z_WORK_INITIALIZER(_handler),             \
+        .sem = Z_SEM_INITIALIZER(name.sem, 1, 1)                               \
+    }
+
+#define ARES_CONFIG_WRITE_WORK_DEFINE(name, _config, _handler)                 \
+    struct config_write_work name =                                            \
+        Z_ARES_CONFIG_WRITE_WORK_INITIALIZER(name, _config, _handler)
+
 struct ble_conn_info {
     struct k_sem adv_name_sem;
 
@@ -53,6 +77,8 @@ struct ble_conn_info {
     struct net_buf *config_resp;
 
     struct config_response_ind_err_work conf_resp_work;
+
+    struct k_work_q write_work_q;
 };
 
 static char adv_name[16] = "Ares";
@@ -188,38 +214,79 @@ static void config_response_indicate_callback(struct bt_conn *conn, uint8_t err,
     }
 }
 
-static void bandwidth_update(struct bt_conn *conn, uint64_t bandwidth) {
+static void write_work_handler(struct k_work *work) {
+    struct config_write_work *wwork =
+        CONTAINER_OF(work, struct config_write_work, work);
+    uint64_t value = wwork->value;
+    enum ares_srv_configs config = wwork->config;
+    k_sem_give(&wwork->sem);
+
+    if (callbacks.config_update != NULL) {
+        callbacks.config_update(config, value);
+    }
+}
+
+ARES_CONFIG_WRITE_WORK_DEFINE(bandwidth_work, ARES_CONFIG_BANDWIDTH,
+                              write_work_handler);
+ARES_CONFIG_WRITE_WORK_DEFINE(center_freq_work, ARES_CONFIG_CENTER_FREQ,
+                              write_work_handler);
+ARES_CONFIG_WRITE_WORK_DEFINE(ref_level_work, ARES_CONFIG_REF_LEVEL,
+                              write_work_handler);
+ARES_CONFIG_WRITE_WORK_DEFINE(duration_work, ARES_CONFIG_DURATION,
+                              write_work_handler);
+
+static enum ares_srv_write_response
+submit_write_work(struct config_write_work *work, uint64_t value) {
+    int ret = k_sem_take(&work->sem, K_NO_WAIT);
+    if (ret < 0) {
+        return ARES_WRITE_BUSY;
+    }
+
+    work->value = value;
+    ret = k_work_submit_to_queue(&connection_info.write_work_q, &work->work);
+    if (ret < 0) {
+        k_sem_give(&work->sem);
+        return ARES_WRITE_FAILED;
+    }
+
+    return ARES_WRITE_SUCCESS;
+}
+
+static enum ares_srv_write_response bandwidth_update(struct bt_conn *conn,
+                                                     uint64_t bandwidth) {
     __ASSERT_NO_MSG(conn == connection_info.conn);
     __ASSERT_NO_MSG(atomic_test_bit(connection_info.state, BLE_INITIALIZED));
     ARG_UNUSED(conn);
     LOG_DBG("Bandwidth update thread priority: %d",
             k_thread_priority_get(k_current_get()));
 
-    callbacks.config_update(ARES_CONFIG_BANDWIDTH, bandwidth);
+    return submit_write_work(&bandwidth_work, bandwidth);
 }
 
-static void center_frequency_update(struct bt_conn *conn,
-                                    uint64_t center_freq) {
+static enum ares_srv_write_response
+center_frequency_update(struct bt_conn *conn, uint64_t center_freq) {
     __ASSERT_NO_MSG(conn == connection_info.conn);
     __ASSERT_NO_MSG(atomic_test_bit(connection_info.state, BLE_INITIALIZED));
     ARG_UNUSED(conn);
     LOG_DBG("Center frequency update thread priority: %d",
             k_thread_priority_get(k_current_get()));
 
-    callbacks.config_update(ARES_CONFIG_CENTER_FREQ, center_freq);
+    return submit_write_work(&center_freq_work, center_freq);
 }
 
-static void reference_level_update(struct bt_conn *conn, uint64_t ref_level) {
+static enum ares_srv_write_response reference_level_update(struct bt_conn *conn,
+                                                           uint64_t ref_level) {
     __ASSERT_NO_MSG(conn == connection_info.conn);
     __ASSERT_NO_MSG(atomic_test_bit(connection_info.state, BLE_INITIALIZED));
     ARG_UNUSED(conn);
     LOG_DBG("Reference level update thread priority: %d",
             k_thread_priority_get(k_current_get()));
 
-    callbacks.config_update(ARES_CONFIG_REF_LEVEL, ref_level);
+    return submit_write_work(&ref_level_work, ref_level);
 }
 
-static void duration_update(struct bt_conn *conn, uint32_t duration) {
+static enum ares_srv_write_response duration_update(struct bt_conn *conn,
+                                                    uint32_t duration) {
     __ASSERT_NO_MSG(conn == connection_info.conn);
     __ASSERT_NO_MSG(atomic_test_bit(connection_info.state, BLE_INITIALIZED));
     ARG_UNUSED(conn);
@@ -228,7 +295,7 @@ static void duration_update(struct bt_conn *conn, uint32_t duration) {
     uint64_t val = 0;
     val = duration;
 
-    callbacks.config_update(ARES_CONFIG_DURATION, val);
+    return submit_write_work(&duration_work, val);
 }
 
 static void description_update(struct bt_conn *conn, const void *buf,
@@ -282,6 +349,10 @@ int ares_init_ble(const struct ares_ble_init_data *init_data) {
         .config_response_ind_cb = config_response_indicate_callback,
         .start = start_handler,
     };
+    struct k_work_queue_config workq_config = {
+        .essential = true,
+        .name = "Ares BLE RX WQ",
+    };
 
     int err;
 
@@ -292,6 +363,11 @@ int ares_init_ble(const struct ares_ble_init_data *init_data) {
     if (atomic_test_bit(&connection_info.state, BLE_INITIALIZED)) {
         return -EALREADY;
     }
+
+    k_work_queue_init(&connection_info.write_work_q);
+    k_work_queue_start(&connection_info.write_work_q, ble_workq_stack,
+                       K_THREAD_STACK_SIZEOF(ble_workq_stack),
+                       CONFIG_ARES_BLE_WORKQ_PRIO, &workq_config);
 
     k_work_init(&connection_info.conf_resp_work.work,
                 config_response_indicate_work);
