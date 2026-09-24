@@ -8,137 +8,358 @@
  * @author Tom Schmitz \<tschmitz@andrew.cmu.edu\>
  */
 
+#include <ble/services/ares_service.h>
 #include <zephyr/bluetooth/gatt.h>
 #include <zephyr/bluetooth/uuid.h>
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
+#include <zephyr/net_buf.h>
 #include <zephyr/sys/byteorder.h>
-
-#include <ble/services/ares_service.h>
 
 LOG_MODULE_REGISTER(ares_ble_service);
 
 enum {
-    CHUNKS_ENABLED,
-    IMAGE_ENABLED,
+    ARES_CONFIG_RESP_ENABLED,
+    ARES_NEIGHBOR_STATE_ENABLED,
 };
 
-static struct ares_service_cb ares_service_cb;
-static atomic_t state;
+struct ares_srv_ctx {
+    struct ares_service_cb ares_service_cb;
+    atomic_t state;
+};
 
-static void ares_service_chunk_cfg_changed(const struct bt_gatt_attr *attr,
-                                           uint16_t value) {
+struct ares_srv_indicate_params {
+    struct bt_gatt_indicate_params params;
+    struct net_buf *user_buf;
+    struct net_buf *buf;
+};
+
+NET_BUF_POOL_DEFINE(ares_srv_tx_pool, 4, 64, 0, NULL);
+
+static struct ares_srv_ctx srv_ctx;
+
+static void
+ares_service_config_resp_cfg_changed(const struct bt_gatt_attr *attr,
+                                     uint16_t value) {
     ARG_UNUSED(attr);
     bool enabled = value == BT_GATT_CCC_INDICATE;
 
-    LOG_DBG("Indication for chunks has been turned %s", enabled ? "on" : "off");
+    LOG_DBG("Indication for config response has been turned %s",
+            enabled ? "on" : "off");
 
-    if (ares_service_cb.num_chunks_ind_enabled != NULL) {
-        ares_service_cb.num_chunks_ind_enabled(enabled);
+    if (srv_ctx.ares_service_cb.config_response_ind_enabled != NULL) {
+        srv_ctx.ares_service_cb.config_response_ind_enabled(enabled);
     }
 
     if (enabled) {
-        atomic_set_bit(&state, CHUNKS_ENABLED);
+        atomic_set_bit(&srv_ctx.state, ARES_CONFIG_RESP_ENABLED);
     } else {
-        atomic_clear_bit(&state, CHUNKS_ENABLED);
+        atomic_clear_bit(&srv_ctx.state, ARES_CONFIG_RESP_ENABLED);
     }
 }
 
-static void ares_service_image_cfg_changed(const struct bt_gatt_attr *attr,
-                                           uint16_t value) {
+static void
+ares_service_neighbor_update_cfg_changed(const struct bt_gatt_attr *attr,
+                                         uint16_t value) {
     ARG_UNUSED(attr);
-    bool enabled = value == BT_GATT_CCC_INDICATE;
+    bool enabled = value == BT_GATT_CCC_NOTIFY;
 
-    LOG_DBG("Indication for image has been turned %s", enabled ? "on" : "off");
+    LOG_DBG("Notification for neighbor updates has been turned %s",
+            enabled ? "on" : "off");
 
-    if (ares_service_cb.image_ind_enabled != NULL) {
-        ares_service_cb.image_ind_enabled(enabled);
+    if (srv_ctx.ares_service_cb.neighbor_state_enabled != NULL) {
+        srv_ctx.ares_service_cb.neighbor_state_enabled(enabled);
     }
 
     if (enabled) {
-        atomic_set_bit(&state, IMAGE_ENABLED);
+        atomic_set_bit(&srv_ctx.state, ARES_NEIGHBOR_STATE_ENABLED);
     } else {
-        atomic_clear_bit(&state, IMAGE_ENABLED);
+        atomic_clear_bit(&srv_ctx.state, ARES_NEIGHBOR_STATE_ENABLED);
     }
+}
+
+static ssize_t write_config_common(struct bt_conn *conn,
+                                   const struct bt_gatt_attr *attr,
+                                   uint16_t len, uint16_t offset,
+                                   uint16_t type_size) {
+    ARG_UNUSED(attr);
+    ARG_UNUSED(conn);
+    LOG_DBG("Attribute write, handle: %u, conn %p", attr->handle, conn);
+
+    if (len != type_size) {
+        LOG_DBG("write bandwidth: Incorecct data length");
+        return BT_GATT_ERR(BT_ATT_ERR_INVALID_ATTRIBUTE_LEN);
+    }
+
+    if (offset != 0u) {
+        LOG_DBG("write bandwidth: Incorrect data offset");
+        return BT_GATT_ERR(BT_ATT_ERR_INVALID_OFFSET);
+    }
+
+    return BT_GATT_ERR(BT_ATT_ERR_NOT_SUPPORTED);
+}
+
+static ssize_t process_response(enum ares_srv_write_response resp,
+                                uint16_t len) {
+    if (resp == ARES_WRITE_SUCCESS) {
+        return len;
+    }
+
+    switch (resp) {
+    case ARES_WRITE_SUCCESS: {
+        return len;
+    }
+    case ARES_WRITE_FAILED: {
+        return BT_GATT_ERR(BT_ATT_ERR_WRITE_REQ_REJECTED);
+    }
+    case ARES_WRITE_BUSY: {
+        return BT_GATT_ERR(BT_ATT_ERR_PREPARE_QUEUE_FULL);
+    }
+    case ARES_WRITE_NO_MEM: {
+        return BT_GATT_ERR(BT_ATT_ERR_INSUFFICIENT_RESOURCES);
+    }
+    }
+
+    return BT_GATT_ERR(BT_ATT_ERR_UNLIKELY);
+}
+
+static ssize_t write_bandwidth(struct bt_conn *conn,
+                               const struct bt_gatt_attr *attr, const void *buf,
+                               uint16_t len, uint16_t offset, uint8_t flags) {
+    ARG_UNUSED(flags);
+    struct ares_srv_ctx *ctx = attr->user_data;
+    ssize_t ret =
+        write_config_common(conn, attr, len, offset, sizeof(uint64_t));
+
+    if (ctx->ares_service_cb.bandwidth_update != NULL &&
+        ret == BT_GATT_ERR(BT_ATT_ERR_NOT_SUPPORTED)) {
+        uint64_t bw = *((uint64_t *)buf);
+        enum ares_srv_write_response resp =
+            ctx->ares_service_cb.bandwidth_update(conn, bw);
+        ret = process_response(resp, len);
+    }
+
+    return ret;
+}
+
+static ssize_t write_center_frequency(struct bt_conn *conn,
+                                      const struct bt_gatt_attr *attr,
+                                      const void *buf, uint16_t len,
+                                      uint16_t offset, uint8_t flags) {
+    ARG_UNUSED(flags);
+    struct ares_srv_ctx *ctx = attr->user_data;
+    ssize_t ret =
+        write_config_common(conn, attr, len, offset, sizeof(uint64_t));
+
+    if (ctx->ares_service_cb.center_frequency_update != NULL &&
+        ret == BT_GATT_ERR(BT_ATT_ERR_NOT_SUPPORTED)) {
+        uint64_t freq = *((uint64_t *)buf);
+        ret = process_response(
+            ctx->ares_service_cb.center_frequency_update(conn, freq), len);
+    }
+
+    return ret;
+}
+
+static ssize_t write_ref_level(struct bt_conn *conn,
+                               const struct bt_gatt_attr *attr, const void *buf,
+                               uint16_t len, uint16_t offset, uint8_t flags) {
+    ARG_UNUSED(flags);
+    struct ares_srv_ctx *ctx = attr->user_data;
+    ssize_t ret =
+        write_config_common(conn, attr, len, offset, sizeof(uint64_t));
+
+    if (ctx->ares_service_cb.reference_level_update != NULL &&
+        ret == BT_GATT_ERR(BT_ATT_ERR_NOT_SUPPORTED)) {
+        uint64_t ref_level = *((uint64_t *)buf);
+        ret = process_response(
+            ctx->ares_service_cb.reference_level_update(conn, ref_level), len);
+    }
+
+    return ret;
+}
+
+static ssize_t write_duration(struct bt_conn *conn,
+                              const struct bt_gatt_attr *attr, const void *buf,
+                              uint16_t len, uint16_t offset, uint8_t flags) {
+    ARG_UNUSED(flags);
+    struct ares_srv_ctx *ctx = attr->user_data;
+    ssize_t ret =
+        write_config_common(conn, attr, len, offset, sizeof(uint32_t));
+
+    if (ctx->ares_service_cb.duration_update != NULL &&
+        ret == BT_GATT_ERR(BT_ATT_ERR_NOT_SUPPORTED)) {
+        uint32_t duration = *((uint32_t *)buf);
+        ret = process_response(
+            ctx->ares_service_cb.duration_update(conn, duration), len);
+    }
+
+    return ret;
+}
+
+static ssize_t write_description(struct bt_conn *conn,
+                                 const struct bt_gatt_attr *attr,
+                                 const void *buf, uint16_t len, uint16_t offset,
+                                 uint8_t flags) {
+    ARG_UNUSED(flags);
+    ARG_UNUSED(offset);
+
+    struct ares_srv_ctx *ctx = attr->user_data;
+    ssize_t ret = BT_GATT_ERR(BT_ATT_ERR_NOT_SUPPORTED);
+
+    if (ctx->ares_service_cb.description_update != NULL) {
+        ret = process_response(
+            ctx->ares_service_cb.description_update(conn, buf, len), len);
+    }
+
+    return ret;
+}
+
+static ssize_t write_config_read(struct bt_conn *conn,
+                                 const struct bt_gatt_attr *attr,
+                                 const void *buf, uint16_t len, uint16_t offset,
+                                 uint8_t flags) {
+    ARG_UNUSED(flags);
+    struct ares_srv_ctx *ctx = attr->user_data;
+    ssize_t ret = write_config_common(conn, attr, len, offset,
+                                      sizeof(enum ares_srv_configs));
+
+    if (ctx->ares_service_cb.config_read != NULL &&
+        ret == BT_GATT_ERR(BT_ATT_ERR_NOT_SUPPORTED)) {
+        enum ares_srv_configs config = *((enum ares_srv_configs *)buf);
+
+        if (config < ARES_CONFIG_INVALID) {
+            ctx->ares_service_cb.config_read(conn, config);
+            ret = len;
+        } else {
+            ret = BT_GATT_ERR(BT_ATT_ERR_VALUE_NOT_ALLOWED);
+        }
+    }
+
+    return ret;
+}
+
+static ssize_t write_start(struct bt_conn *conn,
+                           const struct bt_gatt_attr *attr, const void *buf,
+                           uint16_t len, uint16_t offset, uint8_t flags) {
+    ARG_UNUSED(flags);
+    struct ares_srv_ctx *ctx = attr->user_data;
+    ssize_t ret =
+        write_config_common(conn, attr, len, offset, sizeof(uint32_t));
+
+    if (ctx->ares_service_cb.start != NULL &&
+        ret == BT_GATT_ERR(BT_ATT_ERR_NOT_SUPPORTED)) {
+        uint32_t delay = *((uint32_t *)buf);
+        ctx->ares_service_cb.start(conn, delay);
+        ret = len;
+    }
+
+    return ret;
 }
 
 BT_GATT_SERVICE_DEFINE(
     ares_srv_svc, BT_GATT_PRIMARY_SERVICE(BT_UUID_ARES_SRV),
-    BT_GATT_CHARACTERISTIC(BT_UUID_ARES_SRV_CHUNKS, BT_GATT_CHRC_INDICATE,
+    BT_GATT_CHARACTERISTIC(BT_UUID_ARES_SRV_BANDWIDTH, BT_GATT_CHRC_WRITE,
+                           BT_GATT_PERM_WRITE, NULL, write_bandwidth, &srv_ctx),
+    BT_GATT_CHARACTERISTIC(BT_UUID_ARES_SRV_CENTER_FREQ, BT_GATT_CHRC_WRITE,
+                           BT_GATT_PERM_WRITE, NULL, write_center_frequency,
+                           &srv_ctx),
+    BT_GATT_CHARACTERISTIC(BT_UUID_ARES_SRV_REF_LEVEL, BT_GATT_CHRC_WRITE,
+                           BT_GATT_PERM_WRITE, NULL, write_ref_level, &srv_ctx),
+    BT_GATT_CHARACTERISTIC(BT_UUID_ARES_SRV_DURATION, BT_GATT_CHRC_WRITE,
+                           BT_GATT_PERM_WRITE, NULL, write_duration, &srv_ctx),
+    BT_GATT_CHARACTERISTIC(BT_UUID_ARES_SRV_DESCRIPTION, BT_GATT_CHRC_WRITE,
+                           BT_GATT_PERM_WRITE, NULL, write_description,
+                           &srv_ctx),
+    BT_GATT_CHARACTERISTIC(BT_UUID_ARES_SRV_CONFIG_READ, BT_GATT_CHRC_WRITE,
+                           BT_GATT_PERM_WRITE, NULL, write_config_read,
+                           &srv_ctx),
+    BT_GATT_CHARACTERISTIC(BT_UUID_ARES_SRV_CONFIG_RESP, BT_GATT_CHRC_INDICATE,
                            BT_GATT_PERM_NONE, NULL, NULL, NULL),
-    BT_GATT_CCC(ares_service_chunk_cfg_changed,
+    BT_GATT_CCC(ares_service_config_resp_cfg_changed,
                 BT_GATT_PERM_READ | BT_GATT_PERM_WRITE),
-    BT_GATT_CHARACTERISTIC(BT_UUID_ARES_SRV_IMAGE, BT_GATT_CHRC_INDICATE,
+    BT_GATT_CHARACTERISTIC(BT_UUID_ARES_SRV_START, BT_GATT_CHRC_WRITE,
+                           BT_GATT_PERM_WRITE, NULL, write_start, &srv_ctx),
+    BT_GATT_CHARACTERISTIC(BT_UUID_ARES_SRV_NEIGHBOR_STATE, BT_GATT_CHRC_NOTIFY,
                            BT_GATT_PERM_NONE, NULL, NULL, NULL),
-    BT_GATT_CCC(ares_service_image_cfg_changed,
-                BT_GATT_PERM_READ | BT_GATT_PERM_WRITE));
+    BT_GATT_CCC(ares_service_neighbor_update_cfg_changed,
+                BT_GATT_PERM_READ | BT_GATT_PERM_WRITE), );
 
 int bt_ares_srv_init(const struct ares_service_cb *cb) {
     if (cb == NULL) {
         return -EINVAL;
     }
 
-    ares_service_cb.num_chunks_ind_enabled = cb->num_chunks_ind_enabled;
-    ares_service_cb.image_ind_enabled = cb->image_ind_enabled;
-    ares_service_cb.num_chunks_ind_cb = cb->num_chunks_ind_cb;
-    ares_service_cb.image_ind_cb = cb->image_ind_cb;
+    srv_ctx.ares_service_cb = *cb;
 
     return 0;
 }
 
-static void num_chunks_ind_cb(struct bt_conn *conn,
-                              struct bt_gatt_indicate_params *params,
-                              uint8_t err) {
-    ARG_UNUSED(params);
+static void config_response_ind_cb(struct bt_conn *conn,
+                                   struct bt_gatt_indicate_params *params,
+                                   uint8_t err) {
+    struct ares_srv_indicate_params *srv_params =
+        CONTAINER_OF(params, struct ares_srv_indicate_params, params);
 
     LOG_DBG("Indication %s\n", err != 0U ? "fail" : "success");
 
-    if (ares_service_cb.num_chunks_ind_cb != NULL) {
-        ares_service_cb.num_chunks_ind_cb(conn, err);
+    if (srv_ctx.ares_service_cb.config_response_ind_cb != NULL) {
+        srv_ctx.ares_service_cb.config_response_ind_cb(conn, err,
+                                                       srv_params->user_buf);
     }
+
+    net_buf_unref(srv_params->user_buf);
+    net_buf_unref(srv_params->buf);
 }
 
-static void image_ind_cb(struct bt_conn *conn,
-                         struct bt_gatt_indicate_params *params, uint8_t err) {
-    ARG_UNUSED(params);
+int bt_ares_config_response(struct bt_conn *conn, struct net_buf *net_buf) {
+    struct net_buf *buf;
+    struct ares_srv_indicate_params params;
+    int ret;
 
-    LOG_DBG("Indication %s\n", err != 0U ? "fail" : "success");
-
-    if (ares_service_cb.image_ind_cb != NULL) {
-        ares_service_cb.image_ind_cb(conn, err);
-    }
-}
-
-int bt_ares_srv_ind_chunks(uint64_t chunks) {
-    static struct bt_gatt_indicate_params ind_params = {
-        .func = num_chunks_ind_cb,
-        .len = sizeof(chunks),
-    };
-
-    if (!atomic_test_bit(&state, CHUNKS_ENABLED)) {
+    if (!atomic_test_bit(&srv_ctx.state, ARES_CONFIG_RESP_ENABLED)) {
         return -EACCES;
     }
 
-    ind_params.attr = &ares_srv_svc.attrs[2];
-    ind_params.data = &chunks;
-    return bt_gatt_indicate(NULL, &ind_params);
-}
-
-int bt_ares_srv_ind_image_chunk(const uint8_t *bytes, size_t num_bytes) {
-    static struct bt_gatt_indicate_params ind_params = {
-        .func = image_ind_cb,
-    };
-
-    if (!atomic_test_bit(&state, IMAGE_ENABLED)) {
-        return -EACCES;
-    }
-
-    if (bytes == NULL) {
+    if (net_buf == NULL) {
         return -EINVAL;
     }
 
-    ind_params.attr = &ares_srv_svc.attrs[5];
-    ind_params.data = bytes;
-    ind_params.len = num_bytes;
-    return bt_gatt_indicate(NULL, &ind_params);
+    buf = net_buf_alloc(&ares_srv_tx_pool, K_MSEC(100));
+    if (buf == NULL) {
+        return -ENOMEM;
+    }
+
+    params.buf = buf;
+    params.user_buf = net_buf_ref(net_buf);
+    params.params.func = config_response_ind_cb;
+    params.params.destroy = NULL;
+    params.params.data = params.user_buf->data;
+    params.params.len = params.user_buf->len;
+    params.params.attr = &ares_srv_svc.attrs[14];
+    params.params.uuid = NULL;
+
+    net_buf_add_mem(buf, &params, sizeof(params));
+
+    ret = bt_gatt_indicate(
+        conn, &((struct ares_srv_indicate_params *)buf->data)->params);
+    if (ret < 0) {
+        net_buf_unref(net_buf);
+        net_buf_unref(buf);
+    }
+
+    return ret;
+}
+
+int bt_ares_notify_neighbor_state(struct bt_conn *conn, const void *data,
+                                  size_t len) {
+    if (!atomic_test_bit(&srv_ctx.state, ARES_NEIGHBOR_STATE_ENABLED)) {
+        return -EACCES;
+    }
+
+    if (data == NULL) {
+        return -EINVAL;
+    }
+
+    return bt_gatt_notify(conn, &ares_srv_svc.attrs[19], data, len);
 }

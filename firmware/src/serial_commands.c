@@ -375,15 +375,15 @@ static void handle_ble_disconnect(const struct ares_serial *serial,
 
 static void handle_ble_chunks(const struct ares_serial *serial,
                               struct ares_frame *frame) {
-    int ret = ares_ble_indicate_chunks(frame->payload.BLE_CHUNKS);
-    send_ack_frame(serial, frame, ret);
+    // int ret = ares_ble_indicate_chunks(frame->payload.BLE_CHUNKS);
+    send_ack_frame(serial, frame, 0);
 }
 
 static void handle_ble_image_chunk(const struct ares_serial *serial,
                                    struct ares_frame *frame) {
-    int ret = ares_ble_send_chunk(frame->payload.BLE_IMAGE_CHUNK.buf,
-                                  frame->payload.BLE_IMAGE_CHUNK.len);
-    send_ack_frame(serial, frame, ret);
+    // int ret = ares_ble_send_chunk(frame->payload.BLE_IMAGE_CHUNK.buf,
+    //                               frame->payload.BLE_IMAGE_CHUNK.len);
+    send_ack_frame(serial, frame, 0);
 }
 
 static void handle_reboot(const struct ares_serial *serial,
@@ -510,8 +510,6 @@ static int initialize_ble(const struct ares_serial *serial) {
             .connected = ble_connected,
             .disconnected = ble_disconnected,
             .mtu_size_changed = mtu_size_change,
-            .chunks_enabled = chunks_enabled,
-            .image_enabled = image_enabled,
         }};
 
     connect_work.serial = serial;
@@ -526,35 +524,37 @@ static int initialize_ble(const struct ares_serial *serial) {
 }
 
 static struct ares_serial_command commands[] = {
-    {ARES_FRAME_SETTING, handle_setting},
-    {ARES_FRAME_START, handle_start},
-    {ARES_FRAME_LORA_CONFIG, handle_lora_config},
-    {ARES_FRAME_LED, handle_led},
-    {ARES_FRAME_HEARTBEAT, handle_heartbeat},
-    {ARES_FRAME_POLL, handle_poll},
-    {ARES_FRAME_LOG, handle_log},
-    {ARES_FRAME_LOG_ACK, handle_log_ack},
-    {ARES_FRAME_VERSION, handle_version},
-    {ARES_FRAME_BLE_STATE, handle_ble_state},
-    {ARES_FRAME_BLE_DISCONNECT, handle_ble_disconnect},
-    {ARES_FRAME_BLE_CHUNKS, handle_ble_chunks},
-    {ARES_FRAME_BLE_IMAGE_CHUNK, handle_ble_image_chunk},
-    {ARES_FRAME_REBOOT, handle_reboot},
-    {ARES_FRAME_LORA_ACK, handle_lora_ack},
-    {ARES_FRAME_ABORT, handle_abort},
-    {ARES_FRAME_NODE_CONFIG, handle_node_config},
-    {ARES_FRAME_NODE_CONFIG_POLL, handle_node_config_poll},
-    {ARES_FRAME_NODE_CONFIG_RESP, handle_node_config_response},
-    {ARES_FRAME_NODE_READY, handle_node_ready},
+    {.command = ARES_FRAME_SETTING, .callback = handle_setting},
+    {.command = ARES_FRAME_START, .callback = handle_start},
+    {.command = ARES_FRAME_LORA_CONFIG, .callback = handle_lora_config},
+    {.command = ARES_FRAME_LED, .callback = handle_led},
+    {.command = ARES_FRAME_HEARTBEAT, .callback = handle_heartbeat},
+    {.command = ARES_FRAME_POLL, .callback = handle_poll},
+    {.command = ARES_FRAME_LOG, .callback = handle_log},
+    {.command = ARES_FRAME_LOG_ACK, .callback = handle_log_ack},
+    {.command = ARES_FRAME_VERSION, .callback = handle_version},
+    {.command = ARES_FRAME_BLE_STATE, .callback = handle_ble_state},
+    {.command = ARES_FRAME_BLE_DISCONNECT, .callback = handle_ble_disconnect},
+    {.command = ARES_FRAME_BLE_CHUNKS, .callback = handle_ble_chunks},
+    {.command = ARES_FRAME_BLE_IMAGE_CHUNK, .callback = handle_ble_image_chunk},
+    {.command = ARES_FRAME_REBOOT, .callback = handle_reboot},
+    {.command = ARES_FRAME_LORA_ACK, .callback = handle_lora_ack},
+    {.command = ARES_FRAME_ABORT, .callback = handle_abort},
+    {.command = ARES_FRAME_NODE_CONFIG, .callback = handle_node_config},
+    {.command = ARES_FRAME_NODE_CONFIG_POLL,
+     .callback = handle_node_config_poll},
+    {.command = ARES_FRAME_NODE_CONFIG_RESP,
+     .callback = handle_node_config_response},
+    {.command = ARES_FRAME_NODE_READY, .callback = handle_node_ready},
 };
 
 static int init_serial_handlers(void) {
     const struct ares_serial *serial = ares_serial_backend_uart_get_ptr();
 
-    int ret = initialize_ble(serial);
-    if (ret != 0) {
-        return ret;
-    }
+    // int ret = initialize_ble(serial);
+    // if (ret != 0) {
+    //     return ret;
+    // }
 
     return ares_serial_register_command_callbacks(serial, commands,
                                                   ARRAY_SIZE(commands));

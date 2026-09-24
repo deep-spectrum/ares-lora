@@ -749,7 +749,7 @@ class LoraSerial:
         return None
 
     @lora_serial_command
-    def ble_state(self, state: BleState = BleState.REQUEST) -> BleState | None:
+    def ble_state(self, state: BleState = BleState.REQUEST, **kwargs) -> BleState | None:
         """Retrieve or update the BLE state.
 
         Args:
@@ -762,7 +762,7 @@ class LoraSerial:
             TimeoutError: No response from the firmware within the configured timeout.
             LoraException: Firmware responded with an error code.
         """
-        ret = self._dev.ble_state(state=state.value)
+        ret = self._dev.ble_state(state=state.value, **kwargs)
         self._check_ret_code(ret[0])
         if state == BleState.REQUEST:
             return BleState(ret[1][0])
