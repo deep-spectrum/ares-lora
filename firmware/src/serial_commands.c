@@ -551,10 +551,10 @@ static struct ares_serial_command commands[] = {
 static int init_serial_handlers(void) {
     const struct ares_serial *serial = ares_serial_backend_uart_get_ptr();
 
-    int ret = initialize_ble(serial);
-    if (ret != 0) {
-        return ret;
-    }
+    // int ret = initialize_ble(serial);
+    // if (ret != 0) {
+    //     return ret;
+    // }
 
     return ares_serial_register_command_callbacks(serial, commands,
                                                   ARRAY_SIZE(commands));

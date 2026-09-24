@@ -108,8 +108,9 @@ enum ares_srv_configs {
 enum ares_srv_write_response {
     ARES_WRITE_SUCCESS,
     ARES_WRITE_FAILED,
-    ARES_WRITE_BUSY,
     ARES_WRITE_REJECTED = ARES_WRITE_FAILED,
+    ARES_WRITE_BUSY,
+    ARES_WRITE_NO_MEM,
 };
 
 /**
@@ -168,8 +169,9 @@ struct ares_service_cb {
      * @param[in] buf Pointer to buffer that contains the description.
      * @param[in] len The length of the buffer.
      */
-    void (*description_update)(struct bt_conn *conn, const void *buf,
-                               uint16_t len);
+    enum ares_srv_write_response (*description_update)(struct bt_conn *conn,
+                                                       const void *buf,
+                                                       uint16_t len);
 
     /**
      * @brief Callback for indicating a configuration needs to be read.

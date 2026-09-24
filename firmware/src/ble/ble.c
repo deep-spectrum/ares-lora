@@ -49,9 +49,14 @@ struct config_response_ind_err_work {
     struct k_work work;
 };
 
+// todo: Make the data in the work a list. (Do this when functionality is
+// confirmed to work)
 struct config_write_work {
     struct k_sem sem;
-    uint64_t value;
+    union {
+        uint64_t value;
+        struct net_buf *buf;
+    };
     const enum ares_srv_configs config;
     struct k_work work;
 };
@@ -74,7 +79,6 @@ struct ble_conn_info {
     struct bt_conn *conn;
 
     struct net_buf *desc_buf;
-    struct net_buf *config_resp;
 
     struct config_response_ind_err_work conf_resp_work;
 
@@ -192,6 +196,11 @@ static void on_disconnected(struct bt_conn *conn, uint8_t reason) {
     if (callbacks.disconnected != NULL) {
         callbacks.disconnected();
     }
+
+    if (connection_info.desc_buf != NULL) {
+        net_buf_unref(connection_info.desc_buf);
+        connection_info.desc_buf = NULL;
+    }
 }
 
 BT_CONN_CB_DEFINE(conn_cb) = {
@@ -226,6 +235,30 @@ static void write_work_handler(struct k_work *work) {
     }
 }
 
+static void write_work_net_buf_handler(struct k_work *work) {
+    struct config_write_work *wwork =
+        CONTAINER_OF(work, struct config_write_work, work);
+    struct net_buf *buf = wwork->buf;
+    wwork->buf = NULL;
+    enum ares_srv_configs config = wwork->config;
+    k_sem_give(&wwork->sem);
+
+    switch (config) {
+    case ARES_CONFIG_DESCRIPTION: {
+        if (callbacks.description_update) {
+            callbacks.description_update(buf->data, buf->len);
+        }
+        break;
+    }
+    default: {
+        LOG_ERR("Unhandled case: %d", config);
+        break;
+    }
+    }
+
+    net_buf_unref(buf);
+}
+
 ARES_CONFIG_WRITE_WORK_DEFINE(bandwidth_work, ARES_CONFIG_BANDWIDTH,
                               write_work_handler);
 ARES_CONFIG_WRITE_WORK_DEFINE(center_freq_work, ARES_CONFIG_CENTER_FREQ,
@@ -234,6 +267,8 @@ ARES_CONFIG_WRITE_WORK_DEFINE(ref_level_work, ARES_CONFIG_REF_LEVEL,
                               write_work_handler);
 ARES_CONFIG_WRITE_WORK_DEFINE(duration_work, ARES_CONFIG_DURATION,
                               write_work_handler);
+ARES_CONFIG_WRITE_WORK_DEFINE(description_work, ARES_CONFIG_DESCRIPTION,
+                              write_work_net_buf_handler);
 
 static enum ares_srv_write_response
 submit_write_work(struct config_write_work *work, uint64_t value) {
@@ -298,8 +333,8 @@ static enum ares_srv_write_response duration_update(struct bt_conn *conn,
     return submit_write_work(&duration_work, val);
 }
 
-static void description_update(struct bt_conn *conn, const void *buf,
-                               uint16_t len) {
+static enum ares_srv_write_response
+description_update(struct bt_conn *conn, const void *buf, uint16_t len) {
     __ASSERT_NO_MSG(conn == connection_info.conn);
     __ASSERT_NO_MSG(atomic_test_bit(connection_info.state, BLE_INITIALIZED));
     ARG_UNUSED(conn);
@@ -309,12 +344,27 @@ static void description_update(struct bt_conn *conn, const void *buf,
     if (connection_info.desc_buf == NULL) {
         connection_info.desc_buf = net_buf_alloc(&ares_rx_netbuf, K_NO_WAIT);
         if (connection_info.desc_buf == NULL) {
-            return;
+            return ARES_WRITE_NO_MEM;
         }
     }
 
     net_buf_add_mem(connection_info.desc_buf, buf, len);
-    // TODO: Submit work
+
+    if (((const uint8_t *)buf)[len - 1] == '\0') {
+        int ret = k_sem_take(&description_work.sem, K_NO_WAIT);
+        if (ret < 0) {
+            net_buf_unref(connection_info.desc_buf);
+            connection_info.desc_buf = NULL;
+            return ARES_WRITE_BUSY;
+        }
+
+        description_work.buf = connection_info.desc_buf;
+        connection_info.desc_buf = NULL;
+        k_work_submit_to_queue(&connection_info.write_work_q,
+                               &description_work.work);
+    }
+
+    return ARES_WRITE_SUCCESS;
 }
 
 static void config_read_handler(struct bt_conn *conn,
@@ -547,7 +597,7 @@ int ares_send_neighbor_states(uint8_t num_neighbors, const void *data,
         return -ENOMEM;
     }
 
-    net_buf_add_mem(buf, &buf_len, sizeof(buf_len));
+    net_buf_add_mem(buf, &num_neighbors, sizeof(num_neighbors));
     net_buf_add_mem(buf, data, len);
 
     ret = bt_ares_notify_neighbor_state(connection_info.conn, buf->data,

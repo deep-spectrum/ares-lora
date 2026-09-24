@@ -115,6 +115,9 @@ static ssize_t process_response(enum ares_srv_write_response resp,
     case ARES_WRITE_BUSY: {
         return BT_GATT_ERR(BT_ATT_ERR_PREPARE_QUEUE_FULL);
     }
+    case ARES_WRITE_NO_MEM: {
+        return BT_GATT_ERR(BT_ATT_ERR_INSUFFICIENT_RESOURCES);
+    }
     }
 
     return BT_GATT_ERR(BT_ATT_ERR_UNLIKELY);
@@ -205,8 +208,8 @@ static ssize_t write_description(struct bt_conn *conn,
     ssize_t ret = BT_GATT_ERR(BT_ATT_ERR_NOT_SUPPORTED);
 
     if (ctx->ares_service_cb.description_update != NULL) {
-        ctx->ares_service_cb.description_update(conn, buf, len);
-        ret = len;
+        ret = process_response(
+            ctx->ares_service_cb.description_update(conn, buf, len), len);
     }
 
     return ret;
@@ -330,9 +333,11 @@ int bt_ares_config_response(struct bt_conn *conn, struct net_buf *net_buf) {
     params.buf = buf;
     params.user_buf = net_buf_ref(net_buf);
     params.params.func = config_response_ind_cb;
-    params.params.attr = &ares_srv_svc.attrs[16];
-    params.params.data = net_buf->data;
-    params.params.len = net_buf->len;
+    params.params.destroy = NULL;
+    params.params.data = params.user_buf->data;
+    params.params.len = params.user_buf->len;
+    params.params.attr = &ares_srv_svc.attrs[14];
+    params.params.uuid = NULL;
 
     net_buf_add_mem(buf, &params, sizeof(params));
 
@@ -356,5 +361,5 @@ int bt_ares_notify_neighbor_state(struct bt_conn *conn, const void *data,
         return -EINVAL;
     }
 
-    return bt_gatt_notify(conn, &ares_srv_svc.attrs[21], data, len);
+    return bt_gatt_notify(conn, &ares_srv_svc.attrs[19], data, len);
 }
