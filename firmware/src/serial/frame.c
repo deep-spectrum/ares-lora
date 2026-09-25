@@ -153,6 +153,11 @@ static size_t calculate_frame_length(const struct ares_frame *frame) {
             FSIZEOF_FIELD(NODE_READY.id) + FSIZEOF_FIELD(NODE_READY.flags);
         break;
     }
+    case ARES_FRAME_BLE_NODE_CONFIG: {
+        payload_len = FSIZEOF_FIELD(BLE_NODE_CONFIG.type) +
+                      frame->payload.BLE_NODE_CONFIG.data_len;
+        break;
+    }
     default: {
         __ASSERT(false, "Invalid frame type received");
         break;
@@ -164,7 +169,7 @@ static size_t calculate_frame_length(const struct ares_frame *frame) {
 
 #define Z_FSERIALIZE_LEN(field, len)                                           \
     do {                                                                       \
-        (void)memcpy(payload, &frame.payload.field, (len));                    \
+        (void)memcpy(payload, &frame->payload.field, (len));                   \
         payload += (len);                                                      \
     } while (0)
 #define Z_FSERIALIZE_FIELD(field)                                              \
@@ -323,6 +328,12 @@ static void serialize(uint8_t *buf, const struct ares_frame *frame,
     case ARES_FRAME_NODE_READY: {
         FSERIALIZE(NODE_READY.flags);
         FSERIALIZE(NODE_READY.id);
+        break;
+    }
+    case ARES_FRAME_BLE_NODE_CONFIG: {
+        FSERIALIZE(BLE_NODE_CONFIG.type);
+        FSERIALIZE_PTR(BLE_NODE_CONFIG.data,
+                       frame->payload.BLE_NODE_CONFIG.data_len);
         break;
     }
     default:
@@ -495,6 +506,12 @@ static void deserialize(struct ares_frame *frame, const uint8_t *buf) {
     case ARES_FRAME_NODE_READY: {
         FDESERIALIZE(NODE_READY.flags);
         FDESERIALIZE(NODE_READY.id);
+        break;
+    }
+    case ARES_FRAME_BLE_NODE_CONFIG: {
+        FDESERIALIZE(BLE_NODE_CONFIG.type);
+        FDESERIALIZE_BUF(BLE_NODE_CONFIG.data, void *,
+                         BLE_NODE_CONFIG.data_len);
         break;
     }
     default: {

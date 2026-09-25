@@ -106,6 +106,10 @@ enum ares_frame_type {
     ARES_FRAME_NODE_READY = 26,       ///< Indication that the coordinator
                                       ///< is ready to collect data.
 
+    // More BLE frames
+    ARES_FRAME_BLE_NODE_CONFIG = 27, ///< Node configuration updates
+                                     ///< or responses.
+
     ARES_FRAME_TYPE_INVALID, ///< Invalid frame.
 };
 
@@ -265,6 +269,13 @@ struct ares_frame {
             uint16_t id;
         } NODE_READY; ///< ARES_FRAME_NODE_READY
 
+        struct {
+            uint16_t type;
+            struct {
+                void *data;
+                size_t data_len;
+            };
+        } BLE_NODE_CONFIG;
     } payload;
 };
 
