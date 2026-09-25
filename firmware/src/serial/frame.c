@@ -162,6 +162,10 @@ static size_t calculate_frame_length(const struct ares_frame *frame) {
         payload_len = FSIZEOF_FIELD(BLE_CONFIG_REQUEST);
         break;
     }
+    case ARES_FRAME_BLE_START: {
+        payload_len = FSIZEOF_FIELD(BLE_START);
+        break;
+    }
     default: {
         __ASSERT(false, "Invalid frame type received");
         break;
@@ -342,6 +346,10 @@ static void serialize(uint8_t *buf, const struct ares_frame *frame,
     }
     case ARES_FRAME_BLE_CONFIG_REQUEST: {
         FSERIALIZE(BLE_CONFIG_REQUEST);
+        break;
+    }
+    case ARES_FRAME_BLE_START: {
+        FSERIALIZE(BLE_START);
         break;
     }
     default:
