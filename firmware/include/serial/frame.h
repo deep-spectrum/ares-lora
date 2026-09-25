@@ -91,9 +91,9 @@ enum ares_frame_type {
     ARES_FRAME_BLE_DISCONNECT = 16, ///< Terminate the current BLE connection.
     ARES_FRAME_BLE_SUBSCRIBED = 17, ///< Indicate that an attribute got
                                     ///< subscribed/unsubscribed from. Tx only.
-    ARES_FRAME_BLE_CHUNKS = 18, ///< Tell the central device how many chunks are
-                                ///< going to be sent.
-    ARES_FRAME_BLE_IMAGE_CHUNK = 19, ///< Send a chunk to the central device.
+    ARES_FRAME_BLE_CONN_PARAMS = 18, ///< Indicate what the BLE
+                                     ///< connection params are.
+    ARES_FRAME_BLE_ATT_ERR = 19,     ///< Indicate a BLE ATT error.
 
     // Back to normal frames
     ARES_FRAME_REBOOT = 20,   ///< Reboot device after a short delay, Rx only.
@@ -207,23 +207,23 @@ struct ares_frame {
 
         uint8_t BLE_STATE; ///< ARES_FRAME_BLE_STATE
 
-        struct {
-            bool connected;
-            uint16_t mtu_size;
-        } BLE_CONNECTED; ///< ARES_FRAME_BLE_CONNECTED
+        bool BLE_CONNECTED; ///< ARES_FRAME_BLE_CONNECTED
 
         struct {
-            uint8_t chunks_subscribed : 1;
-            uint8_t image_subscribed : 1;
+            uint8_t config_resp_subscribed : 1;
+            uint8_t neighbor_states_subscribed : 1;
             uint8_t padding : 6;
         } BLE_SUBSCRIBED; ///< ARES_FRAME_BLE_SUBSCRIBED
 
-        uint64_t BLE_CHUNKS; ///< ARES_FRAME_BLE_CHUNKS
-
         struct {
-            size_t len;
-            const uint8_t *buf;
-        } BLE_IMAGE_CHUNK; ///< ARES_FRAME_BLE_IMAGE_CHUNK
+            uint16_t mtu;
+            uint16_t interval;
+            uint16_t latency;
+            uint16_t timeout;
+            uint8_t phy;
+        } BLE_CONN_PARAMS; ///< ARES_FRAME_BLE_CONN_PARAMS
+
+        uint8_t BLE_ATT_ERR; ///< ARES_FRAME_BLE_ATT_ERR;
 
         uint8_t REBOOT; /// ARES_FRAME_REBOOT
 
