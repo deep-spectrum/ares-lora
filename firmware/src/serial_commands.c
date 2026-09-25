@@ -24,89 +24,11 @@
 #include <zephyr/sys/reboot.h>
 #include <zephyr/version.h>
 
-enum connected_state {
-    DISCONNECTED,
-    CONNECTED,
-};
-
-struct connect_work {
-    enum connected_state state;
-    uint16_t mtu_size;
-    const struct ares_serial *serial;
-    struct k_work work;
-};
-
-struct subscribe_work {
-    bool chunk_enabled;
-    bool image_enabled;
-    const struct ares_serial *serial;
-    struct k_work work;
-    struct k_spinlock lock;
-};
-
-static struct connect_work connect_work = {};
-static struct subscribe_work subscribe_work = {};
-
-static void connected_work_handler(struct k_work *work) {
-    struct connect_work *cwork = CONTAINER_OF(work, struct connect_work, work);
-    struct ares_frame frame = {
-        .type = ARES_FRAME_BLE_CONNECTED,
-        .payload.BLE_CONNECTED.connected = cwork->state == CONNECTED,
-    };
-
-    if (cwork->state == DISCONNECTED) {
-        cwork->mtu_size = 0;
-    }
-
-    frame.payload.BLE_CONNECTED.mtu_size = cwork->mtu_size;
-    ares_serial_write_frame(cwork->serial, &frame);
-}
-
-static void subscribe_work_handler(struct k_work *work) {
-    struct subscribe_work *swork =
-        CONTAINER_OF(work, struct subscribe_work, work);
-    struct ares_frame frame = {
-        .type = ARES_FRAME_BLE_SUBSCRIBED,
-    };
-
-    K_SPINLOCK(&swork->lock) {
-        frame.payload.BLE_SUBSCRIBED.chunks_subscribed = swork->chunk_enabled;
-        frame.payload.BLE_SUBSCRIBED.image_subscribed = swork->image_enabled;
-    }
-
-    ares_serial_write_frame(swork->serial, &frame);
-}
-
 static void reboot_work_handler(struct k_work *work) {
     ARG_UNUSED(work);
     sys_reboot(SYS_REBOOT_COLD);
 }
 K_WORK_DELAYABLE_DEFINE(reboot_work, reboot_work_handler);
-
-static void ble_connected(void) {
-    // This is guaranteed to run before the mtu exchange.
-    connect_work.state = CONNECTED;
-}
-
-static void mtu_size_change(size_t new_mtu) {
-    connect_work.mtu_size = (uint16_t)new_mtu;
-    k_work_submit(&connect_work.work);
-}
-
-static void ble_disconnected(void) {
-    connect_work.state = DISCONNECTED;
-    k_work_submit(&connect_work.work);
-}
-
-static void chunks_enabled(bool enable) {
-    K_SPINLOCK(&subscribe_work.lock) { subscribe_work.chunk_enabled = enable; }
-    k_work_submit(&subscribe_work.work);
-}
-
-static void image_enabled(bool enable) {
-    K_SPINLOCK(&subscribe_work.lock) { subscribe_work.image_enabled = enable; }
-    k_work_submit(&subscribe_work.work);
-}
 
 static void send_ack_frame(const struct ares_serial *serial,
                            struct ares_frame *frame, int code) {
@@ -373,19 +295,6 @@ static void handle_ble_disconnect(const struct ares_serial *serial,
     send_ack_frame(serial, frame, ares_disconnect_ble());
 }
 
-static void handle_ble_chunks(const struct ares_serial *serial,
-                              struct ares_frame *frame) {
-    // int ret = ares_ble_indicate_chunks(frame->payload.BLE_CHUNKS);
-    send_ack_frame(serial, frame, 0);
-}
-
-static void handle_ble_image_chunk(const struct ares_serial *serial,
-                                   struct ares_frame *frame) {
-    // int ret = ares_ble_send_chunk(frame->payload.BLE_IMAGE_CHUNK.buf,
-    //                               frame->payload.BLE_IMAGE_CHUNK.len);
-    send_ack_frame(serial, frame, 0);
-}
-
 static void handle_reboot(const struct ares_serial *serial,
                           struct ares_frame *frame) {
     const uint8_t min = 5, max = 30;
@@ -507,16 +416,19 @@ static void handle_node_ready(const struct ares_serial *serial,
 static int initialize_ble(const struct ares_serial *serial) {
     struct ares_ble_init_data init_data = {
         .cb = {
-            .connected = ble_connected,
-            .disconnected = ble_disconnected,
-            .mtu_size_changed = mtu_size_change,
+            .config_update = NULL,
+            .description_update = NULL,
+            .config_request = NULL,
+            .config_response_enabled = NULL,
+            .connected = NULL,
+            .disconnected = NULL,
+            .neighbor_state_enabled = NULL,
+            .connection_param_updated = NULL,
+            .mtu_size_changed = NULL,
+            .phy_updated = NULL,
+            .send_config_response_error = NULL,
+            .start = NULL,
         }};
-
-    connect_work.serial = serial;
-    subscribe_work.serial = serial;
-
-    k_work_init(&connect_work.work, connected_work_handler);
-    k_work_init(&subscribe_work.work, subscribe_work_handler);
 
     (void)retrieve_setting(ARES_SETTING_ID, &init_data.node_id);
 
@@ -535,8 +447,6 @@ static struct ares_serial_command commands[] = {
     {.command = ARES_FRAME_VERSION, .callback = handle_version},
     {.command = ARES_FRAME_BLE_STATE, .callback = handle_ble_state},
     {.command = ARES_FRAME_BLE_DISCONNECT, .callback = handle_ble_disconnect},
-    {.command = ARES_FRAME_BLE_CHUNKS, .callback = handle_ble_chunks},
-    {.command = ARES_FRAME_BLE_IMAGE_CHUNK, .callback = handle_ble_image_chunk},
     {.command = ARES_FRAME_REBOOT, .callback = handle_reboot},
     {.command = ARES_FRAME_LORA_ACK, .callback = handle_lora_ack},
     {.command = ARES_FRAME_ABORT, .callback = handle_abort},
@@ -546,15 +456,17 @@ static struct ares_serial_command commands[] = {
     {.command = ARES_FRAME_NODE_CONFIG_RESP,
      .callback = handle_node_config_response},
     {.command = ARES_FRAME_NODE_READY, .callback = handle_node_ready},
+    {.command = ARES_FRAME_BLE_NODE_CONFIG, .callback = NULL},
+    {.command = ARES_FRAME_BLE_NEIGHBOR_UPDATE, .callback = NULL},
 };
 
 static int init_serial_handlers(void) {
     const struct ares_serial *serial = ares_serial_backend_uart_get_ptr();
 
-    // int ret = initialize_ble(serial);
-    // if (ret != 0) {
-    //     return ret;
-    // }
+    int ret = initialize_ble(serial);
+    if (ret != 0) {
+        return ret;
+    }
 
     return ares_serial_register_command_callbacks(serial, commands,
                                                   ARRAY_SIZE(commands));
