@@ -530,6 +530,12 @@ static void deserialize(struct ares_frame *frame, const uint8_t *buf) {
                          BLE_NODE_CONFIG.data_len);
         break;
     }
+    case ARES_FRAME_BLE_NEIGHBOR_UPDATE: {
+        FDESERIALIZE(BLE_NEIGHBOR_UPDATE.num_neighbors);
+        FDESERIALIZE_BUF(BLE_NEIGHBOR_UPDATE.neighbor_data, void *,
+                         BLE_NEIGHBOR_UPDATE.neighbor_data_len);
+        break;
+    }
     default: {
         // ARES_FRAME_LOG_ACK, ARES_FRAME_ACK, ARES_FRAME_FRAMING_ERROR,
         // and ARES_FRAME_DBG are TX only

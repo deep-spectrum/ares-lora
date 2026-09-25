@@ -107,10 +107,11 @@ enum ares_frame_type {
                                       ///< is ready to collect data.
 
     // More BLE frames
-    ARES_FRAME_BLE_NODE_CONFIG = 27,    ///< Node configuration updates
-                                        ///< or responses.
-    ARES_FRAME_BLE_CONFIG_REQUEST = 28, ///< Configuration request from BLE.
-    ARES_FRAME_BLE_START = 29,          ///< Start message from BLE.
+    ARES_FRAME_BLE_NODE_CONFIG = 27,     ///< Node configuration updates
+                                         ///< or responses.
+    ARES_FRAME_BLE_CONFIG_REQUEST = 28,  ///< Configuration request from BLE.
+    ARES_FRAME_BLE_START = 29,           ///< Start message from BLE.
+    ARES_FRAME_BLE_NEIGHBOR_UPDATE = 30, ///< Push neighbor updates over BLE.
 
     ARES_FRAME_TYPE_INVALID, ///< Invalid frame.
 };
@@ -280,7 +281,16 @@ struct ares_frame {
         } BLE_NODE_CONFIG; ///< ARES_FRAME_BLE_NODE_CONFIG
 
         uint16_t BLE_CONFIG_REQUEST; ///< ARES_FRAME_BLE_CONFIG_REQUEST
-        uint32_t BLE_START;          ///< ARES_FRAME_BLE_START
+
+        uint32_t BLE_START; ///< ARES_FRAME_BLE_START
+
+        struct {
+            uint16_t num_neighbors;
+            struct {
+                void *neighbor_data;
+                size_t neighbor_data_len;
+            };
+        } BLE_NEIGHBOR_UPDATE; ///< ARES_FRAME_BLE_NEIGHBOR_UPDATE
     } payload;
 };
 
