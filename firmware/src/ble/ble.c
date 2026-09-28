@@ -30,19 +30,28 @@ enum {
 };
 
 // todo
-#define CONFIG_ARES_BLE_WORKQ_PRIO       1
+#define CONFIG_ARES_BLE_WORKQ 0
+
+#if IS_ENABLED(CONFIG_ARES_BLE_WORKQ)
+// todo
+#define CONFIG_ARES_BLE_WORKQ_PRIO       (-1)
 #define CONFIG_ARES_BLE_WORKQ_STACK_SIZE 1024
 
 K_THREAD_STACK_DEFINE(ble_workq_stack, CONFIG_ARES_BLE_WORKQ_STACK_SIZE);
 
-// todo
-#define CONFIG_ARES_BLE_NUM_NET_BUFS 4
-#define CONFIG_ARES_BLE_NETBUF_SIZE  1536
+static struct k_work_q ares_ble_work_q;
+#endif
 
-NET_BUF_POOL_DEFINE(ares_tx_netbuf, CONFIG_ARES_BLE_NUM_NET_BUFS,
-                    CONFIG_ARES_BLE_NETBUF_SIZE, 0, NULL);
-NET_BUF_POOL_DEFINE(ares_rx_netbuf, CONFIG_ARES_BLE_NUM_NET_BUFS,
-                    CONFIG_ARES_BLE_NETBUF_SIZE, 0, NULL);
+// todo
+#define CONFIG_ARES_BLE_NUM_RX_NET_BUFS 4
+#define CONFIG_ARES_BLE_NUM_TX_NET_BUFS 4
+#define CONFIG_ARES_BLE_RX_NETBUF_SIZE  1536
+#define CONFIG_ARES_BLE_TX_NETBUF_SIZE  1536
+
+NET_BUF_POOL_DEFINE(ares_tx_netbuf, CONFIG_ARES_BLE_NUM_TX_NET_BUFS,
+                    CONFIG_ARES_BLE_TX_NETBUF_SIZE, 0, NULL);
+NET_BUF_POOL_DEFINE(ares_rx_netbuf, CONFIG_ARES_BLE_NUM_RX_NET_BUFS,
+                    CONFIG_ARES_BLE_RX_NETBUF_SIZE, 0, NULL);
 
 struct config_response_ind_err_work {
     uint8_t err;
@@ -82,7 +91,7 @@ struct ble_conn_info {
 
     struct config_response_ind_err_work conf_resp_work;
 
-    struct k_work_q write_work_q;
+    struct k_work_q *ble_work_q_lp;
 };
 
 static char adv_name[16] = "Ares";
@@ -110,6 +119,63 @@ static void config_response_indicate_work(struct k_work *work) {
         callbacks.send_config_response_error(cwork->err);
     }
 }
+// Initialized in init
+
+static void write_work_handler(struct k_work *work) {
+    struct config_write_work *wwork =
+        CONTAINER_OF(work, struct config_write_work, work);
+    uint64_t value = wwork->value;
+    enum ares_srv_configs config = wwork->config;
+    k_sem_give(&wwork->sem);
+
+    if (callbacks.config_update != NULL) {
+        callbacks.config_update(config, value);
+    }
+}
+
+static void write_work_net_buf_handler(struct k_work *work) {
+    struct config_write_work *wwork =
+        CONTAINER_OF(work, struct config_write_work, work);
+    struct net_buf *buf = wwork->buf;
+    wwork->buf = NULL;
+    enum ares_srv_configs config = wwork->config;
+    k_sem_give(&wwork->sem);
+
+    switch (config) {
+    case ARES_CONFIG_DESCRIPTION: {
+        if (callbacks.description_update) {
+            callbacks.description_update(buf->data, buf->len);
+        }
+        break;
+    }
+    default: {
+        LOG_ERR("Unhandled case: %d", config);
+        break;
+    }
+    }
+
+    net_buf_unref(buf);
+}
+
+ARES_CONFIG_WRITE_WORK_DEFINE(bandwidth_work, ARES_CONFIG_BANDWIDTH,
+                              write_work_handler);
+ARES_CONFIG_WRITE_WORK_DEFINE(center_freq_work, ARES_CONFIG_CENTER_FREQ,
+                              write_work_handler);
+ARES_CONFIG_WRITE_WORK_DEFINE(ref_level_work, ARES_CONFIG_REF_LEVEL,
+                              write_work_handler);
+ARES_CONFIG_WRITE_WORK_DEFINE(duration_work, ARES_CONFIG_DURATION,
+                              write_work_handler);
+ARES_CONFIG_WRITE_WORK_DEFINE(description_work, ARES_CONFIG_DESCRIPTION,
+                              write_work_net_buf_handler);
+
+static void connected_work_handler(struct k_work *work) {
+    ARG_UNUSED(work);
+
+    if (callbacks.connected) {
+        callbacks.connected();
+    }
+}
+K_WORK_DEFINE(connected_work, connected_work_handler);
 
 static void adv_work_handler(struct k_work *work) {
     ARG_UNUSED(work);
@@ -178,9 +244,7 @@ static void on_connected(struct bt_conn *conn, uint8_t bt_err) {
         return;
     }
 
-    if (callbacks.connected != NULL) {
-        callbacks.connected();
-    }
+    k_work_submit_to_queue(connection_info.ble_work_q_lp, &connected_work);
 
     update_mtu(conn);
 }
@@ -223,53 +287,6 @@ static void config_response_indicate_callback(struct bt_conn *conn, uint8_t err,
     }
 }
 
-static void write_work_handler(struct k_work *work) {
-    struct config_write_work *wwork =
-        CONTAINER_OF(work, struct config_write_work, work);
-    uint64_t value = wwork->value;
-    enum ares_srv_configs config = wwork->config;
-    k_sem_give(&wwork->sem);
-
-    if (callbacks.config_update != NULL) {
-        callbacks.config_update(config, value);
-    }
-}
-
-static void write_work_net_buf_handler(struct k_work *work) {
-    struct config_write_work *wwork =
-        CONTAINER_OF(work, struct config_write_work, work);
-    struct net_buf *buf = wwork->buf;
-    wwork->buf = NULL;
-    enum ares_srv_configs config = wwork->config;
-    k_sem_give(&wwork->sem);
-
-    switch (config) {
-    case ARES_CONFIG_DESCRIPTION: {
-        if (callbacks.description_update) {
-            callbacks.description_update(buf->data, buf->len);
-        }
-        break;
-    }
-    default: {
-        LOG_ERR("Unhandled case: %d", config);
-        break;
-    }
-    }
-
-    net_buf_unref(buf);
-}
-
-ARES_CONFIG_WRITE_WORK_DEFINE(bandwidth_work, ARES_CONFIG_BANDWIDTH,
-                              write_work_handler);
-ARES_CONFIG_WRITE_WORK_DEFINE(center_freq_work, ARES_CONFIG_CENTER_FREQ,
-                              write_work_handler);
-ARES_CONFIG_WRITE_WORK_DEFINE(ref_level_work, ARES_CONFIG_REF_LEVEL,
-                              write_work_handler);
-ARES_CONFIG_WRITE_WORK_DEFINE(duration_work, ARES_CONFIG_DURATION,
-                              write_work_handler);
-ARES_CONFIG_WRITE_WORK_DEFINE(description_work, ARES_CONFIG_DESCRIPTION,
-                              write_work_net_buf_handler);
-
 static enum ares_srv_write_response
 submit_write_work(struct config_write_work *work, uint64_t value) {
     int ret = k_sem_take(&work->sem, K_NO_WAIT);
@@ -278,7 +295,7 @@ submit_write_work(struct config_write_work *work, uint64_t value) {
     }
 
     work->value = value;
-    ret = k_work_submit_to_queue(&connection_info.write_work_q, &work->work);
+    ret = k_work_submit_to_queue(connection_info.ble_work_q_lp, &work->work);
     if (ret < 0) {
         k_sem_give(&work->sem);
         return ARES_WRITE_FAILED;
@@ -358,9 +375,10 @@ description_update(struct bt_conn *conn, const void *buf, uint16_t len) {
             return ARES_WRITE_BUSY;
         }
 
-        description_work.buf = connection_info.desc_buf;
+        description_work.buf = net_buf_ref(connection_info.desc_buf);
+        net_buf_unref(connection_info.desc_buf);
         connection_info.desc_buf = NULL;
-        k_work_submit_to_queue(&connection_info.write_work_q,
+        k_work_submit_to_queue(connection_info.ble_work_q_lp,
                                &description_work.work);
     }
 
@@ -388,6 +406,23 @@ static void start_handler(struct bt_conn *conn, uint32_t delay) {
     callbacks.start(delay);
 }
 
+static void initialize_workq(void) {
+#if IS_ENABLED(CONFIG_ARES_BLE_WORKQ)
+    struct k_work_queue_config workq_config = {
+        .essential = true,
+        .name = "Ares BLE RX WQ LP",
+    };
+
+    k_work_queue_init(&ares_ble_work_q);
+    k_work_queue_start(&ares_ble_work_q, ble_workq_stack,
+                       K_THREAD_STACK_SIZEOF(ble_workq_stack),
+                       CONFIG_ARES_BLE_WORKQ_PRIO, &workq_config);
+    connection_info.ble_work_q_lp = &ares_ble_work_q;
+#else
+    connection_info.ble_work_q_lp = &k_sys_work_q;
+#endif
+}
+
 int ares_init_ble(const struct ares_ble_init_data *init_data) {
     struct ares_service_cb service_cb = {
         .bandwidth_update = bandwidth_update,
@@ -398,10 +433,6 @@ int ares_init_ble(const struct ares_ble_init_data *init_data) {
         .config_read = config_read_handler,
         .config_response_ind_cb = config_response_indicate_callback,
         .start = start_handler,
-    };
-    struct k_work_queue_config workq_config = {
-        .essential = true,
-        .name = "Ares BLE RX WQ",
     };
 
     int err;
@@ -414,10 +445,7 @@ int ares_init_ble(const struct ares_ble_init_data *init_data) {
         return -EALREADY;
     }
 
-    k_work_queue_init(&connection_info.write_work_q);
-    k_work_queue_start(&connection_info.write_work_q, ble_workq_stack,
-                       K_THREAD_STACK_SIZEOF(ble_workq_stack),
-                       CONFIG_ARES_BLE_WORKQ_PRIO, &workq_config);
+    initialize_workq();
 
     k_work_init(&connection_info.conf_resp_work.work,
                 config_response_indicate_work);
@@ -530,7 +558,7 @@ static int check_response_size(uint32_t type, size_t len) {
         break;
     }
     case ARES_CONFIG_DESCRIPTION: {
-        if (len >= (size_t)CONFIG_ARES_BLE_NETBUF_SIZE) {
+        if (len >= (size_t)CONFIG_ARES_BLE_TX_NETBUF_SIZE) {
             ret = -ENOMEM;
         }
         break;
