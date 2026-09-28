@@ -92,6 +92,13 @@ struct ble_conn_info {
     struct config_response_ind_err_work conf_resp_work;
 
     struct k_work_q *ble_work_q_lp;
+
+    struct {
+        uint16_t interval;
+        uint16_t latency;
+        uint16_t timeout;
+        enum le_phy phy;
+    } conn_params;
 };
 
 static char adv_name[16] = "Ares";
@@ -108,7 +115,12 @@ static struct bt_data sd[] = {
     BT_DATA(BT_DATA_NAME_COMPLETE, adv_name, 4),
 };
 
-static struct ble_conn_info connection_info;
+static struct ble_conn_info connection_info = {
+    .conn_params = {
+        .interval = CONFIG_BT_PERIPHERAL_PREF_MIN_INT,
+        .latency = CONFIG_BT_PERIPHERAL_PREF_LATENCY,
+        .timeout = CONFIG_BT_PERIPHERAL_PREF_TIMEOUT,
+    }};
 static struct ares_ble_callbacks callbacks;
 
 static void config_response_indicate_work(struct k_work *work) {
@@ -176,6 +188,17 @@ static void connected_work_handler(struct k_work *work) {
     }
 }
 K_WORK_DEFINE(connected_work, connected_work_handler);
+
+static void param_update_work_handler(struct k_work *work) {
+    ARG_UNUSED(work);
+
+    if (callbacks.connection_param_updated) {
+        callbacks.connection_param_updated(connection_info.conn_params.interval,
+                                           connection_info.conn_params.latency,
+                                           connection_info.conn_params.timeout);
+    }
+}
+K_WORK_DEFINE(param_updated_work, param_update_work_handler);
 
 static void adv_work_handler(struct k_work *work) {
     ARG_UNUSED(work);
@@ -267,10 +290,23 @@ static void on_disconnected(struct bt_conn *conn, uint8_t reason) {
     }
 }
 
+static void on_le_param_updated(struct bt_conn *conn, uint16_t interval,
+                                uint16_t latency, uint16_t timeout) {
+    __ASSERT_NO_MSG(conn == connection_info.conn);
+    ARG_UNUSED(conn);
+
+    connection_info.conn_params.interval = interval;
+    connection_info.conn_params.latency = latency;
+    connection_info.conn_params.timeout = timeout;
+
+    k_work_submit_to_queue(connection_info.ble_work_q_lp, &param_updated_work);
+}
+
 BT_CONN_CB_DEFINE(conn_cb) = {
     .connected = on_connected,
     .disconnected = on_disconnected,
     .recycled = recycled_cb,
+    .le_param_updated = on_le_param_updated,
 };
 
 static void config_response_indicate_callback(struct bt_conn *conn, uint8_t err,
