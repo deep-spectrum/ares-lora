@@ -84,7 +84,6 @@ struct ble_conn_info {
     struct k_sem adv_name_sem;
 
     atomic_t state;
-    size_t payload_mtu_size;
     struct bt_conn *conn;
 
     struct net_buf *desc_buf;
@@ -97,6 +96,7 @@ struct ble_conn_info {
         uint16_t interval;
         uint16_t latency;
         uint16_t timeout;
+        uint16_t mtu_size;
         enum le_phy phy;
     } conn_params;
 };
@@ -212,6 +212,15 @@ static void phy_update_work_handler(struct k_work *work) {
 }
 K_WORK_DEFINE(phy_update_work, phy_update_work_handler);
 
+static void mtu_update_work_handler(struct k_work *work) {
+    ARG_UNUSED(work);
+
+    if (callbacks.mtu_size_changed != NULL) {
+        callbacks.mtu_size_changed(connection_info.conn_params.mtu_size);
+    }
+}
+K_WORK_DEFINE(mtu_change_work, mtu_update_work_handler);
+
 static void adv_work_handler(struct k_work *work) {
     ARG_UNUSED(work);
     int err;
@@ -245,10 +254,8 @@ static void exchange_mtu_cb(struct bt_conn *conn, uint8_t att_err,
     ARG_UNUSED(params);
     LOG_INF("MTU exchange %s", att_err == 0 ? "successful" : "failed");
     if (att_err == 0) {
-        connection_info.payload_mtu_size = bt_gatt_get_mtu(conn) - 3;
-        if (callbacks.mtu_size_changed != NULL) {
-            callbacks.mtu_size_changed(connection_info.payload_mtu_size);
-        }
+        connection_info.conn_params.mtu_size = bt_gatt_get_mtu(conn) - 3;
+        k_work_submit_to_queue(connection_info.ble_work_q_lp, &mtu_change_work);
     }
 }
 
@@ -406,15 +413,11 @@ static void on_le_param_updated(struct bt_conn *conn, uint16_t interval,
     __ASSERT_NO_MSG(conn == connection_info.conn);
     ARG_UNUSED(conn);
 
-    LOG_INF("PARAMS updated");
-
     connection_info.conn_params.interval = interval;
     connection_info.conn_params.latency = latency;
     connection_info.conn_params.timeout = timeout;
 
-    int ret = k_work_submit_to_queue(connection_info.ble_work_q_lp,
-                                     &param_updated_work);
-    LOG_DBG("Submission to queue yielded %d", ret);
+    k_work_submit_to_queue(connection_info.ble_work_q_lp, &param_updated_work);
 }
 
 BT_CONN_CB_DEFINE(conn_cb) = {
