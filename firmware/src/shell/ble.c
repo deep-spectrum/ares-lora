@@ -303,12 +303,27 @@ static int cmd_disconnect(const struct shell *sh, size_t argc, char **argv) {
 
 #define BLE_DISCONNECT_HELP "Terminate BLE connection"
 
+static int cmd_phy(const struct shell *sh, size_t argc, char **argv,
+                   void *data) {
+    enum le_phy phy = (int)data;
+    int ret = ares_ble_update_phy(phy);
+    shell_print(sh, "Update PHY returned: %d", ret);
+    return 0;
+}
+
+SHELL_SUBCMD_DICT_SET_CREATE(sub_phy, cmd_phy, (1M, LE_PHY_1M, "1M PHY"),
+                             (2M, LE_PHY_2M, "2M PHY"),
+                             (S2, LE_PHY_CODED_S2, "Coded S=2 PHY"),
+                             (S8, LE_PHY_CODED_S8, "Coded S=8 PHY"));
+
+#define PHY_HELP "Determine what PHY to use"
+
 SHELL_STATIC_SUBCMD_SET_CREATE(
     sub_ble, SHELL_CMD(state, &sub_state, BLE_STATE_HELP, NULL),
     SHELL_CMD(config_resp, &sub_send_config, BLE_CONFIG_RESP_HELP, NULL),
     SHELL_CMD(send_neighbors, NULL, BLE_SEND_NEIGHBOR_HELP,
               cmd_send_neighbor_list),
     SHELL_CMD(disconnect, NULL, BLE_DISCONNECT_HELP, cmd_disconnect),
-    SHELL_SUBCMD_SET_END, );
+    SHELL_CMD(phy, &sub_phy, PHY_HELP, NULL), SHELL_SUBCMD_SET_END, );
 
 SHELL_CMD_REGISTER(ble, &sub_ble, "BLE commands", NULL);

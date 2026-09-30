@@ -22,6 +22,8 @@ enum le_phy {
     LE_PHY_2M,       ///< 2Mbps
     LE_PHY_CODED_S2, ///< Coded PHY S=2
     LE_PHY_CODED_S8, ///< Coded PHY S=8
+    LE_PHY_CODED,    ///< Prefer Coded, but no preference on S.
+    LE_PHY_NONE,     ///< No preference.
 };
 
 /**
@@ -181,6 +183,16 @@ int ares_disconnect_ble(void);
  * @return 0 on success.
  */
 int ares_set_ble_node(uint32_t node_id);
+
+/**
+ * Update the connection PHY.
+ *
+ * @param[in] phy The PHY to use.
+ *
+ * @return 0 on success.
+ * @return negative error code otherwise.
+ */
+int ares_ble_update_phy(enum le_phy phy);
 
 /**
  * Send a response to a configuration read request.

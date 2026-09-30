@@ -103,6 +103,9 @@ struct ble_conn_info {
 
 static char adv_name[16] = "Ares";
 
+K_MUTEX_DEFINE(pref_phy_mtx);
+static enum le_phy preferred_phy = LE_PHY_CODED_S2;
+
 static const struct bt_le_adv_param *adv_param = BT_LE_ADV_PARAM(
     (BT_LE_ADV_OPT_CONN | BT_LE_ADV_OPT_USE_IDENTITY), 800, 801, NULL);
 
@@ -192,13 +195,22 @@ K_WORK_DEFINE(connected_work, connected_work_handler);
 static void param_update_work_handler(struct k_work *work) {
     ARG_UNUSED(work);
 
-    if (callbacks.connection_param_updated) {
+    if (callbacks.connection_param_updated != NULL) {
         callbacks.connection_param_updated(connection_info.conn_params.interval,
                                            connection_info.conn_params.latency,
                                            connection_info.conn_params.timeout);
     }
 }
 K_WORK_DEFINE(param_updated_work, param_update_work_handler);
+
+static void phy_update_work_handler(struct k_work *work) {
+    ARG_UNUSED(work);
+
+    if (callbacks.phy_updated != NULL) {
+        callbacks.phy_updated(connection_info.conn_params.phy);
+    }
+}
+K_WORK_DEFINE(phy_update_work, phy_update_work_handler);
 
 static void adv_work_handler(struct k_work *work) {
     ARG_UNUSED(work);
@@ -248,6 +260,103 @@ static void update_mtu(struct bt_conn *conn) {
     }
 }
 
+static int update_phy(struct bt_conn *conn) {
+    int err;
+    struct bt_conn_le_phy_param preferred_phy_param = {
+        .pref_rx_phy = BT_GAP_LE_PHY_NONE,
+        .pref_tx_phy = BT_GAP_LE_PHY_NONE,
+        .options = BT_CONN_LE_PHY_OPT_NONE,
+    };
+
+    LOG_INF("Attempting to Update PHY");
+
+    err = k_mutex_lock(&pref_phy_mtx, K_USEC(10));
+    if (err < 0) {
+        return err;
+    }
+
+    switch (preferred_phy) {
+    case LE_PHY_1M: {
+        LOG_DBG("Attempting to update to 1M");
+        preferred_phy_param.pref_rx_phy = BT_GAP_LE_PHY_1M;
+        preferred_phy_param.pref_tx_phy = BT_GAP_LE_PHY_1M;
+        break;
+    }
+    case LE_PHY_2M: {
+        LOG_DBG("Attempting to update to 2M");
+        preferred_phy_param.pref_rx_phy = BT_GAP_LE_PHY_2M;
+        preferred_phy_param.pref_tx_phy = BT_GAP_LE_PHY_2M;
+        break;
+    }
+    case LE_PHY_CODED_S2: {
+        LOG_DBG("Attempting to update to Coded S=2");
+        preferred_phy_param.pref_rx_phy = BT_GAP_LE_PHY_CODED;
+        preferred_phy_param.pref_tx_phy = BT_GAP_LE_PHY_CODED;
+        preferred_phy_param.options = BT_CONN_LE_PHY_OPT_CODED_S2;
+        break;
+    }
+    case LE_PHY_CODED_S8: {
+        LOG_DBG("Attempting to update to Coded S=8");
+        preferred_phy_param.pref_rx_phy = BT_GAP_LE_PHY_CODED;
+        preferred_phy_param.pref_tx_phy = BT_GAP_LE_PHY_CODED;
+        preferred_phy_param.options = BT_CONN_LE_PHY_OPT_CODED_S8;
+        break;
+    }
+    case LE_PHY_CODED: {
+        LOG_DBG("Attempting to update to Coded with no codfing preference");
+        preferred_phy_param.pref_rx_phy = BT_GAP_LE_PHY_CODED;
+        preferred_phy_param.pref_tx_phy = BT_GAP_LE_PHY_CODED;
+        break;
+    }
+    default: {
+        LOG_DBG("Attempting to indicate no preference");
+        // nop
+        break;
+    }
+    }
+    k_mutex_unlock(&pref_phy_mtx);
+
+    LOG_INF("Now updating PHY");
+    err = bt_conn_le_phy_update(conn, &preferred_phy_param);
+    if (err < 0) {
+        LOG_DBG("Failed to update: %d", err);
+    }
+
+    return err;
+}
+
+static void on_le_phy_updated(struct bt_conn *conn,
+                              struct bt_conn_le_phy_info *param) {
+    __ASSERT_NO_MSG(conn == connection_info.conn);
+    ARG_UNUSED(conn);
+    LOG_DBG("PHY Updated (TX: %d, RX: %d)", param->tx_phy, param->rx_phy);
+
+    switch (param->tx_phy) {
+    case BT_CONN_LE_TX_POWER_PHY_1M: {
+        connection_info.conn_params.phy = LE_PHY_1M;
+        break;
+    }
+    case BT_CONN_LE_TX_POWER_PHY_2M: {
+        connection_info.conn_params.phy = LE_PHY_2M;
+        break;
+    }
+    case BT_CONN_LE_TX_POWER_PHY_CODED_S2: {
+        connection_info.conn_params.phy = LE_PHY_CODED_S2;
+        break;
+    }
+    case BT_CONN_LE_TX_POWER_PHY_CODED_S8: {
+        connection_info.conn_params.phy = LE_PHY_CODED_S8;
+        break;
+    }
+    default: {
+        connection_info.conn_params.phy = LE_PHY_NONE;
+        break;
+    }
+    }
+
+    k_work_submit_to_queue(connection_info.ble_work_q_lp, &phy_update_work);
+}
+
 static void on_connected(struct bt_conn *conn, uint8_t bt_err) {
     int err;
     struct bt_conn_info info;
@@ -258,7 +367,6 @@ static void on_connected(struct bt_conn *conn, uint8_t bt_err) {
     }
 
     connection_info.conn = bt_conn_ref(conn);
-    atomic_set_bit(&connection_info.state, BLE_CONNECTED);
     atomic_clear_bit(&connection_info.state, BLE_ADVERTISING);
 
     err = bt_conn_get_info(conn, &info);
@@ -269,7 +377,10 @@ static void on_connected(struct bt_conn *conn, uint8_t bt_err) {
 
     k_work_submit_to_queue(connection_info.ble_work_q_lp, &connected_work);
 
+    update_phy(conn);
     update_mtu(conn);
+
+    atomic_set_bit(&connection_info.state, BLE_CONNECTED);
 }
 
 static void on_disconnected(struct bt_conn *conn, uint8_t reason) {
@@ -295,11 +406,15 @@ static void on_le_param_updated(struct bt_conn *conn, uint16_t interval,
     __ASSERT_NO_MSG(conn == connection_info.conn);
     ARG_UNUSED(conn);
 
+    LOG_INF("PARAMS updated");
+
     connection_info.conn_params.interval = interval;
     connection_info.conn_params.latency = latency;
     connection_info.conn_params.timeout = timeout;
 
-    k_work_submit_to_queue(connection_info.ble_work_q_lp, &param_updated_work);
+    int ret = k_work_submit_to_queue(connection_info.ble_work_q_lp,
+                                     &param_updated_work);
+    LOG_DBG("Submission to queue yielded %d", ret);
 }
 
 BT_CONN_CB_DEFINE(conn_cb) = {
@@ -307,6 +422,7 @@ BT_CONN_CB_DEFINE(conn_cb) = {
     .disconnected = on_disconnected,
     .recycled = recycled_cb,
     .le_param_updated = on_le_param_updated,
+    .le_phy_updated = on_le_phy_updated,
 };
 
 static void config_response_indicate_callback(struct bt_conn *conn, uint8_t err,
@@ -570,6 +686,21 @@ int ares_set_ble_node(uint32_t node_id) {
     k_sem_give(&connection_info.adv_name_sem);
 
     return 0;
+}
+
+int ares_ble_update_phy(enum le_phy phy) {
+    int ret = 0;
+    k_mutex_lock(&pref_phy_mtx, K_FOREVER);
+
+    preferred_phy = phy;
+
+    if (atomic_test_bit(&connection_info.state, BLE_CONNECTED)) {
+        ret = update_phy(connection_info.conn);
+    }
+
+    k_mutex_unlock(&pref_phy_mtx);
+
+    return ret;
 }
 
 #define ARES_BLE_CHECK_MSG_LEN(ret, len, type)                                 \
