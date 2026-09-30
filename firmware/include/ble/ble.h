@@ -94,26 +94,6 @@ struct ares_ble_callbacks {
      */
     void (*subscription_update)(uint32_t subscriptions);
 
-    // /**
-    //  * Indication that the config response attribute was
-    //  subscribed/unsubscribed
-    //  * to.
-    //  *
-    //  * @param[in] enabled `true` if subscribed to, `false` if unsubscribed
-    //  from.
-    //  */
-    // void (*config_response_enabled)(bool enabled);
-    //
-    // /**
-    //  * Indication that the neighbor state attribute was
-    //  subscribed/unsubscribed
-    //  * to.
-    //  *
-    //  * @param[in] enabled `true` if subscribed to, `false` if unsubscribed
-    //  from.
-    //  */
-    // void (*neighbor_state_enabled)(bool enabled);
-
     /**
      * Notification for a configuration change.
      *

@@ -224,6 +224,10 @@ static ssize_t write_config_read(struct bt_conn *conn,
     ssize_t ret = write_config_common(conn, attr, len, offset,
                                       sizeof(enum ares_srv_configs));
 
+    if (!atomic_test_bit(&ctx->state, ARES_CONFIG_RESP_ENABLED)) {
+        ret = BT_GATT_ERR(BT_ATT_ERR_WRITE_REQ_REJECTED);
+    }
+
     if (ctx->ares_service_cb.config_read != NULL &&
         ret == BT_GATT_ERR(BT_ATT_ERR_NOT_SUPPORTED)) {
         enum ares_srv_configs config = *((enum ares_srv_configs *)buf);
