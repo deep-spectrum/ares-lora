@@ -99,12 +99,14 @@ struct ble_conn_info {
         uint16_t mtu_size;
         enum le_phy phy;
     } conn_params;
+
+    atomic_t subscriptions;
 };
 
 static char adv_name[16] = "Ares";
 
 K_MUTEX_DEFINE(pref_phy_mtx);
-static enum le_phy preferred_phy = LE_PHY_CODED_S2;
+static enum le_phy preferred_phy = LE_PHY_1M;
 
 static const struct bt_le_adv_param *adv_param = BT_LE_ADV_PARAM(
     (BT_LE_ADV_OPT_CONN | BT_LE_ADV_OPT_USE_IDENTITY), 800, 801, NULL);
@@ -221,6 +223,16 @@ static void mtu_update_work_handler(struct k_work *work) {
 }
 K_WORK_DEFINE(mtu_change_work, mtu_update_work_handler);
 
+static void subscription_changed_work_handler(struct k_work *work) {
+    ARG_UNUSED(work);
+
+    if (callbacks.subscription_update != NULL) {
+        uint32_t states = atomic_get(&connection_info.subscriptions);
+        callbacks.subscription_update(states);
+    }
+}
+K_WORK_DEFINE(subscription_changed_work, subscription_changed_work_handler);
+
 static void adv_work_handler(struct k_work *work) {
     ARG_UNUSED(work);
     int err;
@@ -274,8 +286,6 @@ static int update_phy(struct bt_conn *conn) {
         .pref_tx_phy = BT_GAP_LE_PHY_NONE,
         .options = BT_CONN_LE_PHY_OPT_NONE,
     };
-
-    LOG_INF("Attempting to Update PHY");
 
     err = k_mutex_lock(&pref_phy_mtx, K_USEC(10));
     if (err < 0) {
@@ -561,6 +571,32 @@ static void start_handler(struct bt_conn *conn, uint32_t delay) {
     callbacks.start(delay);
 }
 
+static void config_response_ind_enabled(bool enabled) {
+    if (enabled) {
+        atomic_set_bit(&connection_info.subscriptions,
+                       ARES_SUBSCRIPTION_CONFIG_RESP_BIT);
+    } else {
+        atomic_clear_bit(&connection_info.subscriptions,
+                         ARES_SUBSCRIPTION_CONFIG_RESP_BIT);
+    }
+
+    k_work_submit_to_queue(connection_info.ble_work_q_lp,
+                           &subscription_changed_work);
+}
+
+static void neighbor_updates_enabled(bool enabled) {
+    if (enabled) {
+        atomic_set_bit(&connection_info.subscriptions,
+                       ARES_SUBSCRIPTION_NEIGHBOR_UPDATES_BIT);
+    } else {
+        atomic_clear_bit(&connection_info.subscriptions,
+                         ARES_SUBSCRIPTION_NEIGHBOR_UPDATES_BIT);
+    }
+
+    k_work_submit_to_queue(connection_info.ble_work_q_lp,
+                           &subscription_changed_work);
+}
+
 static void initialize_workq(void) {
 #if IS_ENABLED(CONFIG_ARES_BLE_WORKQ)
     struct k_work_queue_config workq_config = {
@@ -588,6 +624,8 @@ int ares_init_ble(const struct ares_ble_init_data *init_data) {
         .config_read = config_read_handler,
         .config_response_ind_cb = config_response_indicate_callback,
         .start = start_handler,
+        .config_response_ind_enabled = config_response_ind_enabled,
+        .neighbor_state_enabled = neighbor_updates_enabled,
     };
 
     int err;
@@ -608,9 +646,6 @@ int ares_init_ble(const struct ares_ble_init_data *init_data) {
     callbacks = init_data->cb;
 
     k_sem_init(&connection_info.adv_name_sem, 1, 1);
-
-    service_cb.config_response_ind_enabled = callbacks.config_response_enabled;
-    service_cb.neighbor_state_enabled = callbacks.neighbor_state_enabled;
 
     bt_ares_srv_init(&service_cb);
 

@@ -96,11 +96,15 @@ static void config_request(uint32_t config) {
     LOG_INF("Configuration requested: %" PRIu32, config);
 }
 
-static void config_response_enabled(bool enabled) {
-    LOG_INF("config_response_enabled: {Thread Name: %s, Thread Prio: %d}",
+static void subscriptions_changed(uint32_t subscriptions) {
+    LOG_INF("subscriptions_changed: {Thread Name: %s, Thread Prio: %d}",
             k_thread_name_get(k_current_get()),
             k_thread_priority_get(k_current_get()));
-    LOG_INF("Configuration response: %s", enabled ? "on" : "off");
+    LOG_INF("Configuration response: %s",
+            (subscriptions & ARES_SUBSCRIPTION_CONFIG_RESP) ? "on" : "off");
+    LOG_INF("Neighbor state: %s",
+            (subscriptions & ARES_SUBSCRIPTION_NEIGHBOR_UPDATES) ? "on"
+                                                                 : "off");
 }
 
 static void connection_param_update(uint16_t interval, uint16_t latency,
@@ -110,13 +114,6 @@ static void connection_param_update(uint16_t interval, uint16_t latency,
             k_thread_priority_get(k_current_get()));
     LOG_INF("Interval: %" PRIu16 ", Latency: %" PRIu16 ", Timeout: %" PRIu16,
             interval, latency, timeout);
-}
-
-static void neighbor_state_enabled(bool enabled) {
-    LOG_INF("neighbor_state_enabled: {Thread Name: %s, Thread Prio: %d}",
-            k_thread_name_get(k_current_get()),
-            k_thread_priority_get(k_current_get()));
-    LOG_INF("Neighbor state: %s", enabled ? "on" : "off");
 }
 
 static void phy_update(enum le_phy phy) {
@@ -167,12 +164,11 @@ static int initialize_ble(void) {
                 .config_update = config_update,
                 .description_update = description_update,
                 .config_request = config_request,
-                .config_response_enabled = config_response_enabled,
+                .subscription_update = subscriptions_changed,
                 .connected = connected,
                 .connection_param_updated = connection_param_update,
                 .disconnected = disconnected,
                 .mtu_size_changed = mtu_changed,
-                .neighbor_state_enabled = neighbor_state_enabled,
                 .phy_updated = phy_update,
                 .send_config_response_error = send_config_resp_err,
                 .start = start,

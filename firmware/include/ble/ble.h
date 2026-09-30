@@ -27,6 +27,27 @@ enum le_phy {
 };
 
 /**
+ * Subscription status flags.
+ */
+enum ares_subscription {
+    ARES_SUBSCRIPTION_CONFIG_RESP_BIT = 0,
+    ARES_SUBSCRIPTION_NEIGHBOR_UPDATES_BIT = 1,
+
+    /**
+     * @brief Flag indicating the configuration response attribute subscription
+     * status.
+     */
+    ARES_SUBSCRIPTION_CONFIG_RESP = BIT(ARES_SUBSCRIPTION_CONFIG_RESP_BIT),
+
+    /**
+     * @brief Flag indicating the neighbor updates attribute subscription
+     * status.
+     */
+    ARES_SUBSCRIPTION_NEIGHBOR_UPDATES =
+        BIT(ARES_SUBSCRIPTION_NEIGHBOR_UPDATES_BIT),
+};
+
+/**
  * @struct ares_ble_callbacks
  * @brief Callbacks for the ble module.
  */
@@ -66,20 +87,32 @@ struct ares_ble_callbacks {
     void (*phy_updated)(enum le_phy phy);
 
     /**
-     * Indication that the config response attribute was subscribed/unsubscribed
-     * to.
+     * Indication that the subscription attributes have been updated (subscribed
+     * or unsubscribe to).
      *
-     * @param[in] enabled `true` if subscribed to, `false` if unsubscribed from.
+     * @param[in] subscriptions Bitfield of the subscription statuses.
      */
-    void (*config_response_enabled)(bool enabled);
+    void (*subscription_update)(uint32_t subscriptions);
 
-    /**
-     * Indication that the neighbor state attribute was subscribed/unsubscribed
-     * to.
-     *
-     * @param[in] enabled `true` if subscribed to, `false` if unsubscribed from.
-     */
-    void (*neighbor_state_enabled)(bool enabled);
+    // /**
+    //  * Indication that the config response attribute was
+    //  subscribed/unsubscribed
+    //  * to.
+    //  *
+    //  * @param[in] enabled `true` if subscribed to, `false` if unsubscribed
+    //  from.
+    //  */
+    // void (*config_response_enabled)(bool enabled);
+    //
+    // /**
+    //  * Indication that the neighbor state attribute was
+    //  subscribed/unsubscribed
+    //  * to.
+    //  *
+    //  * @param[in] enabled `true` if subscribed to, `false` if unsubscribed
+    //  from.
+    //  */
+    // void (*neighbor_state_enabled)(bool enabled);
 
     /**
      * Notification for a configuration change.
