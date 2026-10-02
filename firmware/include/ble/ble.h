@@ -15,6 +15,39 @@
 #include <zephyr/kernel.h>
 
 /**
+ * Available LE PHYs.
+ */
+enum le_phy {
+    LE_PHY_1M,       ///< 1Mbps
+    LE_PHY_2M,       ///< 2Mbps
+    LE_PHY_CODED_S2, ///< Coded PHY S=2
+    LE_PHY_CODED_S8, ///< Coded PHY S=8
+    LE_PHY_CODED,    ///< Prefer Coded, but no preference on S.
+    LE_PHY_NONE,     ///< No preference.
+};
+
+/**
+ * Subscription status flags.
+ */
+enum ares_subscription {
+    ARES_SUBSCRIPTION_CONFIG_RESP_BIT = 0,
+    ARES_SUBSCRIPTION_NEIGHBOR_UPDATES_BIT = 1,
+
+    /**
+     * @brief Flag indicating the configuration response attribute subscription
+     * status.
+     */
+    ARES_SUBSCRIPTION_CONFIG_RESP = BIT(ARES_SUBSCRIPTION_CONFIG_RESP_BIT),
+
+    /**
+     * @brief Flag indicating the neighbor updates attribute subscription
+     * status.
+     */
+    ARES_SUBSCRIPTION_NEIGHBOR_UPDATES =
+        BIT(ARES_SUBSCRIPTION_NEIGHBOR_UPDATES_BIT),
+};
+
+/**
  * @struct ares_ble_callbacks
  * @brief Callbacks for the ble module.
  */
@@ -37,18 +70,69 @@ struct ares_ble_callbacks {
     void (*mtu_size_changed)(size_t new_mtu);
 
     /**
-     * Indication that the chunks attribute was subscribed/unsubscribed to.
+     * Indication that the connection parameters have been changed.
      *
-     * @param[in] enabled `true` if subscribed to, `false` if unsubscribed from.
+     * @param[in] interval The connection interval.
+     * @param[in] latency The connection latency.
+     * @param[in] timeout The supervisor timeout.
      */
-    void (*chunks_enabled)(bool enabled);
+    void (*connection_param_updated)(uint16_t interval, uint16_t latency,
+                                     uint16_t timeout);
 
     /**
-     * Indication that the image attribute was subscribed/unsubscribed to.
+     * Indication that the PHY of the connection has changed.
      *
-     * @param[in] enabled `true` if subscribed to, `false` if unsubscribed from.
+     * @param[in] phy The new PHY of the connection.
      */
-    void (*image_enabled)(bool enabled);
+    void (*phy_updated)(enum le_phy phy);
+
+    /**
+     * Indication that the subscription attributes have been updated (subscribed
+     * or unsubscribe to).
+     *
+     * @param[in] subscriptions Bitfield of the subscription statuses.
+     */
+    void (*subscription_update)(uint32_t subscriptions);
+
+    /**
+     * Notification for a configuration change.
+     *
+     * @param[in] type The configuration type.
+     * @param[in] value The new value of the configuration.
+     */
+    void (*config_update)(uint32_t type, uint64_t value);
+
+    /**
+     * Notification that the description changed.
+     *
+     * @param[in] buf The buffer that stores the new description.
+     * @param[in] len The length of the buffer.
+     */
+    void (*description_update)(const uint8_t *buf, size_t len);
+
+    /**
+     * Notification that the central device is requesting a configuration.
+     *
+     * @param[in] type The configuration being requested.
+     */
+    void (*config_request)(uint32_t type);
+
+    /**
+     * Notification that the run is ready to be started.
+     *
+     * @param[in] start_delay The amount of seconds to schedule out the start
+     * time by.
+     */
+    void (*start)(uint32_t start_delay);
+
+    /**
+     * Config read response indication error handler.
+     *
+     * @param[in] err The ATT error code.
+     *
+     * @note This is only called on ATT errors.
+     */
+    void (*send_config_response_error)(uint8_t err);
 };
 
 /**
@@ -114,22 +198,36 @@ int ares_disconnect_ble(void);
 int ares_set_ble_node(uint32_t node_id);
 
 /**
- * Tell the central device how many chunks are about to be transferred.
+ * Update the connection PHY.
  *
- * @param[in] chunks The number of chunks that need to be transferred.
+ * @param[in] phy The PHY to use.
  *
  * @return 0 on success.
+ * @return negative error code otherwise.
  */
-int ares_ble_indicate_chunks(uint64_t chunks);
+int ares_ble_update_phy(enum le_phy phy);
 
 /**
- * Send a chunk to the central device.
+ * Send a response to a configuration read request.
  *
- * @param[in] chunk Pointer to the first byte in the chunk.
- * @param[in] num_bytes The number of bytes in the chunk.
+ * @param[in] type The configuration type.
+ * @param[in] config The config data.
+ * @param[in] len The length of the config data.
  *
  * @return 0 on success.
  */
-int ares_ble_send_chunk(const uint8_t *chunk, size_t num_bytes);
+int ares_send_config_response(uint32_t type, const void *config, size_t len);
+
+/**
+ * Send neighbor state information over BLE.
+ *
+ * @param[in] num_neighbors The number of neighbors.
+ * @param[in] data The neighbor information.
+ * @param[in] len The length of the neighbor information.
+ *
+ * @return 0 on success.
+ */
+int ares_send_neighbor_states(uint8_t num_neighbors, const void *data,
+                              size_t len);
 
 #endif // ARES_BLE_H

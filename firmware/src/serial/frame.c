@@ -103,12 +103,23 @@ static size_t calculate_frame_length(const struct ares_frame *frame) {
         break;
     }
     case ARES_FRAME_BLE_CONNECTED: {
-        payload_len = FSIZEOF_FIELD(BLE_CONNECTED.connected) +
-                      FSIZEOF_FIELD(BLE_CONNECTED.mtu_size);
+        payload_len = FSIZEOF_FIELD(BLE_CONNECTED);
         break;
     }
     case ARES_FRAME_BLE_SUBSCRIBED: {
         payload_len = FSIZEOF_FIELD(BLE_SUBSCRIBED);
+        break;
+    }
+    case ARES_FRAME_BLE_CONN_PARAMS: {
+        payload_len = FSIZEOF_FIELD(BLE_CONN_PARAMS.mtu) +
+                      FSIZEOF_FIELD(BLE_CONN_PARAMS.interval) +
+                      FSIZEOF_FIELD(BLE_CONN_PARAMS.latency) +
+                      FSIZEOF_FIELD(BLE_CONN_PARAMS.timeout) +
+                      FSIZEOF_FIELD(BLE_CONN_PARAMS.phy);
+        break;
+    }
+    case ARES_FRAME_BLE_ATT_ERR: {
+        payload_len = FSIZEOF_FIELD(BLE_ATT_ERR);
         break;
     }
     case ARES_FRAME_LORA_ACK: {
@@ -142,6 +153,19 @@ static size_t calculate_frame_length(const struct ares_frame *frame) {
             FSIZEOF_FIELD(NODE_READY.id) + FSIZEOF_FIELD(NODE_READY.flags);
         break;
     }
+    case ARES_FRAME_BLE_NODE_CONFIG: {
+        payload_len = FSIZEOF_FIELD(BLE_NODE_CONFIG.type) +
+                      frame->payload.BLE_NODE_CONFIG.data_len;
+        break;
+    }
+    case ARES_FRAME_BLE_CONFIG_REQUEST: {
+        payload_len = FSIZEOF_FIELD(BLE_CONFIG_REQUEST);
+        break;
+    }
+    case ARES_FRAME_BLE_START: {
+        payload_len = FSIZEOF_FIELD(BLE_START);
+        break;
+    }
     default: {
         __ASSERT(false, "Invalid frame type received");
         break;
@@ -153,7 +177,7 @@ static size_t calculate_frame_length(const struct ares_frame *frame) {
 
 #define Z_FSERIALIZE_LEN(field, len)                                           \
     do {                                                                       \
-        (void)memcpy(payload, &frame.payload.field, (len));                    \
+        (void)memcpy(payload, &frame->payload.field, (len));                   \
         payload += (len);                                                      \
     } while (0)
 #define Z_FSERIALIZE_FIELD(field)                                              \
@@ -263,12 +287,23 @@ static void serialize(uint8_t *buf, const struct ares_frame *frame,
         break;
     }
     case ARES_FRAME_BLE_CONNECTED: {
-        FSERIALIZE(BLE_CONNECTED.connected);
-        FSERIALIZE(BLE_CONNECTED.mtu_size);
+        FSERIALIZE(BLE_CONNECTED);
         break;
     }
     case ARES_FRAME_BLE_SUBSCRIBED: {
         FSERIALIZE(BLE_SUBSCRIBED);
+        break;
+    }
+    case ARES_FRAME_BLE_CONN_PARAMS: {
+        FSERIALIZE(BLE_CONN_PARAMS.mtu);
+        FSERIALIZE(BLE_CONN_PARAMS.interval);
+        FSERIALIZE(BLE_CONN_PARAMS.latency);
+        FSERIALIZE(BLE_CONN_PARAMS.timeout);
+        FSERIALIZE(BLE_CONN_PARAMS.phy);
+        break;
+    }
+    case ARES_FRAME_BLE_ATT_ERR: {
+        FSERIALIZE(BLE_ATT_ERR);
         break;
     }
     case ARES_FRAME_LORA_ACK: {
@@ -301,6 +336,20 @@ static void serialize(uint8_t *buf, const struct ares_frame *frame,
     case ARES_FRAME_NODE_READY: {
         FSERIALIZE(NODE_READY.flags);
         FSERIALIZE(NODE_READY.id);
+        break;
+    }
+    case ARES_FRAME_BLE_NODE_CONFIG: {
+        FSERIALIZE(BLE_NODE_CONFIG.type);
+        FSERIALIZE_PTR(BLE_NODE_CONFIG.data,
+                       frame->payload.BLE_NODE_CONFIG.data_len);
+        break;
+    }
+    case ARES_FRAME_BLE_CONFIG_REQUEST: {
+        FSERIALIZE(BLE_CONFIG_REQUEST);
+        break;
+    }
+    case ARES_FRAME_BLE_START: {
+        FSERIALIZE(BLE_START);
         break;
     }
     default:
@@ -439,15 +488,6 @@ static void deserialize(struct ares_frame *frame, const uint8_t *buf) {
         // nop: Nothing to deserialize.
         break;
     }
-    case ARES_FRAME_BLE_CHUNKS: {
-        FDESERIALIZE(BLE_CHUNKS);
-        break;
-    }
-    case ARES_FRAME_BLE_IMAGE_CHUNK: {
-        FDESERIALIZE_BUF(BLE_IMAGE_CHUNK.buf, const uint8_t *,
-                         BLE_IMAGE_CHUNK.len);
-        break;
-    }
     case ARES_FRAME_REBOOT: {
         FDESERIALIZE(REBOOT);
         break;
@@ -482,6 +522,18 @@ static void deserialize(struct ares_frame *frame, const uint8_t *buf) {
     case ARES_FRAME_NODE_READY: {
         FDESERIALIZE(NODE_READY.flags);
         FDESERIALIZE(NODE_READY.id);
+        break;
+    }
+    case ARES_FRAME_BLE_NODE_CONFIG: {
+        FDESERIALIZE(BLE_NODE_CONFIG.type);
+        FDESERIALIZE_BUF(BLE_NODE_CONFIG.data, void *,
+                         BLE_NODE_CONFIG.data_len);
+        break;
+    }
+    case ARES_FRAME_BLE_NEIGHBOR_UPDATE: {
+        FDESERIALIZE(BLE_NEIGHBOR_UPDATE.num_neighbors);
+        FDESERIALIZE_BUF(BLE_NEIGHBOR_UPDATE.neighbor_data, void *,
+                         BLE_NEIGHBOR_UPDATE.neighbor_data_len);
         break;
     }
     default: {

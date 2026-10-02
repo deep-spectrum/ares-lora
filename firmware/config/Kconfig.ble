@@ -1,0 +1,7 @@
+menu "BLE Configurations"
+
+module = BLE_APP
+module-str = BLE Application
+source "subsys/logging/Kconfig.template.log_config"
+
+endmenu # BLE Configurations

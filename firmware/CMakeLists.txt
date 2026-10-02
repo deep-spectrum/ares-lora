@@ -31,4 +31,9 @@ set(BLE_SRC
         src/ble/services/ares_service.c
 )
 
+set(SHELL_SRC
+        src/shell/ble.c
+)
+
 target_sources(app PRIVATE ${SRC} ${SERIAL_SRC} ${LORA_SRC} ${BLE_SRC})
+target_sources_ifdef(CONFIG_SHELL app PRIVATE ${SHELL_SRC})

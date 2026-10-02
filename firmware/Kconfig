@@ -7,6 +7,8 @@ rsource "config/Kconfig.serial"
 
 rsource "config/Kconfig.lora"
 
+rsource "config/Kconfig.ble"
+
 endmenu  # Application Configurations
 
 source "samples/subsys/usb/common/Kconfig.sample_usbd"
