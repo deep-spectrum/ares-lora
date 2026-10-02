@@ -103,6 +103,9 @@ enum ares_srv_configs {
     ARES_CONFIG_DESCRIPTION,
 
     ARES_CONFIG_INVALID,
+    // Reserved configs
+    ARES_CONFIG_RESERVED_GET,
+    ARES_CONFIG_RESERVED_START,
 };
 
 enum ares_srv_write_response {
@@ -181,7 +184,8 @@ struct ares_service_cb {
      *
      * @note The response should be carried out with the response indication.
      */
-    void (*config_read)(struct bt_conn *conn, enum ares_srv_configs config);
+    enum ares_srv_write_response (*config_read)(struct bt_conn *conn,
+                                                enum ares_srv_configs config);
 
     /**
      * @brief Callback for indicating that the config response has been
@@ -210,7 +214,7 @@ struct ares_service_cb {
      * @param[in] conn Pointer to the bt_conn instance the write occurred on.
      * @param[in] delay Number of seconds into the future.
      */
-    void (*start)(struct bt_conn *conn, uint32_t delay);
+    enum ares_srv_write_response (*start)(struct bt_conn *conn, uint32_t delay);
 
     /**
      * @brief Callback for indicating that the neighbor state characteristic has

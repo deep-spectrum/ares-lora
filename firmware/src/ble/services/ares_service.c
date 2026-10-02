@@ -233,8 +233,8 @@ static ssize_t write_config_read(struct bt_conn *conn,
         enum ares_srv_configs config = *((enum ares_srv_configs *)buf);
 
         if (config < ARES_CONFIG_INVALID) {
-            ctx->ares_service_cb.config_read(conn, config);
-            ret = len;
+            ret = process_response(
+                ctx->ares_service_cb.config_read(conn, config), len);
         } else {
             ret = BT_GATT_ERR(BT_ATT_ERR_VALUE_NOT_ALLOWED);
         }
@@ -254,8 +254,7 @@ static ssize_t write_start(struct bt_conn *conn,
     if (ctx->ares_service_cb.start != NULL &&
         ret == BT_GATT_ERR(BT_ATT_ERR_NOT_SUPPORTED)) {
         uint32_t delay = *((uint32_t *)buf);
-        ctx->ares_service_cb.start(conn, delay);
-        ret = len;
+        ret = process_response(ctx->ares_service_cb.start(conn, delay), len);
     }
 
     return ret;

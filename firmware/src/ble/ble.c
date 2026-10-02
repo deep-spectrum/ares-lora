@@ -145,8 +145,25 @@ static void write_work_handler(struct k_work *work) {
     enum ares_srv_configs config = wwork->config;
     k_sem_give(&wwork->sem);
 
-    if (callbacks.config_update != NULL) {
-        callbacks.config_update(config, value);
+    switch (wwork->config) {
+    case ARES_CONFIG_RESERVED_GET: {
+        if (callbacks.config_request != NULL) {
+            callbacks.config_request((uint32_t)value);
+        }
+        break;
+    }
+    case ARES_CONFIG_RESERVED_START: {
+        if (callbacks.start != NULL) {
+            callbacks.start((uint32_t)value);
+        }
+        break;
+    }
+    default: {
+        if (callbacks.config_update != NULL) {
+            callbacks.config_update(config, value);
+        }
+        break;
+    }
     }
 }
 
@@ -184,6 +201,10 @@ ARES_CONFIG_WRITE_WORK_DEFINE(duration_work, ARES_CONFIG_DURATION,
                               write_work_handler);
 ARES_CONFIG_WRITE_WORK_DEFINE(description_work, ARES_CONFIG_DESCRIPTION,
                               write_work_net_buf_handler);
+ARES_CONFIG_WRITE_WORK_DEFINE(config_request_work, ARES_CONFIG_RESERVED_GET,
+                              write_work_handler);
+ARES_CONFIG_WRITE_WORK_DEFINE(start_work, ARES_CONFIG_RESERVED_START,
+                              write_work_handler);
 
 static void connected_work_handler(struct k_work *work) {
     ARG_UNUSED(work);
@@ -550,25 +571,26 @@ description_update(struct bt_conn *conn, const void *buf, uint16_t len) {
     return ARES_WRITE_SUCCESS;
 }
 
-static void config_read_handler(struct bt_conn *conn,
-                                enum ares_srv_configs config) {
+static enum ares_srv_write_response
+config_read_handler(struct bt_conn *conn, enum ares_srv_configs config) {
     __ASSERT_NO_MSG(conn == connection_info.conn);
     __ASSERT_NO_MSG(atomic_test_bit(connection_info.state, BLE_INITIALIZED));
     ARG_UNUSED(conn);
     LOG_DBG("Config read thread priority: %d",
             k_thread_priority_get(k_current_get()));
 
-    callbacks.config_request(config);
+    return submit_write_work(&config_request_work, config);
 }
 
-static void start_handler(struct bt_conn *conn, uint32_t delay) {
+static enum ares_srv_write_response start_handler(struct bt_conn *conn,
+                                                  uint32_t delay) {
     __ASSERT_NO_MSG(conn == connection_info.conn);
     __ASSERT_NO_MSG(atomic_test_bit(connection_info.state, BLE_INITIALIZED));
     ARG_UNUSED(conn);
     LOG_DBG("Start thread priority: %d",
             k_thread_priority_get(k_current_get()));
 
-    callbacks.start(delay);
+    return submit_write_work(&start_work, delay);
 }
 
 static void config_response_ind_enabled(bool enabled) {
