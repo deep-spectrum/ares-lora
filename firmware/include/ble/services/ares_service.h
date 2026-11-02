@@ -141,6 +141,8 @@ struct ares_service_cb {
     enum ares_srv_write_response (*center_frequency_update)(
         struct bt_conn *conn, uint64_t center_freq);
 
+    ares_srv_desc_subscribe_update reference_level_subscribe_update;
+
     /**
      * @brief Callback for updating the reference level value.
      *
