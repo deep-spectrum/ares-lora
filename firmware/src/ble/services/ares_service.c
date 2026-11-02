@@ -16,7 +16,7 @@
 #include <zephyr/net_buf.h>
 #include <zephyr/sys/byteorder.h>
 
-LOG_MODULE_REGISTER(ares_ble_service, LOG_LEVEL_DBG);
+LOG_MODULE_REGISTER(ares_ble_service);
 
 enum {
     ARES_BW_SUBSCRIBED,
