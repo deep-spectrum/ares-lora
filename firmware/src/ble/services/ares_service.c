@@ -22,6 +22,7 @@ enum {
     ARES_BW_SUBSCRIBED,
     ARES_CENTER_FREQ_SUBSCRIBED,
     ARES_REF_LVL_SUBSCRIBED,
+    ARES_DURATION_SUBSCRIBED,
     ARES_NEIGHBOR_STATE_ENABLED,
 };
 
@@ -83,6 +84,15 @@ static void ares_srv_ref_lvl_update_cfg_changed(const struct bt_gatt_attr *attr,
     ares_srv_cfg_changed_common(
         value, srv_ctx.ares_service_cb.reference_level_subscribe_update,
         ARES_REF_LVL_SUBSCRIBED, "reference level");
+}
+
+static void
+ares_srv_duration_update_cfg_changed(const struct bt_gatt_attr *attr,
+                                     uint16_t value) {
+    ARG_UNUSED(attr);
+    ares_srv_cfg_changed_common(
+        value, srv_ctx.ares_service_cb.duration_subscribe_update,
+        ARES_DURATION_SUBSCRIBED, "duration");
 }
 
 static void
@@ -262,6 +272,10 @@ static int verify_subscription(const struct ares_srv_ctx *ctx,
         bit = ARES_REF_LVL_SUBSCRIBED;
         break;
     }
+    case ARES_CONFIG_DURATION: {
+        bit = ARES_DURATION_SUBSCRIBED;
+        break;
+    }
     default: {
         LOG_ERR("Invalid enum value encountered");
         ret = -ENOTSUP;
@@ -337,8 +351,11 @@ BT_GATT_SERVICE_DEFINE(
                            BT_GATT_PERM_WRITE, NULL, write_ref_level, &srv_ctx),
     BT_GATT_CCC(ares_srv_ref_lvl_update_cfg_changed,
                 BT_GATT_PERM_READ | BT_GATT_PERM_WRITE),
-    BT_GATT_CHARACTERISTIC(BT_UUID_ARES_SRV_DURATION, BT_GATT_CHRC_WRITE,
+    BT_GATT_CHARACTERISTIC(BT_UUID_ARES_SRV_DURATION,
+                           BT_GATT_CHRC_WRITE | BT_GATT_CHRC_INDICATE,
                            BT_GATT_PERM_WRITE, NULL, write_duration, &srv_ctx),
+    BT_GATT_CCC(ares_srv_duration_update_cfg_changed,
+                BT_GATT_PERM_READ | BT_GATT_PERM_WRITE),
     BT_GATT_CHARACTERISTIC(BT_UUID_ARES_SRV_DESCRIPTION, BT_GATT_CHRC_WRITE,
                            BT_GATT_PERM_WRITE, NULL, write_description,
                            &srv_ctx),
@@ -388,17 +405,22 @@ static int setup_config_indication(enum ares_srv_configs config,
     switch (config) {
     case ARES_CONFIG_BANDWIDTH: {
         bit = ARES_BW_SUBSCRIBED;
-        params->params.attr = &ares_srv_svc.attrs[2];
+        params->params.attr = &ares_srv_svc.attrs[0x0002];
         break;
     }
     case ARES_CONFIG_CENTER_FREQ: {
         bit = ARES_CENTER_FREQ_SUBSCRIBED;
-        params->params.attr = &ares_srv_svc.attrs[5];
+        params->params.attr = &ares_srv_svc.attrs[0x0005];
         break;
     }
     case ARES_CONFIG_REF_LEVEL: {
         bit = ARES_REF_LVL_SUBSCRIBED;
-        params->params.attr = &ares_srv_svc.attrs[8];
+        params->params.attr = &ares_srv_svc.attrs[0x0008];
+        break;
+    }
+    case ARES_CONFIG_DURATION: {
+        bit = ARES_DURATION_SUBSCRIBED;
+        params->params.attr = &ares_srv_svc.attrs[0x000B];
         break;
     }
     default: {

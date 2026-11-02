@@ -154,6 +154,8 @@ struct ares_service_cb {
     enum ares_srv_write_response (*reference_level_update)(struct bt_conn *conn,
                                                            uint64_t ref_level);
 
+    ares_srv_desc_subscribe_update duration_subscribe_update;
+
     /**
      * @brief Callback for updating the duration value.
      *
