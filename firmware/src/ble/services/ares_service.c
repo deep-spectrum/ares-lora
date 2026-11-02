@@ -19,7 +19,7 @@
 LOG_MODULE_REGISTER(ares_ble_service);
 
 enum {
-    ARES_CONFIG_RESP_ENABLED,
+    ARES_BW_SUBSCRIBED,
     ARES_NEIGHBOR_STATE_ENABLED,
 };
 
@@ -38,23 +38,21 @@ NET_BUF_POOL_DEFINE(ares_srv_tx_pool, 4, 64, 0, NULL);
 
 static struct ares_srv_ctx srv_ctx;
 
-static void
-ares_service_config_resp_cfg_changed(const struct bt_gatt_attr *attr,
-                                     uint16_t value) {
+static void ares_srv_bw_update_cfg_changed(const struct bt_gatt_attr *attr,
+                                           uint16_t value) {
     ARG_UNUSED(attr);
     bool enabled = value == BT_GATT_CCC_INDICATE;
 
-    LOG_DBG("Indication for config response has been turned %s",
-            enabled ? "on" : "off");
+    LOG_DBG("Subscribed to bandwidth indications: %d", enabled);
 
-    if (srv_ctx.ares_service_cb.config_response_ind_enabled != NULL) {
-        srv_ctx.ares_service_cb.config_response_ind_enabled(enabled);
+    if (srv_ctx.ares_service_cb.bandwidth_subscribe_update != NULL) {
+        srv_ctx.ares_service_cb.bandwidth_subscribe_update(enabled);
     }
 
     if (enabled) {
-        atomic_set_bit(&srv_ctx.state, ARES_CONFIG_RESP_ENABLED);
+        atomic_set_bit(&srv_ctx.state, ARES_BW_SUBSCRIBED);
     } else {
-        atomic_clear_bit(&srv_ctx.state, ARES_CONFIG_RESP_ENABLED);
+        atomic_clear_bit(&srv_ctx.state, ARES_BW_SUBSCRIBED);
     }
 }
 
@@ -215,6 +213,28 @@ static ssize_t write_description(struct bt_conn *conn,
     return ret;
 }
 
+static ssize_t verify_subscription(const struct ares_srv_ctx *ctx,
+                                   const void *buf) {
+    enum ares_srv_configs config = *((enum ares_srv_configs *)buf);
+    const ssize_t valid_ret = BT_GATT_ERR(BT_ATT_ERR_NOT_SUPPORTED);
+    ssize_t ret = BT_GATT_ERR(BT_ATT_ERR_WRITE_REQ_REJECTED);
+
+    switch (config) {
+    case ARES_CONFIG_BANDWIDTH: {
+        if (atomic_test_bit(&ctx->state, ARES_BW_SUBSCRIBED)) {
+            ret = valid_ret;
+        }
+        break;
+    }
+    default: {
+        LOG_ERR("Invalid enum value encountered");
+        break;
+    }
+    }
+
+    return ret;
+}
+
 static ssize_t write_config_read(struct bt_conn *conn,
                                  const struct bt_gatt_attr *attr,
                                  const void *buf, uint16_t len, uint16_t offset,
@@ -224,8 +244,8 @@ static ssize_t write_config_read(struct bt_conn *conn,
     ssize_t ret = write_config_common(conn, attr, len, offset,
                                       sizeof(enum ares_srv_configs));
 
-    if (!atomic_test_bit(&ctx->state, ARES_CONFIG_RESP_ENABLED)) {
-        ret = BT_GATT_ERR(BT_ATT_ERR_WRITE_REQ_REJECTED);
+    if (ret == BT_GATT_ERR(BT_ATT_ERR_NOT_SUPPORTED)) {
+        ret = verify_subscription(ctx, buf);
     }
 
     if (ctx->ares_service_cb.config_read != NULL &&
@@ -262,8 +282,11 @@ static ssize_t write_start(struct bt_conn *conn,
 
 BT_GATT_SERVICE_DEFINE(
     ares_srv_svc, BT_GATT_PRIMARY_SERVICE(BT_UUID_ARES_SRV),
-    BT_GATT_CHARACTERISTIC(BT_UUID_ARES_SRV_BANDWIDTH, BT_GATT_CHRC_WRITE,
+    BT_GATT_CHARACTERISTIC(BT_UUID_ARES_SRV_BANDWIDTH,
+                           BT_GATT_CHRC_WRITE | BT_GATT_CHRC_INDICATE,
                            BT_GATT_PERM_WRITE, NULL, write_bandwidth, &srv_ctx),
+    BT_GATT_CCC(ares_srv_bw_update_cfg_changed,
+                BT_GATT_PERM_READ | BT_GATT_PERM_WRITE),
     BT_GATT_CHARACTERISTIC(BT_UUID_ARES_SRV_CENTER_FREQ, BT_GATT_CHRC_WRITE,
                            BT_GATT_PERM_WRITE, NULL, write_center_frequency,
                            &srv_ctx),
@@ -277,10 +300,6 @@ BT_GATT_SERVICE_DEFINE(
     BT_GATT_CHARACTERISTIC(BT_UUID_ARES_SRV_CONFIG_READ, BT_GATT_CHRC_WRITE,
                            BT_GATT_PERM_WRITE, NULL, write_config_read,
                            &srv_ctx),
-    BT_GATT_CHARACTERISTIC(BT_UUID_ARES_SRV_CONFIG_RESP, BT_GATT_CHRC_INDICATE,
-                           BT_GATT_PERM_NONE, NULL, NULL, NULL),
-    BT_GATT_CCC(ares_service_config_resp_cfg_changed,
-                BT_GATT_PERM_READ | BT_GATT_PERM_WRITE),
     BT_GATT_CHARACTERISTIC(BT_UUID_ARES_SRV_START, BT_GATT_CHRC_WRITE,
                            BT_GATT_PERM_WRITE, NULL, write_start, &srv_ctx),
     BT_GATT_CHARACTERISTIC(BT_UUID_ARES_SRV_NEIGHBOR_STATE, BT_GATT_CHRC_NOTIFY,
@@ -298,61 +317,61 @@ int bt_ares_srv_init(const struct ares_service_cb *cb) {
     return 0;
 }
 
-static void config_response_ind_cb(struct bt_conn *conn,
-                                   struct bt_gatt_indicate_params *params,
-                                   uint8_t err) {
-    struct ares_srv_indicate_params *srv_params =
-        CONTAINER_OF(params, struct ares_srv_indicate_params, params);
-
-    LOG_DBG("Indication %s\n", err != 0U ? "fail" : "success");
-
-    if (srv_ctx.ares_service_cb.config_response_ind_cb != NULL) {
-        srv_ctx.ares_service_cb.config_response_ind_cb(conn, err,
-                                                       srv_params->user_buf);
-    }
-
-    net_buf_unref(srv_params->user_buf);
-    net_buf_unref(srv_params->buf);
-}
-
-int bt_ares_config_response(struct bt_conn *conn, struct net_buf *net_buf) {
-    struct net_buf *buf;
-    struct ares_srv_indicate_params params;
-    int ret;
-
-    if (!atomic_test_bit(&srv_ctx.state, ARES_CONFIG_RESP_ENABLED)) {
-        return -EACCES;
-    }
-
-    if (net_buf == NULL) {
-        return -EINVAL;
-    }
-
-    buf = net_buf_alloc(&ares_srv_tx_pool, K_MSEC(100));
-    if (buf == NULL) {
-        return -ENOMEM;
-    }
-
-    params.buf = buf;
-    params.user_buf = net_buf_ref(net_buf);
-    params.params.func = config_response_ind_cb;
-    params.params.destroy = NULL;
-    params.params.data = params.user_buf->data;
-    params.params.len = params.user_buf->len;
-    params.params.attr = &ares_srv_svc.attrs[14];
-    params.params.uuid = NULL;
-
-    net_buf_add_mem(buf, &params, sizeof(params));
-
-    ret = bt_gatt_indicate(
-        conn, &((struct ares_srv_indicate_params *)buf->data)->params);
-    if (ret < 0) {
-        net_buf_unref(net_buf);
-        net_buf_unref(buf);
-    }
-
-    return ret;
-}
+// static void config_response_ind_cb(struct bt_conn *conn,
+//                                    struct bt_gatt_indicate_params *params,
+//                                    uint8_t err) {
+//     struct ares_srv_indicate_params *srv_params =
+//         CONTAINER_OF(params, struct ares_srv_indicate_params, params);
+//
+//     LOG_DBG("Indication %s\n", err != 0U ? "fail" : "success");
+//
+//     if (srv_ctx.ares_service_cb.config_response_ind_cb != NULL) {
+//         srv_ctx.ares_service_cb.config_response_ind_cb(conn, err,
+//                                                        srv_params->user_buf);
+//     }
+//
+//     net_buf_unref(srv_params->user_buf);
+//     net_buf_unref(srv_params->buf);
+// }
+//
+// int bt_ares_config_response(struct bt_conn *conn, struct net_buf *net_buf) {
+//     struct net_buf *buf;
+//     struct ares_srv_indicate_params params;
+//     int ret;
+//
+//     if (!atomic_test_bit(&srv_ctx.state, ARES_CONFIG_RESP_ENABLED)) {
+//         return -EACCES;
+//     }
+//
+//     if (net_buf == NULL) {
+//         return -EINVAL;
+//     }
+//
+//     buf = net_buf_alloc(&ares_srv_tx_pool, K_MSEC(100));
+//     if (buf == NULL) {
+//         return -ENOMEM;
+//     }
+//
+//     params.buf = buf;
+//     params.user_buf = net_buf_ref(net_buf);
+//     params.params.func = config_response_ind_cb;
+//     params.params.destroy = NULL;
+//     params.params.data = params.user_buf->data;
+//     params.params.len = params.user_buf->len;
+//     params.params.attr = &ares_srv_svc.attrs[14];
+//     params.params.uuid = NULL;
+//
+//     net_buf_add_mem(buf, &params, sizeof(params));
+//
+//     ret = bt_gatt_indicate(
+//         conn, &((struct ares_srv_indicate_params *)buf->data)->params);
+//     if (ret < 0) {
+//         net_buf_unref(net_buf);
+//         net_buf_unref(buf);
+//     }
+//
+//     return ret;
+// }
 
 int bt_ares_notify_neighbor_state(struct bt_conn *conn, const void *data,
                                   size_t len) {

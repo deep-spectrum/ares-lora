@@ -59,12 +59,6 @@
     BT_UUID_128_ENCODE(0xf2765f23, 0xd570, 0x48cf, 0xa6b7, 0x985ff6af492c)
 
 /**
- * Ares config response UUID.
- */
-#define BT_UUID_ARES_SRV_CONFIG_RESP_VAL                                       \
-    BT_UUID_128_ENCODE(0xf2765f24, 0xd570, 0x48cf, 0xa6b7, 0x985ff6af492c)
-
-/**
  * Ares start UUID.
  */
 #define BT_UUID_ARES_SRV_START_VAL                                             \
@@ -89,8 +83,6 @@
     BT_UUID_DECLARE_128(BT_UUID_ARES_SRV_DESCRIPTION_VAL)
 #define BT_UUID_ARES_SRV_CONFIG_READ                                           \
     BT_UUID_DECLARE_128(BT_UUID_ARES_SRV_CONFIG_READ_VAL)
-#define BT_UUID_ARES_SRV_CONFIG_RESP                                           \
-    BT_UUID_DECLARE_128(BT_UUID_ARES_SRV_CONFIG_RESP_VAL)
 #define BT_UUID_ARES_SRV_START BT_UUID_DECLARE_128(BT_UUID_ARES_SRV_START_VAL)
 #define BT_UUID_ARES_SRV_NEIGHBOR_STATE                                        \
     BT_UUID_DECLARE_128(BT_UUID_ARES_SRV_NEIGHBOR_STATE_VAL)
@@ -116,11 +108,15 @@ enum ares_srv_write_response {
     ARES_WRITE_NO_MEM,
 };
 
+typedef void (*ares_srv_desc_subscribe_update)(bool enable);
+
 /**
  * @struct ares_service_cb
  * @brief Service callback configurations.
  */
 struct ares_service_cb {
+    ares_srv_desc_subscribe_update bandwidth_subscribe_update;
+
     /**
      * @brief Callback for updating the bandwidth value.
      *
@@ -234,22 +230,6 @@ struct ares_service_cb {
  * @return 0 if no error.
  */
 int bt_ares_srv_init(const struct ares_service_cb *cb);
-
-/**
- * @brief Send the configuration response.
- *
- * @param[in] conn Pointer to the bt_conn to send the indication on.
- * @param[in] net_buf Pointer to the network buffer that contains the data to be
- * sent.
- *
- * @return @p -EACCESS if the indication has not been subscribed to.
- * @return @p -ENOMEM if unable to allocate internal memory for indication.
- * @return @p 0 on success.
- * @return negative error code otherwise.
- *
- * @note This function will increment the reference count of the network buffer.
- */
-int bt_ares_config_response(struct bt_conn *conn, struct net_buf *net_buf);
 
 /**
  * @brief Send neighbor state information.
