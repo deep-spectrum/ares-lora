@@ -20,6 +20,7 @@ LOG_MODULE_REGISTER(ares_ble_service, LOG_LEVEL_DBG);
 
 enum {
     ARES_BW_SUBSCRIBED,
+    ARES_CENTER_FREQ_SUBSCRIBED,
     ARES_NEIGHBOR_STATE_ENABLED,
 };
 
@@ -38,22 +39,41 @@ NET_BUF_POOL_DEFINE(ares_srv_tx_pool, 4, 64, 0, NULL);
 
 static struct ares_srv_ctx srv_ctx;
 
-static void ares_srv_bw_update_cfg_changed(const struct bt_gatt_attr *attr,
-                                           uint16_t value) {
-    ARG_UNUSED(attr);
+static void ares_srv_cfg_changed_common(uint16_t value,
+                                        ares_srv_desc_subscribe_update cb,
+                                        uint8_t bit, const char *str) {
+    ARG_UNUSED(str);
     bool enabled = value == BT_GATT_CCC_INDICATE;
 
-    LOG_DBG("Subscribed to bandwidth indications: %d", enabled);
+    LOG_DBG("Indications for %s has been turned %s", str,
+            enabled ? "on" : "off");
 
-    if (srv_ctx.ares_service_cb.bandwidth_subscribe_update != NULL) {
-        srv_ctx.ares_service_cb.bandwidth_subscribe_update(enabled);
+    if (cb) {
+        cb(enabled);
     }
 
     if (enabled) {
-        atomic_set_bit(&srv_ctx.state, ARES_BW_SUBSCRIBED);
+        atomic_set_bit(&srv_ctx.state, bit);
     } else {
-        atomic_clear_bit(&srv_ctx.state, ARES_BW_SUBSCRIBED);
+        atomic_clear_bit(&srv_ctx.state, bit);
     }
+}
+
+static void ares_srv_bw_update_cfg_changed(const struct bt_gatt_attr *attr,
+                                           uint16_t value) {
+    ARG_UNUSED(attr);
+    ares_srv_cfg_changed_common(
+        value, srv_ctx.ares_service_cb.bandwidth_subscribe_update,
+        ARES_BW_SUBSCRIBED, "bandwidth");
+}
+
+static void
+ares_srv_center_freq_update_cfg_changed(const struct bt_gatt_attr *attr,
+                                        uint16_t value) {
+    ARG_UNUSED(attr);
+    ares_srv_cfg_changed_common(
+        value, srv_ctx.ares_service_cb.center_frequency_subscribe_update,
+        ARES_CENTER_FREQ_SUBSCRIBED, "center frequency");
 }
 
 static void
@@ -85,12 +105,14 @@ static ssize_t write_config_common(struct bt_conn *conn,
     LOG_DBG("Attribute write, handle: %u, conn %p", attr->handle, conn);
 
     if (len != type_size) {
-        LOG_ERR("write bandwidth: Incorecct data length. Expected %u, got %u", type_size, len);
+        LOG_ERR("write bandwidth: Incorecct data length. Expected %u, got %u",
+                type_size, len);
         return BT_GATT_ERR(BT_ATT_ERR_INVALID_ATTRIBUTE_LEN);
     }
 
     if (offset != 0u) {
-        LOG_ERR("write bandwidth: Incorrect data offset. Expected 0, got %u", offset);
+        LOG_ERR("write bandwidth: Incorrect data offset. Expected 0, got %u",
+                offset);
         return BT_GATT_ERR(BT_ATT_ERR_INVALID_OFFSET);
     }
 
@@ -216,12 +238,15 @@ static ssize_t write_description(struct bt_conn *conn,
 static int verify_subscription(const struct ares_srv_ctx *ctx,
                                enum ares_srv_configs config) {
     int ret = -EBADFD;
+    uint8_t bit = 0;
 
     switch (config) {
     case ARES_CONFIG_BANDWIDTH: {
-        if (atomic_test_bit(&ctx->state, ARES_BW_SUBSCRIBED)) {
-            ret = 0;
-        }
+        bit = ARES_BW_SUBSCRIBED;
+        break;
+    }
+    case ARES_CONFIG_CENTER_FREQ: {
+        bit = ARES_CENTER_FREQ_SUBSCRIBED;
         break;
     }
     default: {
@@ -229,6 +254,10 @@ static int verify_subscription(const struct ares_srv_ctx *ctx,
         ret = -ENOTSUP;
         break;
     }
+    }
+
+    if (ret != -ENOTSUP && atomic_test_bit(&ctx->state, bit)) {
+        ret = 0;
     }
 
     return ret;
@@ -284,9 +313,12 @@ BT_GATT_SERVICE_DEFINE(
                            BT_GATT_PERM_WRITE, NULL, write_bandwidth, &srv_ctx),
     BT_GATT_CCC(ares_srv_bw_update_cfg_changed,
                 BT_GATT_PERM_READ | BT_GATT_PERM_WRITE),
-    BT_GATT_CHARACTERISTIC(BT_UUID_ARES_SRV_CENTER_FREQ, BT_GATT_CHRC_WRITE,
+    BT_GATT_CHARACTERISTIC(BT_UUID_ARES_SRV_CENTER_FREQ,
+                           BT_GATT_CHRC_WRITE | BT_GATT_CHRC_INDICATE,
                            BT_GATT_PERM_WRITE, NULL, write_center_frequency,
                            &srv_ctx),
+    BT_GATT_CCC(ares_srv_center_freq_update_cfg_changed,
+                BT_GATT_PERM_READ | BT_GATT_PERM_WRITE),
     BT_GATT_CHARACTERISTIC(BT_UUID_ARES_SRV_REF_LEVEL, BT_GATT_CHRC_WRITE,
                            BT_GATT_PERM_WRITE, NULL, write_ref_level, &srv_ctx),
     BT_GATT_CHARACTERISTIC(BT_UUID_ARES_SRV_DURATION, BT_GATT_CHRC_WRITE,
@@ -335,18 +367,26 @@ static int setup_config_indication(enum ares_srv_configs config,
                                    struct net_buf *net_buf,
                                    struct ares_srv_indicate_params *params) {
     struct net_buf *buf;
+    uint8_t bit;
 
     switch (config) {
     case ARES_CONFIG_BANDWIDTH: {
-        if (!atomic_test_bit(&srv_ctx.state, ARES_BW_SUBSCRIBED)) {
-            return -EACCES;
-        }
+        bit = ARES_BW_SUBSCRIBED;
         params->params.attr = &ares_srv_svc.attrs[2];
+        break;
+    }
+    case ARES_CONFIG_CENTER_FREQ: {
+        bit = ARES_CENTER_FREQ_SUBSCRIBED;
+        params->params.attr = &ares_srv_svc.attrs[5];
         break;
     }
     default: {
         return -ENOTSUP;
     }
+    }
+
+    if (!atomic_test_bit(&srv_ctx.state, bit)) {
+        return -EACCES;
     }
 
     buf = net_buf_alloc(&ares_srv_tx_pool, K_MSEC(100));

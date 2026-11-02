@@ -11,9 +11,9 @@
 #ifndef ARES_BLE_H
 #define ARES_BLE_H
 
+#include <ble/services/ares_service.h>
 #include <stdint.h>
 #include <zephyr/kernel.h>
-#include <ble/services/ares_service.h>
 
 /**
  * Available LE PHYs.
@@ -217,7 +217,8 @@ int ares_ble_update_phy(enum le_phy phy);
  *
  * @return 0 on success.
  */
-int ares_send_config_response(enum ares_srv_configs type, const void *config, size_t len);
+int ares_send_config_response(enum ares_srv_configs type, const void *config,
+                              size_t len);
 
 /**
  * Send neighbor state information over BLE.

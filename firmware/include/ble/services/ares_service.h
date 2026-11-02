@@ -128,6 +128,8 @@ struct ares_service_cb {
     enum ares_srv_write_response (*bandwidth_update)(struct bt_conn *conn,
                                                      uint64_t bandwidth);
 
+    ares_srv_desc_subscribe_update center_frequency_subscribe_update;
+
     /**
      * @brief Callback for updating the center frequency value.
      *

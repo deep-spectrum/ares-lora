@@ -799,7 +799,8 @@ static int check_response_size(enum ares_srv_configs type, size_t len) {
     return ret;
 }
 
-int ares_send_config_response(enum ares_srv_configs type, const void *config, size_t len) {
+int ares_send_config_response(enum ares_srv_configs type, const void *config,
+                              size_t len) {
     int ret;
     struct net_buf *buffer;
 
