@@ -770,7 +770,7 @@ int ares_ble_update_phy(enum le_phy phy) {
         }                                                                      \
     } while (false)
 
-static int check_response_size(uint32_t type, size_t len) {
+static int check_response_size(enum ares_srv_configs type, size_t len) {
     int ret = 0;
 
     switch (type) {
@@ -799,10 +799,9 @@ static int check_response_size(uint32_t type, size_t len) {
     return ret;
 }
 
-int ares_send_config_response(uint32_t type, const void *config, size_t len) {
+int ares_send_config_response(enum ares_srv_configs type, const void *config, size_t len) {
     int ret;
     struct net_buf *buffer;
-    uint16_t len_ = (uint16_t)len;
 
     if (!atomic_test_bit(&connection_info.state, BLE_INITIALIZED)) {
         return -ECANCELED;
@@ -818,11 +817,9 @@ int ares_send_config_response(uint32_t type, const void *config, size_t len) {
         return -ENOMEM;
     }
 
-    net_buf_add_mem(buffer, &type, sizeof(type));
-    net_buf_add_mem(buffer, &len_, sizeof(len_));
     net_buf_add_mem(buffer, config, len);
 
-    ret = bt_ares_config_response(connection_info.conn, buffer);
+    ret = bt_ares_config_response(connection_info.conn, type, buffer);
     if (ret < 0) {
         net_buf_unref(buffer);
     }

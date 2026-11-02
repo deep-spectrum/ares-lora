@@ -16,7 +16,7 @@
 #include <zephyr/net_buf.h>
 #include <zephyr/sys/byteorder.h>
 
-LOG_MODULE_REGISTER(ares_ble_service);
+LOG_MODULE_REGISTER(ares_ble_service, LOG_LEVEL_DBG);
 
 enum {
     ARES_BW_SUBSCRIBED,
@@ -85,12 +85,12 @@ static ssize_t write_config_common(struct bt_conn *conn,
     LOG_DBG("Attribute write, handle: %u, conn %p", attr->handle, conn);
 
     if (len != type_size) {
-        LOG_DBG("write bandwidth: Incorecct data length");
+        LOG_ERR("write bandwidth: Incorecct data length. Expected %u, got %u", type_size, len);
         return BT_GATT_ERR(BT_ATT_ERR_INVALID_ATTRIBUTE_LEN);
     }
 
     if (offset != 0u) {
-        LOG_DBG("write bandwidth: Incorrect data offset");
+        LOG_ERR("write bandwidth: Incorrect data offset. Expected 0, got %u", offset);
         return BT_GATT_ERR(BT_ATT_ERR_INVALID_OFFSET);
     }
 
