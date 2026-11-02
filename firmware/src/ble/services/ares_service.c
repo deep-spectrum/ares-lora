@@ -23,6 +23,7 @@ enum {
     ARES_CENTER_FREQ_SUBSCRIBED,
     ARES_REF_LVL_SUBSCRIBED,
     ARES_DURATION_SUBSCRIBED,
+    ARES_DESCRIPTION_SUBSCRIBED,
     ARES_NEIGHBOR_STATE_ENABLED,
 };
 
@@ -93,6 +94,15 @@ ares_srv_duration_update_cfg_changed(const struct bt_gatt_attr *attr,
     ares_srv_cfg_changed_common(
         value, srv_ctx.ares_service_cb.duration_subscribe_update,
         ARES_DURATION_SUBSCRIBED, "duration");
+}
+
+static void
+ares_srv_description_update_cfg_changed(const struct bt_gatt_attr *attr,
+                                        uint16_t value) {
+    ARG_UNUSED(attr);
+    ares_srv_cfg_changed_common(
+        value, srv_ctx.ares_service_cb.description_subscribe_update,
+        ARES_DESCRIPTION_SUBSCRIBED, "description");
 }
 
 static void
@@ -276,6 +286,10 @@ static int verify_subscription(const struct ares_srv_ctx *ctx,
         bit = ARES_DURATION_SUBSCRIBED;
         break;
     }
+    case ARES_CONFIG_DESCRIPTION: {
+        bit = ARES_DESCRIPTION_SUBSCRIBED;
+        break;
+    }
     default: {
         LOG_ERR("Invalid enum value encountered");
         ret = -ENOTSUP;
@@ -356,9 +370,12 @@ BT_GATT_SERVICE_DEFINE(
                            BT_GATT_PERM_WRITE, NULL, write_duration, &srv_ctx),
     BT_GATT_CCC(ares_srv_duration_update_cfg_changed,
                 BT_GATT_PERM_READ | BT_GATT_PERM_WRITE),
-    BT_GATT_CHARACTERISTIC(BT_UUID_ARES_SRV_DESCRIPTION, BT_GATT_CHRC_WRITE,
+    BT_GATT_CHARACTERISTIC(BT_UUID_ARES_SRV_DESCRIPTION,
+                           BT_GATT_CHRC_WRITE | BT_GATT_CHRC_INDICATE,
                            BT_GATT_PERM_WRITE, NULL, write_description,
                            &srv_ctx),
+    BT_GATT_CCC(ares_srv_description_update_cfg_changed,
+                BT_GATT_PERM_READ | BT_GATT_PERM_WRITE),
     BT_GATT_CHARACTERISTIC(BT_UUID_ARES_SRV_CONFIG_READ, BT_GATT_CHRC_WRITE,
                            BT_GATT_PERM_WRITE, NULL, write_config_read,
                            &srv_ctx),
@@ -423,6 +440,11 @@ static int setup_config_indication(enum ares_srv_configs config,
         params->params.attr = &ares_srv_svc.attrs[0x000B];
         break;
     }
+    case ARES_CONFIG_DESCRIPTION: {
+        bit = ARES_DESCRIPTION_SUBSCRIBED;
+        params->params.attr = &ares_srv_svc.attrs[0x000E];
+        break;
+    }
     default: {
         return -ENOTSUP;
     }
@@ -485,5 +507,5 @@ int bt_ares_notify_neighbor_state(struct bt_conn *conn, const void *data,
         return -EINVAL;
     }
 
-    return bt_gatt_notify(conn, &ares_srv_svc.attrs[17], data, len);
+    return bt_gatt_notify(conn, &ares_srv_svc.attrs[0x0015], data, len);
 }

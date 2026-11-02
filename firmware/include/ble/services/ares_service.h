@@ -167,6 +167,8 @@ struct ares_service_cb {
     enum ares_srv_write_response (*duration_update)(struct bt_conn *conn,
                                                     uint32_t duration);
 
+    ares_srv_desc_subscribe_update description_subscribe_update;
+
     /**
      * @brief Callback for updating the test description.
      *
