@@ -231,6 +231,9 @@ struct ares_service_cb {
  */
 int bt_ares_srv_init(const struct ares_service_cb *cb);
 
+int bt_ares_config_response(struct bt_conn *conn, enum ares_srv_configs config,
+                            struct net_buf *net_buf);
+
 /**
  * @brief Send neighbor state information.
  *
