@@ -416,6 +416,10 @@ int bt_ares_config_response(struct bt_conn *conn, enum ares_srv_configs config,
 
     ret = setup_config_indication(config, net_buf, &params);
 
+    if (ret < 0) {
+        return ret;
+    }
+
     net_buf_add_mem(params.buf, &params, sizeof(params));
 
     ret = bt_gatt_indicate(
