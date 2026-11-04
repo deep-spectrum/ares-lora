@@ -106,7 +106,7 @@ struct ble_conn_info {
 
 struct ble_callback_data {
     struct ares_ble_callbacks cb;
-    const void *user_data;
+    void *user_data;
 };
 
 static char adv_name[16] = "Ares";

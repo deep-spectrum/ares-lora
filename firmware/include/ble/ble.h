@@ -82,14 +82,14 @@ struct ares_ble_callbacks {
      *
      * @param[in] user_data Pointer to the user data.
      */
-    void (*connected)(const void *user_data);
+    void (*connected)(void *user_data);
 
     /**
      * Indication that BLE is disconnected.
      *
      * @param[in] user_data Pointer to the user data.
      */
-    void (*disconnected)(const void *user_data);
+    void (*disconnected)(void *user_data);
 
     /**
      * Indication that the mtu size has changed.
@@ -97,7 +97,7 @@ struct ares_ble_callbacks {
      * @param[in] user_data Pointer to the user data.
      * @param[in] new_mtu The new mtu size.
      */
-    void (*mtu_size_changed)(const void *user_data, size_t new_mtu);
+    void (*mtu_size_changed)(void *user_data, size_t new_mtu);
 
     /**
      * Indication that the connection parameters have been changed.
@@ -107,7 +107,7 @@ struct ares_ble_callbacks {
      * @param[in] latency The connection latency.
      * @param[in] timeout The supervisor timeout.
      */
-    void (*connection_param_updated)(const void *user_data, uint16_t interval,
+    void (*connection_param_updated)(void *user_data, uint16_t interval,
                                      uint16_t latency, uint16_t timeout);
 
     /**
@@ -116,7 +116,7 @@ struct ares_ble_callbacks {
      * @param[in] user_data Pointer to the user data.
      * @param[in] phy The new PHY of the connection.
      */
-    void (*phy_updated)(const void *user_data, enum le_phy phy);
+    void (*phy_updated)(void *user_data, enum le_phy phy);
 
     /**
      * Indication that the subscription attributes have been updated (subscribed
@@ -125,7 +125,7 @@ struct ares_ble_callbacks {
      * @param[in] user_data Pointer to the user data.
      * @param[in] subscriptions Bitfield of the subscription statuses.
      */
-    void (*subscription_update)(const void *user_data, uint32_t subscriptions);
+    void (*subscription_update)(void *user_data, uint32_t subscriptions);
 
     /**
      * Notification for a configuration change.
@@ -134,7 +134,7 @@ struct ares_ble_callbacks {
      * @param[in] type The configuration type.
      * @param[in] value The new value of the configuration.
      */
-    void (*config_update)(const void *user_data, uint32_t type, uint64_t value);
+    void (*config_update)(void *user_data, uint32_t type, uint64_t value);
 
     /**
      * Notification that the description changed.
@@ -143,8 +143,7 @@ struct ares_ble_callbacks {
      * @param[in] buf The buffer that stores the new description.
      * @param[in] len The length of the buffer.
      */
-    void (*description_update)(const void *user_data, const uint8_t *buf,
-                               size_t len);
+    void (*description_update)(void *user_data, const uint8_t *buf, size_t len);
 
     /**
      * Notification that the central device is requesting a configuration.
@@ -152,7 +151,7 @@ struct ares_ble_callbacks {
      * @param[in] user_data Pointer to the user data.
      * @param[in] type The configuration being requested.
      */
-    void (*config_request)(const void *user_data, uint32_t type);
+    void (*config_request)(void *user_data, uint32_t type);
 
     /**
      * Notification that the run is ready to be started.
@@ -161,7 +160,7 @@ struct ares_ble_callbacks {
      * @param[in] start_delay The amount of seconds to schedule out the start
      * time by.
      */
-    void (*start)(const void *user_data, uint32_t start_delay);
+    void (*start)(void *user_data, uint32_t start_delay);
 
     /**
      * Config read response indication error handler.
@@ -171,7 +170,7 @@ struct ares_ble_callbacks {
      *
      * @note This is only called on ATT errors.
      */
-    void (*send_config_response_error)(const void *user_data, uint8_t err);
+    void (*send_config_response_error)(void *user_data, uint8_t err);
 };
 
 /**
@@ -192,7 +191,7 @@ struct ares_ble_init_data {
     /**
      * Pointer to the user data that gets passed into the callbacks.
      */
-    const void *user_data;
+    void *user_data;
 };
 
 /**

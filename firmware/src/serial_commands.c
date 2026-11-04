@@ -416,24 +416,35 @@ ARES_FRAME_HANDLER(ARES_FRAME_BLE_NEIGHBOR_UPDATE) {
     ares_serial_write_frame(serial, frame);
 }
 
-static void connected(const void *data) {
-    const struct ares_serial *serial = data;
+struct ble_user_data {
+    const struct ares_serial *serial;
+    uint16_t mtu;
+    uint16_t interval;
+    uint16_t latency;
+    uint16_t timeout;
+    uint8_t phy;
+};
+
+struct ble_user_data ares_ble_user_data;
+
+static void connected(void *data) {
+    struct ble_user_data *ctx = data;
     struct ares_frame frame = {
         .type = ARES_FRAME_BLE_CONNECTED,
         .payload.BLE_CONNECTED = true,
     };
 
-    ares_serial_write_frame(serial, &frame);
+    ares_serial_write_frame(ctx->serial, &frame);
 }
 
-static void disconnected(const void *data) {
-    const struct ares_serial *serial = data;
+static void disconnected(void *data) {
+    struct ble_user_data *ctx = data;
     struct ares_frame frame = {
         .type = ARES_FRAME_BLE_CONNECTED,
         .payload.BLE_CONNECTED = false,
     };
 
-    ares_serial_write_frame(serial, &frame);
+    ares_serial_write_frame(ctx->serial, &frame);
 }
 
 static int initialize_ble(const struct ares_serial *serial) {
@@ -452,8 +463,10 @@ static int initialize_ble(const struct ares_serial *serial) {
                 .send_config_response_error = NULL,
                 .start = NULL,
             },
-        .user_data = serial,
+        .user_data = &ares_ble_user_data,
     };
+
+    ares_ble_user_data.serial = serial;
 
     (void)retrieve_setting(ARES_SETTING_ID, &init_data.node_id);
 
