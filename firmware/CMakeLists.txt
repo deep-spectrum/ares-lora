@@ -37,3 +37,8 @@ set(SHELL_SRC
 
 target_sources(app PRIVATE ${SRC} ${SERIAL_SRC} ${LORA_SRC} ${BLE_SRC})
 target_sources_ifdef(CONFIG_SHELL app PRIVATE ${SHELL_SRC})
+
+zephyr_iterable_section(NAME ares_serial_command
+        KVMA RAM_REGION GROUP RODATA_REGION
+        SUBALIGN Z_LINK_ITERABLE_SUBALIGN)
+zephyr_linker_sources(SECTIONS linker/ares_iterables_rom.ld)

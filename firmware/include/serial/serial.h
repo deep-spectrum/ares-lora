@@ -240,16 +240,6 @@ struct ares_serial_ctx {
     struct k_poll_event events[ARES_SIGNALS];
 
     /**
-     * Array of serial handlers for received frames.
-     */
-    const struct ares_serial_command *commands;
-
-    /**
-     * Number of serial handlers.
-     */
-    size_t num_commands;
-
-    /**
      * Write mutex.
      */
     struct k_mutex wr_mtx;
@@ -309,6 +299,24 @@ struct ares_serial {
                                                  &UTIL_CAT(_name, _thread),    \
                                              .stack = UTIL_CAT(_name, _stack)}
 
+#define ARES_FRAME_HANDLER(frame_type)                                         \
+    static void UTIL_CAT(handle_, frame_type)(                                 \
+        const struct ares_serial *serial, struct ares_frame *frame);           \
+    const STRUCT_SECTION_ITERABLE(ares_serial_command,                         \
+                                  UTIL_CAT(frame_type, _struct)) = {           \
+        .command = frame_type,                                                 \
+        .callback = UTIL_CAT(handle_, frame_type),                             \
+    };                                                                         \
+    static void UTIL_CAT(handle_, frame_type)(                                 \
+        const struct ares_serial *serial, struct ares_frame *frame)
+
+#define ARES_FRAME_HANDLER_NOT_IMPLEMENTED(frame_type)                         \
+    const STRUCT_SECTION_ITERABLE(ares_serial_command,                         \
+                                  UTIL_CAT(frame_type, _struct)) = {           \
+        .command = frame_type,                                                 \
+        .callback = NULL,                                                      \
+    }
+
 /**
  * @brief Function for initiating a transport layer and internal serial state.
  *
@@ -320,20 +328,6 @@ struct ares_serial {
  */
 int ares_serial_init(const struct ares_serial *serial,
                      const void *transport_config);
-
-/**
- * @brief Function for registering frame handlers.
- *
- * @param[in] serial Pointer to serial instance.
- * @param[in] commands The array of frame handlers.
- * @param[in] num_commands The number of frame handlers in the array.
- *
- * @return 0 on success.
- * @return -EINVAL if parameters are invalid.
- */
-int ares_serial_register_command_callbacks(
-    const struct ares_serial *serial,
-    const struct ares_serial_command *commands, size_t num_commands);
 
 /**
  * @brief Function to write a frame to the serial transfer layer.

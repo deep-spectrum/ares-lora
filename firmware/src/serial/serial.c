@@ -121,20 +121,6 @@ int ares_serial_init(const struct ares_serial *serial,
     return 0;
 }
 
-int ares_serial_register_command_callbacks(
-    const struct ares_serial *serial,
-    const struct ares_serial_command *commands, size_t num_commands) {
-    if (serial == NULL || serial->ctx == NULL ||
-        (commands == NULL && num_commands != 0)) {
-        return -EINVAL;
-    }
-
-    serial->ctx->commands = commands;
-    serial->ctx->num_commands = num_commands;
-
-    return 0;
-}
-
 static void report_error(const struct ares_serial *serial,
                          enum ares_frame_error error) {
     struct ares_frame frame = {
@@ -157,13 +143,13 @@ static void dispatch(const struct ares_serial *serial, int start_index,
         return;
     }
 
-    for (size_t i = 0; i < serial->ctx->num_commands; i++) {
-        if (serial->ctx->commands[i].command != frame.type) {
+    STRUCT_SECTION_FOREACH(ares_serial_command, handler) {
+        if (handler->command != frame.type) {
             continue;
         }
 
-        if (serial->ctx->commands[i].callback != NULL) {
-            serial->ctx->commands[i].callback(serial, &frame);
+        if (handler->callback != NULL) {
+            handler->callback(serial, &frame);
         } else {
             report_error(serial, ARES_FRAME_ERROR_NOT_IMPLEMENTED);
         }
