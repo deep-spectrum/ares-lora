@@ -416,6 +416,26 @@ ARES_FRAME_HANDLER(ARES_FRAME_BLE_NEIGHBOR_UPDATE) {
     ares_serial_write_frame(serial, frame);
 }
 
+static void connected(const void *data) {
+    const struct ares_serial *serial = data;
+    struct ares_frame frame = {
+        .type = ARES_FRAME_BLE_CONNECTED,
+        .payload.BLE_CONNECTED = true,
+    };
+
+    ares_serial_write_frame(serial, &frame);
+}
+
+static void disconnected(const void *data) {
+    const struct ares_serial *serial = data;
+    struct ares_frame frame = {
+        .type = ARES_FRAME_BLE_CONNECTED,
+        .payload.BLE_CONNECTED = false,
+    };
+
+    ares_serial_write_frame(serial, &frame);
+}
+
 static int initialize_ble(const struct ares_serial *serial) {
     struct ares_ble_init_data init_data = {
         .cb =
@@ -424,8 +444,8 @@ static int initialize_ble(const struct ares_serial *serial) {
                 .description_update = NULL,
                 .config_request = NULL,
                 .subscription_update = NULL,
-                .connected = NULL,
-                .disconnected = NULL,
+                .connected = connected,
+                .disconnected = disconnected,
                 .connection_param_updated = NULL,
                 .mtu_size_changed = NULL,
                 .phy_updated = NULL,
