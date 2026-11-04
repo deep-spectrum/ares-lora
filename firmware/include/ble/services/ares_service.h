@@ -109,24 +109,10 @@ enum ares_srv_write_response {
 };
 
 /**
- * @typedef ares_srv_subscription_update
- * @brief Subscription state update callback.
- *
- * @param[in] enable The new state of the subscription status. @p true if
- * subscribed, @p false otherwise.
- */
-typedef void (*ares_srv_subscription_update)(bool enable);
-
-/**
  * @struct ares_service_cb
  * @brief Service callback configurations.
  */
 struct ares_service_cb {
-    /**
-     * @brief Callback for indicating the new bandwidth subscription status.
-     */
-    ares_srv_subscription_update bandwidth_subscribe_update;
-
     /**
      * @brief Callback for updating the bandwidth value.
      *
@@ -137,12 +123,6 @@ struct ares_service_cb {
      */
     enum ares_srv_write_response (*bandwidth_update)(struct bt_conn *conn,
                                                      uint64_t bandwidth);
-
-    /**
-     * @brief Callback for indicating the new center frequency subscription
-     * status.
-     */
-    ares_srv_subscription_update center_frequency_subscribe_update;
 
     /**
      * @brief Callback for updating the center frequency value.
@@ -156,12 +136,6 @@ struct ares_service_cb {
         struct bt_conn *conn, uint64_t center_freq);
 
     /**
-     * @brief Callback for indicating the new reference level subscription
-     * status.
-     */
-    ares_srv_subscription_update reference_level_subscribe_update;
-
-    /**
      * @brief Callback for updating the reference level value.
      *
      * @param[in] conn Pointer to the bt_conn instance the write occurred on.
@@ -173,11 +147,6 @@ struct ares_service_cb {
                                                            uint64_t ref_level);
 
     /**
-     * @brief Callback for indicating the new duration subscription status.
-     */
-    ares_srv_subscription_update duration_subscribe_update;
-
-    /**
      * @brief Callback for updating the duration value.
      *
      * @param[in] conn Pointer to the bt_conn instance the write occurred on.
@@ -187,11 +156,6 @@ struct ares_service_cb {
      */
     enum ares_srv_write_response (*duration_update)(struct bt_conn *conn,
                                                     uint32_t duration);
-
-    /**
-     * @brief Callback for indicating the new description subscription status.
-     */
-    ares_srv_subscription_update description_subscribe_update;
 
     /**
      * @brief Callback for updating the test description.
@@ -245,6 +209,17 @@ struct ares_service_cb {
     enum ares_srv_write_response (*start)(struct bt_conn *conn, uint32_t delay);
 
     /**
+     * @brief Callback for indicating that a configuration characteristic has
+     * been subscribed to.
+     *
+     * @param[in] config The config indication subscribed to.
+     * @param[in] enable The new state of the subscription status. @p true if
+     * subscribed, @p false otherwise.
+     */
+    void (*config_subscription_update)(enum ares_srv_configs config,
+                                       bool enable);
+
+    /**
      * @brief Callback for indicating that the neighbor state characteristic has
      * been subscribed to.
      *
@@ -263,6 +238,21 @@ struct ares_service_cb {
  */
 int bt_ares_srv_init(const struct ares_service_cb *cb);
 
+/**
+ * @brief Send the configuration response.
+ *
+ * @param[in] conn Pointer to the bt_conn to send the indication on.
+ * @param[in] config The configuration to indicate.
+ * @param[in] net_buf Pointer to the network buffer that contains the data to be
+ * sent.
+ *
+ * @return @p -EACCESS if the indication has not been subscribed to.
+ * @return @p -ENOMEM if unable to allocate internal memory for indication.
+ * @return @p 0 on success.
+ * @return negative error code otherwise.
+ *
+ * @note This function will increment the reference count of the network buffer.
+ */
 int bt_ares_config_response(struct bt_conn *conn, enum ares_srv_configs config,
                             struct net_buf *net_buf);
 

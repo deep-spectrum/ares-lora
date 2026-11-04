@@ -43,7 +43,7 @@ NET_BUF_POOL_DEFINE(ares_srv_tx_pool, 4, 64, 0, NULL);
 static struct ares_srv_ctx srv_ctx;
 
 static void ares_srv_cfg_changed_common(uint16_t value,
-                                        const ares_srv_subscription_update cb,
+                                        enum ares_srv_configs config,
                                         uint8_t bit, const char *str) {
     ARG_UNUSED(str);
     bool enabled = value == BT_GATT_CCC_INDICATE;
@@ -51,8 +51,8 @@ static void ares_srv_cfg_changed_common(uint16_t value,
     LOG_DBG("Indications for %s has been turned %s", str,
             enabled ? "on" : "off");
 
-    if (cb) {
-        cb(enabled);
+    if (srv_ctx.ares_service_cb.config_subscription_update) {
+        srv_ctx.ares_service_cb.config_subscription_update(config, enabled);
     }
 
     if (enabled) {
@@ -65,44 +65,40 @@ static void ares_srv_cfg_changed_common(uint16_t value,
 static void ares_srv_bw_update_cfg_changed(const struct bt_gatt_attr *attr,
                                            uint16_t value) {
     ARG_UNUSED(attr);
-    ares_srv_cfg_changed_common(
-        value, srv_ctx.ares_service_cb.bandwidth_subscribe_update,
-        ARES_BW_SUBSCRIBED, "bandwidth");
+    ares_srv_cfg_changed_common(value, ARES_CONFIG_BANDWIDTH,
+                                ARES_BW_SUBSCRIBED, "bandwidth");
 }
 
 static void
 ares_srv_center_freq_update_cfg_changed(const struct bt_gatt_attr *attr,
                                         uint16_t value) {
     ARG_UNUSED(attr);
-    ares_srv_cfg_changed_common(
-        value, srv_ctx.ares_service_cb.center_frequency_subscribe_update,
-        ARES_CENTER_FREQ_SUBSCRIBED, "center frequency");
+    ares_srv_cfg_changed_common(value, ARES_CONFIG_CENTER_FREQ,
+                                ARES_CENTER_FREQ_SUBSCRIBED,
+                                "center frequency");
 }
 
 static void ares_srv_ref_lvl_update_cfg_changed(const struct bt_gatt_attr *attr,
                                                 uint16_t value) {
     ARG_UNUSED(attr);
-    ares_srv_cfg_changed_common(
-        value, srv_ctx.ares_service_cb.reference_level_subscribe_update,
-        ARES_REF_LVL_SUBSCRIBED, "reference level");
+    ares_srv_cfg_changed_common(value, ARES_CONFIG_REF_LEVEL,
+                                ARES_REF_LVL_SUBSCRIBED, "reference level");
 }
 
 static void
 ares_srv_duration_update_cfg_changed(const struct bt_gatt_attr *attr,
                                      uint16_t value) {
     ARG_UNUSED(attr);
-    ares_srv_cfg_changed_common(
-        value, srv_ctx.ares_service_cb.duration_subscribe_update,
-        ARES_DURATION_SUBSCRIBED, "duration");
+    ares_srv_cfg_changed_common(value, ARES_CONFIG_DURATION,
+                                ARES_DURATION_SUBSCRIBED, "duration");
 }
 
 static void
 ares_srv_description_update_cfg_changed(const struct bt_gatt_attr *attr,
                                         uint16_t value) {
     ARG_UNUSED(attr);
-    ares_srv_cfg_changed_common(
-        value, srv_ctx.ares_service_cb.description_subscribe_update,
-        ARES_DESCRIPTION_SUBSCRIBED, "description");
+    ares_srv_cfg_changed_common(value, ARES_CONFIG_DESCRIPTION,
+                                ARES_DESCRIPTION_SUBSCRIBED, "description");
 }
 
 static void
