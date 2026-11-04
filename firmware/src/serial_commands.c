@@ -418,19 +418,22 @@ ARES_FRAME_HANDLER(ARES_FRAME_BLE_NEIGHBOR_UPDATE) {
 
 static int initialize_ble(const struct ares_serial *serial) {
     struct ares_ble_init_data init_data = {
-        .cb = {
-            .config_update = NULL,
-            .description_update = NULL,
-            .config_request = NULL,
-            .subscription_update = NULL,
-            .connected = NULL,
-            .disconnected = NULL,
-            .connection_param_updated = NULL,
-            .mtu_size_changed = NULL,
-            .phy_updated = NULL,
-            .send_config_response_error = NULL,
-            .start = NULL,
-        }};
+        .cb =
+            {
+                .config_update = NULL,
+                .description_update = NULL,
+                .config_request = NULL,
+                .subscription_update = NULL,
+                .connected = NULL,
+                .disconnected = NULL,
+                .connection_param_updated = NULL,
+                .mtu_size_changed = NULL,
+                .phy_updated = NULL,
+                .send_config_response_error = NULL,
+                .start = NULL,
+            },
+        .user_data = serial,
+    };
 
     (void)retrieve_setting(ARES_SETTING_ID, &init_data.node_id);
 

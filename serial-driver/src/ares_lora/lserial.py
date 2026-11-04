@@ -237,8 +237,8 @@ class LoraSerial:
 
         if not port:
             raise ValueError("Invalid port")
-        # if not check_serial_port(port):
-        #     raise IOError(f"Cannot open port {port}: Does not exist")
+        if not check_serial_port(port):
+            raise IOError(f"Cannot open port {port}: Does not exist")
 
         self._start_hook_lock = threading.Lock()
         self._start_hook: Callable[[int, int], None] | None = None

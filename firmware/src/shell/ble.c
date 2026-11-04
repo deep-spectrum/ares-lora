@@ -37,7 +37,7 @@ static struct config_buffer str_configs[1] = {
                                                            .len = 5},
 };
 
-static void config_update(uint32_t type, uint64_t value) {
+static void config_update(void *user_data, uint32_t type, uint64_t value) {
     LOG_INF("config_update: {Thread Name: %s, Thread Prio: %d}",
             k_thread_name_get(k_current_get()),
             k_thread_priority_get(k_current_get()));
@@ -62,7 +62,8 @@ static void config_update(uint32_t type, uint64_t value) {
     }
 }
 
-static void description_update(const uint8_t *buf, size_t len) {
+static void description_update(void *user_data, const uint8_t *buf,
+                               size_t len) {
     LOG_INF("description_update: {Thread Name: %s, Thread Prio: %d}",
             k_thread_name_get(k_current_get()),
             k_thread_priority_get(k_current_get()));
@@ -72,33 +73,33 @@ static void description_update(const uint8_t *buf, size_t len) {
     str_configs[0].len = len;
 }
 
-static void connected(void) {
+static void connected(void *user_data) {
     LOG_INF("connected: {Thread Name: %s, Thread Prio: %d}",
             k_thread_name_get(k_current_get()),
             k_thread_priority_get(k_current_get()));
 }
 
-static void disconnected(void) {
+static void disconnected(void *user_data) {
     LOG_INF("disconnected: {Thread Name: %s, Thread Prio: %d}",
             k_thread_name_get(k_current_get()),
             k_thread_priority_get(k_current_get()));
 }
 
-static void mtu_changed(size_t new_mtu) {
+static void mtu_changed(void *user_data, size_t new_mtu) {
     LOG_INF("new_mtu: {Thread Name: %s, Thread Prio: %d}",
             k_thread_name_get(k_current_get()),
             k_thread_priority_get(k_current_get()));
     LOG_INF("New MTU size: %" PRIu32, new_mtu);
 }
 
-static void config_request(uint32_t config) {
+static void config_request(void *user_data, uint32_t config) {
     LOG_INF("config_request: {Thread Name: %s, Thread Prio: %d}",
             k_thread_name_get(k_current_get()),
             k_thread_priority_get(k_current_get()));
     LOG_INF("Configuration requested: %" PRIu32, config);
 }
 
-static void subscriptions_changed(uint32_t subscriptions) {
+static void subscriptions_changed(void *user_data, uint32_t subscriptions) {
     LOG_INF("subscriptions_changed: {Thread Name: %s, Thread Prio: %d}",
             k_thread_name_get(k_current_get()),
             k_thread_priority_get(k_current_get()));
@@ -117,8 +118,8 @@ static void subscriptions_changed(uint32_t subscriptions) {
             (subscriptions & ARES_SUBSCRIPTION_DESCRIPTION) ? "on" : "off");
 }
 
-static void connection_param_update(uint16_t interval, uint16_t latency,
-                                    uint16_t timeout) {
+static void connection_param_update(void *user_data, uint16_t interval,
+                                    uint16_t latency, uint16_t timeout) {
     LOG_INF("config_param_updated: {Thread Name: %s, Thread Prio: %d}",
             k_thread_name_get(k_current_get()),
             k_thread_priority_get(k_current_get()));
@@ -126,7 +127,7 @@ static void connection_param_update(uint16_t interval, uint16_t latency,
             interval, latency, timeout);
 }
 
-static void phy_update(enum le_phy phy) {
+static void phy_update(void *user_data, enum le_phy phy) {
     LOG_INF("phy_update: {Thread Name: %s, Thread Prio: %d}",
             k_thread_name_get(k_current_get()),
             k_thread_priority_get(k_current_get()));
@@ -151,7 +152,7 @@ static void phy_update(enum le_phy phy) {
     }
 }
 
-static void send_config_resp_err(uint8_t err) {
+static void send_config_resp_err(void *user_data, uint8_t err) {
     LOG_INF("send_config_resp_err: {Thread Name: %s, Thread Prio: %d}",
             k_thread_name_get(k_current_get()),
             k_thread_priority_get(k_current_get()));
@@ -159,7 +160,7 @@ static void send_config_resp_err(uint8_t err) {
     LOG_ERR("Send error: %d", err);
 }
 
-static void start(uint32_t delay) {
+static void start(void *user_data, uint32_t delay) {
     LOG_INF("start: {Thread Name: %s, Thread Prio: %d}",
             k_thread_name_get(k_current_get()),
             k_thread_priority_get(k_current_get()));
@@ -184,7 +185,7 @@ static int initialize_ble(void) {
                 .start = start,
             },
 
-        .node_id = 69,
+        .node_id = 70,
     };
 
     return ares_init_ble(&init_data);

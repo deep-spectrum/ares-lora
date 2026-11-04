@@ -104,6 +104,11 @@ struct ble_conn_info {
     atomic_t subscriptions;
 };
 
+struct ble_callback_data {
+    struct ares_ble_callbacks cb;
+    const void *user_data;
+};
+
 static char adv_name[16] = "Ares";
 
 K_MUTEX_DEFINE(pref_phy_mtx);
@@ -127,14 +132,15 @@ static struct ble_conn_info connection_info = {
         .latency = CONFIG_BT_PERIPHERAL_PREF_LATENCY,
         .timeout = CONFIG_BT_PERIPHERAL_PREF_TIMEOUT,
     }};
-static struct ares_ble_callbacks callbacks;
+static struct ble_callback_data callbacks;
 
 static void config_response_indicate_work(struct k_work *work) {
     struct config_response_ind_err_work *cwork =
         CONTAINER_OF(work, struct config_response_ind_err_work, work);
 
-    if (callbacks.send_config_response_error != NULL) {
-        callbacks.send_config_response_error(cwork->err);
+    if (callbacks.cb.send_config_response_error != NULL) {
+        callbacks.cb.send_config_response_error(callbacks.user_data,
+                                                cwork->err);
     }
 }
 // Initialized in init
@@ -148,20 +154,20 @@ static void write_work_handler(struct k_work *work) {
 
     switch (wwork->config) {
     case ARES_CONFIG_RESERVED_GET: {
-        if (callbacks.config_request != NULL) {
-            callbacks.config_request((uint32_t)value);
+        if (callbacks.cb.config_request != NULL) {
+            callbacks.cb.config_request(callbacks.user_data, (uint32_t)value);
         }
         break;
     }
     case ARES_CONFIG_RESERVED_START: {
-        if (callbacks.start != NULL) {
-            callbacks.start((uint32_t)value);
+        if (callbacks.cb.start != NULL) {
+            callbacks.cb.start(callbacks.user_data, (uint32_t)value);
         }
         break;
     }
     default: {
-        if (callbacks.config_update != NULL) {
-            callbacks.config_update(config, value);
+        if (callbacks.cb.config_update != NULL) {
+            callbacks.cb.config_update(callbacks.user_data, config, value);
         }
         break;
     }
@@ -178,8 +184,9 @@ static void write_work_net_buf_handler(struct k_work *work) {
 
     switch (config) {
     case ARES_CONFIG_DESCRIPTION: {
-        if (callbacks.description_update) {
-            callbacks.description_update(buf->data, buf->len);
+        if (callbacks.cb.description_update) {
+            callbacks.cb.description_update(callbacks.user_data, buf->data,
+                                            buf->len);
         }
         break;
     }
@@ -210,8 +217,8 @@ ARES_CONFIG_WRITE_WORK_DEFINE(start_work, ARES_CONFIG_RESERVED_START,
 static void connected_work_handler(struct k_work *work) {
     ARG_UNUSED(work);
 
-    if (callbacks.connected) {
-        callbacks.connected();
+    if (callbacks.cb.connected) {
+        callbacks.cb.connected(callbacks.user_data);
     }
 }
 K_WORK_DEFINE(connected_work, connected_work_handler);
@@ -219,10 +226,11 @@ K_WORK_DEFINE(connected_work, connected_work_handler);
 static void param_update_work_handler(struct k_work *work) {
     ARG_UNUSED(work);
 
-    if (callbacks.connection_param_updated != NULL) {
-        callbacks.connection_param_updated(connection_info.conn_params.interval,
-                                           connection_info.conn_params.latency,
-                                           connection_info.conn_params.timeout);
+    if (callbacks.cb.connection_param_updated != NULL) {
+        callbacks.cb.connection_param_updated(
+            callbacks.user_data, connection_info.conn_params.interval,
+            connection_info.conn_params.latency,
+            connection_info.conn_params.timeout);
     }
 }
 K_WORK_DEFINE(param_updated_work, param_update_work_handler);
@@ -230,8 +238,9 @@ K_WORK_DEFINE(param_updated_work, param_update_work_handler);
 static void phy_update_work_handler(struct k_work *work) {
     ARG_UNUSED(work);
 
-    if (callbacks.phy_updated != NULL) {
-        callbacks.phy_updated(connection_info.conn_params.phy);
+    if (callbacks.cb.phy_updated != NULL) {
+        callbacks.cb.phy_updated(callbacks.user_data,
+                                 connection_info.conn_params.phy);
     }
 }
 K_WORK_DEFINE(phy_update_work, phy_update_work_handler);
@@ -239,8 +248,9 @@ K_WORK_DEFINE(phy_update_work, phy_update_work_handler);
 static void mtu_update_work_handler(struct k_work *work) {
     ARG_UNUSED(work);
 
-    if (callbacks.mtu_size_changed != NULL) {
-        callbacks.mtu_size_changed(connection_info.conn_params.mtu_size);
+    if (callbacks.cb.mtu_size_changed != NULL) {
+        callbacks.cb.mtu_size_changed(callbacks.user_data,
+                                      connection_info.conn_params.mtu_size);
     }
 }
 K_WORK_DEFINE(mtu_change_work, mtu_update_work_handler);
@@ -248,9 +258,9 @@ K_WORK_DEFINE(mtu_change_work, mtu_update_work_handler);
 static void subscription_changed_work_handler(struct k_work *work) {
     ARG_UNUSED(work);
 
-    if (callbacks.subscription_update != NULL) {
+    if (callbacks.cb.subscription_update != NULL) {
         uint32_t states = atomic_get(&connection_info.subscriptions);
-        callbacks.subscription_update(states);
+        callbacks.cb.subscription_update(callbacks.user_data, states);
     }
 }
 K_WORK_DEFINE(subscription_changed_work, subscription_changed_work_handler);
@@ -430,8 +440,8 @@ static void on_disconnected(struct bt_conn *conn, uint8_t reason) {
     connection_info.conn = NULL;
     atomic_clear_bit(&connection_info.state, BLE_CONNECTED);
 
-    if (callbacks.disconnected != NULL) {
-        callbacks.disconnected();
+    if (callbacks.cb.disconnected != NULL) {
+        callbacks.cb.disconnected(callbacks.user_data);
     }
 
     if (connection_info.desc_buf != NULL) {
@@ -694,7 +704,8 @@ int ares_init_ble(const struct ares_ble_init_data *init_data) {
     k_work_init(&connection_info.conf_resp_work.work,
                 config_response_indicate_work);
 
-    callbacks = init_data->cb;
+    callbacks.cb = init_data->cb;
+    callbacks.user_data = init_data->user_data;
 
     k_sem_init(&connection_info.adv_name_sem, 1, 1);
 

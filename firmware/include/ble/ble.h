@@ -79,85 +79,99 @@ enum ares_subscription {
 struct ares_ble_callbacks {
     /**
      * Indication that BLE is connected.
+     *
+     * @param[in] user_data Pointer to the user data.
      */
-    void (*connected)(void);
+    void (*connected)(const void *user_data);
 
     /**
      * Indication that BLE is disconnected.
+     *
+     * @param[in] user_data Pointer to the user data.
      */
-    void (*disconnected)(void);
+    void (*disconnected)(const void *user_data);
 
     /**
      * Indication that the mtu size has changed.
      *
+     * @param[in] user_data Pointer to the user data.
      * @param[in] new_mtu The new mtu size.
      */
-    void (*mtu_size_changed)(size_t new_mtu);
+    void (*mtu_size_changed)(const void *user_data, size_t new_mtu);
 
     /**
      * Indication that the connection parameters have been changed.
      *
+     * @param[in] user_data Pointer to the user data.
      * @param[in] interval The connection interval.
      * @param[in] latency The connection latency.
      * @param[in] timeout The supervisor timeout.
      */
-    void (*connection_param_updated)(uint16_t interval, uint16_t latency,
-                                     uint16_t timeout);
+    void (*connection_param_updated)(const void *user_data, uint16_t interval,
+                                     uint16_t latency, uint16_t timeout);
 
     /**
      * Indication that the PHY of the connection has changed.
      *
+     * @param[in] user_data Pointer to the user data.
      * @param[in] phy The new PHY of the connection.
      */
-    void (*phy_updated)(enum le_phy phy);
+    void (*phy_updated)(const void *user_data, enum le_phy phy);
 
     /**
      * Indication that the subscription attributes have been updated (subscribed
      * or unsubscribe to).
      *
+     * @param[in] user_data Pointer to the user data.
      * @param[in] subscriptions Bitfield of the subscription statuses.
      */
-    void (*subscription_update)(uint32_t subscriptions);
+    void (*subscription_update)(const void *user_data, uint32_t subscriptions);
 
     /**
      * Notification for a configuration change.
      *
+     * @param[in] user_data Pointer to the user data.
      * @param[in] type The configuration type.
      * @param[in] value The new value of the configuration.
      */
-    void (*config_update)(uint32_t type, uint64_t value);
+    void (*config_update)(const void *user_data, uint32_t type, uint64_t value);
 
     /**
      * Notification that the description changed.
      *
+     * @param[in] user_data Pointer to the user data.
      * @param[in] buf The buffer that stores the new description.
      * @param[in] len The length of the buffer.
      */
-    void (*description_update)(const uint8_t *buf, size_t len);
+    void (*description_update)(const void *user_data, const uint8_t *buf,
+                               size_t len);
 
     /**
      * Notification that the central device is requesting a configuration.
      *
+     * @param[in] user_data Pointer to the user data.
      * @param[in] type The configuration being requested.
      */
-    void (*config_request)(uint32_t type);
+    void (*config_request)(const void *user_data, uint32_t type);
 
     /**
      * Notification that the run is ready to be started.
      *
+     * @param[in] user_data Pointer to the user data.
      * @param[in] start_delay The amount of seconds to schedule out the start
      * time by.
      */
-    void (*start)(uint32_t start_delay);
+    void (*start)(const void *user_data, uint32_t start_delay);
 
     /**
      * Config read response indication error handler.
      *
+     * @param[in] user_data Pointer to the user data.
      * @param[in] err The ATT error code.
      *
      * @note This is only called on ATT errors.
      */
-    void (*send_config_response_error)(uint8_t err);
+    void (*send_config_response_error)(const void *user_data, uint8_t err);
 };
 
 /**
@@ -174,6 +188,11 @@ struct ares_ble_init_data {
      * Callbacks for the BLE module.
      */
     struct ares_ble_callbacks cb;
+
+    /**
+     * Pointer to the user data that gets passed into the callbacks.
+     */
+    const void *user_data;
 };
 
 /**
