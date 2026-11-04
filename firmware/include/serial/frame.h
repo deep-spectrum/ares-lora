@@ -217,9 +217,13 @@ struct ares_frame {
         bool BLE_CONNECTED; ///< ARES_FRAME_BLE_CONNECTED
 
         struct {
-            uint8_t config_resp_subscribed : 1;
             uint8_t neighbor_states_subscribed : 1;
-            uint8_t padding : 6;
+            uint8_t bandwidth: 1;
+            uint8_t center_freq: 1;
+            uint8_t ref_lvl: 1;
+            uint8_t duration: 1;
+            uint8_t description: 1;
+            uint8_t padding : 2;
         } BLE_SUBSCRIBED; ///< ARES_FRAME_BLE_SUBSCRIBED
 
         struct {
