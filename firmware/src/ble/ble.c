@@ -594,13 +594,41 @@ static enum ares_srv_write_response start_handler(struct bt_conn *conn,
     return submit_write_work(&start_work, delay);
 }
 
-static void config_response_ind_enabled(bool enabled) {
+static void config_response_indication_enable(enum ares_srv_configs config,
+                                              bool enabled) {
+    int bit = 0;
+
+    switch (config) {
+    case ARES_CONFIG_BANDWIDTH: {
+        bit = ARES_SUBSCRIPTION_BANDWIDTH_BIT;
+        break;
+    }
+    case ARES_CONFIG_CENTER_FREQ: {
+        bit = ARES_SUBSCRIPTION_CENTER_FREQ_BIT;
+        break;
+    }
+    case ARES_CONFIG_REF_LEVEL: {
+        bit = ARES_SUBSCRIPTION_REF_LVL_BIT;
+        break;
+    }
+    case ARES_CONFIG_DURATION: {
+        bit = ARES_SUBSCRIPTION_DURATION_BIT;
+        break;
+    }
+    case ARES_CONFIG_DESCRIPTION: {
+        bit = ARES_SUBSCRIPTION_DESCRIPTION_BIT;
+        break;
+    }
+    default: {
+        LOG_ERR("Invalid config subscribed to: %d", config);
+        return;
+    }
+    }
+
     if (enabled) {
-        atomic_set_bit(&connection_info.subscriptions,
-                       ARES_SUBSCRIPTION_CONFIG_RESP_BIT);
+        atomic_set_bit(&connection_info.subscriptions, bit);
     } else {
-        atomic_clear_bit(&connection_info.subscriptions,
-                         ARES_SUBSCRIPTION_CONFIG_RESP_BIT);
+        atomic_clear_bit(&connection_info.subscriptions, bit);
     }
 
     k_work_submit_to_queue(connection_info.ble_work_q_lp,
@@ -647,7 +675,7 @@ int ares_init_ble(const struct ares_ble_init_data *init_data) {
         .config_read = config_read_handler,
         .config_response_ind_cb = config_response_indicate_callback,
         .start = start_handler,
-        .config_response_ind_enabled = config_response_ind_enabled,
+        .config_subscription_update = config_response_indication_enable,
         .neighbor_state_enabled = neighbor_updates_enabled,
     };
 

@@ -180,14 +180,6 @@ struct ares_service_cb {
                                                 enum ares_srv_configs config);
 
     /**
-     * @brief Callback for indicating that the config response has been
-     * subscribed to.
-     *
-     * @param[in] enabled `true` if subscribed to to, `false` otherwise.
-     */
-    void (*config_response_ind_enabled)(bool enabled);
-
-    /**
      * @brief Indication complete callback for config response characteristic.
      *
      * @param[in] conn Pointer to the bt_conn instance the indication was

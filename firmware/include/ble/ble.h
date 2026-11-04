@@ -31,14 +31,12 @@ enum le_phy {
  * Subscription status flags.
  */
 enum ares_subscription {
-    ARES_SUBSCRIPTION_CONFIG_RESP_BIT = 0,
-    ARES_SUBSCRIPTION_NEIGHBOR_UPDATES_BIT = 1,
-
-    /**
-     * @brief Flag indicating the configuration response attribute subscription
-     * status.
-     */
-    ARES_SUBSCRIPTION_CONFIG_RESP = BIT(ARES_SUBSCRIPTION_CONFIG_RESP_BIT),
+    ARES_SUBSCRIPTION_NEIGHBOR_UPDATES_BIT = 0,
+    ARES_SUBSCRIPTION_BANDWIDTH_BIT = 1,
+    ARES_SUBSCRIPTION_CENTER_FREQ_BIT = 2,
+    ARES_SUBSCRIPTION_REF_LVL_BIT = 3,
+    ARES_SUBSCRIPTION_DURATION_BIT = 4,
+    ARES_SUBSCRIPTION_DESCRIPTION_BIT = 5,
 
     /**
      * @brief Flag indicating the neighbor updates attribute subscription
@@ -46,6 +44,32 @@ enum ares_subscription {
      */
     ARES_SUBSCRIPTION_NEIGHBOR_UPDATES =
         BIT(ARES_SUBSCRIPTION_NEIGHBOR_UPDATES_BIT),
+
+    /**
+     * @brief Flag indicating the bandwidth attribute subscription status.
+     */
+    ARES_SUBSCRIPTION_BANDWIDTH = BIT(ARES_SUBSCRIPTION_BANDWIDTH_BIT),
+
+    /**
+     * @brief Flag indicating the center frequency attribute subscription
+     * status.
+     */
+    ARES_SUBSCRIPTION_CENTER_FREQ = BIT(ARES_SUBSCRIPTION_CENTER_FREQ_BIT),
+
+    /**
+     * @brief Flag indicating the reference level attribute subscription status.
+     */
+    ARES_SUBSCRIPTION_REF_LVL = BIT(ARES_SUBSCRIPTION_REF_LVL_BIT),
+
+    /**
+     * @brief Flag indicating the duration attribute subscription status.
+     */
+    ARES_SUBSCRIPTION_DURATION = BIT(ARES_SUBSCRIPTION_DURATION_BIT),
+
+    /**
+     * @brief Flag indicating the description attribute subscription status.
+     */
+    ARES_SUBSCRIPTION_DESCRIPTION = BIT(ARES_SUBSCRIPTION_DESCRIPTION_BIT),
 };
 
 /**
