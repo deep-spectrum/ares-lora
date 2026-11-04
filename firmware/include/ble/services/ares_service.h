@@ -108,14 +108,24 @@ enum ares_srv_write_response {
     ARES_WRITE_NO_MEM,
 };
 
-typedef void (*ares_srv_desc_subscribe_update)(bool enable);
+/**
+ * @typedef ares_srv_subscription_update
+ * @brief Subscription state update callback.
+ *
+ * @param[in] enable The new state of the subscription status. @p true if
+ * subscribed, @p false otherwise.
+ */
+typedef void (*ares_srv_subscription_update)(bool enable);
 
 /**
  * @struct ares_service_cb
  * @brief Service callback configurations.
  */
 struct ares_service_cb {
-    ares_srv_desc_subscribe_update bandwidth_subscribe_update;
+    /**
+     * @brief Callback for indicating the new bandwidth subscription status.
+     */
+    ares_srv_subscription_update bandwidth_subscribe_update;
 
     /**
      * @brief Callback for updating the bandwidth value.
@@ -128,7 +138,11 @@ struct ares_service_cb {
     enum ares_srv_write_response (*bandwidth_update)(struct bt_conn *conn,
                                                      uint64_t bandwidth);
 
-    ares_srv_desc_subscribe_update center_frequency_subscribe_update;
+    /**
+     * @brief Callback for indicating the new center frequency subscription
+     * status.
+     */
+    ares_srv_subscription_update center_frequency_subscribe_update;
 
     /**
      * @brief Callback for updating the center frequency value.
@@ -141,7 +155,11 @@ struct ares_service_cb {
     enum ares_srv_write_response (*center_frequency_update)(
         struct bt_conn *conn, uint64_t center_freq);
 
-    ares_srv_desc_subscribe_update reference_level_subscribe_update;
+    /**
+     * @brief Callback for indicating the new reference level subscription
+     * status.
+     */
+    ares_srv_subscription_update reference_level_subscribe_update;
 
     /**
      * @brief Callback for updating the reference level value.
@@ -154,7 +172,10 @@ struct ares_service_cb {
     enum ares_srv_write_response (*reference_level_update)(struct bt_conn *conn,
                                                            uint64_t ref_level);
 
-    ares_srv_desc_subscribe_update duration_subscribe_update;
+    /**
+     * @brief Callback for indicating the new duration subscription status.
+     */
+    ares_srv_subscription_update duration_subscribe_update;
 
     /**
      * @brief Callback for updating the duration value.
@@ -167,7 +188,10 @@ struct ares_service_cb {
     enum ares_srv_write_response (*duration_update)(struct bt_conn *conn,
                                                     uint32_t duration);
 
-    ares_srv_desc_subscribe_update description_subscribe_update;
+    /**
+     * @brief Callback for indicating the new description subscription status.
+     */
+    ares_srv_subscription_update description_subscribe_update;
 
     /**
      * @brief Callback for updating the test description.

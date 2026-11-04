@@ -43,7 +43,7 @@ NET_BUF_POOL_DEFINE(ares_srv_tx_pool, 4, 64, 0, NULL);
 static struct ares_srv_ctx srv_ctx;
 
 static void ares_srv_cfg_changed_common(uint16_t value,
-                                        ares_srv_desc_subscribe_update cb,
+                                        const ares_srv_subscription_update cb,
                                         uint8_t bit, const char *str) {
     ARG_UNUSED(str);
     bool enabled = value == BT_GATT_CCC_INDICATE;

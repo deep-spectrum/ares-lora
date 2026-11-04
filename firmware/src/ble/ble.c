@@ -44,9 +44,10 @@ static struct k_work_q ares_ble_work_q;
 
 // todo
 #define CONFIG_ARES_BLE_NUM_RX_NET_BUFS 4
-#define CONFIG_ARES_BLE_NUM_TX_NET_BUFS 4
+#define CONFIG_ARES_BLE_NUM_TX_NET_BUFS 8
 #define CONFIG_ARES_BLE_RX_NETBUF_SIZE  1536
-#define CONFIG_ARES_BLE_TX_NETBUF_SIZE  1536
+#define CONFIG_ARES_BLE_TX_NETBUF_SIZE  244
+#define CONFIG_DESCRIPTION_BUF_SIZE     1024
 
 NET_BUF_POOL_DEFINE(ares_tx_netbuf, CONFIG_ARES_BLE_NUM_TX_NET_BUFS,
                     CONFIG_ARES_BLE_TX_NETBUF_SIZE, 0, NULL);
@@ -785,7 +786,7 @@ static int check_response_size(enum ares_srv_configs type, size_t len) {
         break;
     }
     case ARES_CONFIG_DESCRIPTION: {
-        if (len >= (size_t)CONFIG_ARES_BLE_TX_NETBUF_SIZE) {
+        if (len >= (size_t)CONFIG_DESCRIPTION_BUF_SIZE) {
             ret = -ENOMEM;
         }
         break;
@@ -799,21 +800,11 @@ static int check_response_size(enum ares_srv_configs type, size_t len) {
     return ret;
 }
 
-int ares_send_config_response(enum ares_srv_configs type, const void *config,
-                              size_t len) {
+static int indicate_config_response_simple(enum ares_srv_configs type,
+                                           const void *config, size_t len) {
     int ret;
-    struct net_buf *buffer;
 
-    if (!atomic_test_bit(&connection_info.state, BLE_INITIALIZED)) {
-        return -ECANCELED;
-    }
-
-    ret = check_response_size(type, len);
-    if (ret < 0) {
-        return ret;
-    }
-
-    buffer = net_buf_alloc(&ares_tx_netbuf, K_MSEC(100));
+    struct net_buf *buffer = net_buf_alloc(&ares_tx_netbuf, K_MSEC(100));
     if (buffer == NULL) {
         return -ENOMEM;
     }
@@ -826,6 +817,48 @@ int ares_send_config_response(enum ares_srv_configs type, const void *config,
     }
 
     return ret;
+}
+
+static int indicate_config_response_chunked(enum ares_srv_configs type,
+                                            const void *config, size_t len) {
+    ssize_t bytes_left = (ssize_t)len,
+            chunk_size = connection_info.conn_params.mtu_size;
+    int ret = 0;
+
+    for (size_t index = 0; bytes_left > 0 && ret == 0;
+         index += chunk_size, chunk_size = MIN(chunk_size, bytes_left)) {
+        ret = indicate_config_response_simple(
+            type, (const uint8_t *)config + index, chunk_size);
+        bytes_left -= chunk_size;
+        LOG_DBG("Sent %d bytes, %d bytes remaining", chunk_size, bytes_left);
+    }
+
+    return ret;
+}
+
+static int indicate_config_response(enum ares_srv_configs type,
+                                    const void *config, size_t len) {
+    if (len <= connection_info.conn_params.mtu_size) {
+        return indicate_config_response_simple(type, config, len);
+    }
+
+    return indicate_config_response_chunked(type, config, len);
+}
+
+int ares_send_config_response(enum ares_srv_configs type, const void *config,
+                              size_t len) {
+    int ret;
+
+    if (!atomic_test_bit(&connection_info.state, BLE_INITIALIZED)) {
+        return -ECANCELED;
+    }
+
+    ret = check_response_size(type, len);
+    if (ret < 0) {
+        return ret;
+    }
+
+    return indicate_config_response(type, config, len);
 }
 
 int ares_send_neighbor_states(uint8_t num_neighbors, const void *data,

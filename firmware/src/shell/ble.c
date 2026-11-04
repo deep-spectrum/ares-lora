@@ -15,6 +15,8 @@
 
 LOG_MODULE_REGISTER(ble_shell);
 
+#define CONFIG_DESCRIPTION_BUF_SIZE 1024
+
 static uint64_t u64_configs[3] = {
     [ARES_CONFIG_BANDWIDTH] = 100,
     [ARES_CONFIG_CENTER_FREQ] = 2450000000,
@@ -26,7 +28,7 @@ static uint32_t u32_configs[1] = {
 };
 
 struct config_buffer {
-    char config[1024];
+    char config[CONFIG_DESCRIPTION_BUF_SIZE];
     size_t len;
 };
 
