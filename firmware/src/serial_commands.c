@@ -395,6 +395,27 @@ ARES_FRAME_HANDLER(ARES_FRAME_NODE_READY) {
                                                                        : 1);
 }
 
+ARES_FRAME_HANDLER(ARES_FRAME_BLE_NODE_CONFIG) {
+    frame->type = ARES_FRAME_ACK;
+    frame->payload.ACK =
+        ares_send_config_response(frame->payload.BLE_NODE_CONFIG.type,
+                                  frame->payload.BLE_NODE_CONFIG.data,
+                                  frame->payload.BLE_NODE_CONFIG.data_len);
+    ares_serial_write_frame(serial, frame);
+}
+
+ARES_FRAME_HANDLER(ARES_FRAME_BLE_NEIGHBOR_UPDATE) {
+    int ret = ares_send_neighbor_states(
+        frame->payload.BLE_NEIGHBOR_UPDATE.num_neighbors,
+        frame->payload.BLE_NEIGHBOR_UPDATE.neighbor_data,
+        frame->payload.BLE_NEIGHBOR_UPDATE.neighbor_data_len);
+
+    frame->type = ARES_FRAME_ACK;
+    frame->payload.ACK = ret;
+
+    ares_serial_write_frame(serial, frame);
+}
+
 static int initialize_ble(const struct ares_serial *serial) {
     struct ares_ble_init_data init_data = {
         .cb = {
@@ -416,32 +437,6 @@ static int initialize_ble(const struct ares_serial *serial) {
     return ares_init_ble(&init_data);
 }
 
-// static struct ares_serial_command commands[] = {
-//     {.command = ARES_FRAME_SETTING, .callback = handle_setting},
-//     {.command = ARES_FRAME_START, .callback = handle_start},
-//     {.command = ARES_FRAME_LORA_CONFIG, .callback = handle_lora_config},
-//     {.command = ARES_FRAME_LED, .callback = handle_led},
-//     {.command = ARES_FRAME_HEARTBEAT, .callback = handle_heartbeat},
-//     {.command = ARES_FRAME_POLL, .callback = handle_poll},
-//     {.command = ARES_FRAME_LOG, .callback = handle_log},
-//     {.command = ARES_FRAME_LOG_ACK, .callback = handle_log_ack},
-//     {.command = ARES_FRAME_VERSION, .callback = handle_version},
-//     {.command = ARES_FRAME_BLE_STATE, .callback = handle_ble_state},
-//     {.command = ARES_FRAME_BLE_DISCONNECT, .callback =
-//     handle_ble_disconnect},
-//     {.command = ARES_FRAME_REBOOT, .callback = handle_reboot},
-//     {.command = ARES_FRAME_LORA_ACK, .callback = handle_lora_ack},
-//     {.command = ARES_FRAME_ABORT, .callback = handle_abort},
-//     {.command = ARES_FRAME_NODE_CONFIG, .callback = handle_node_config},
-//     {.command = ARES_FRAME_NODE_CONFIG_POLL,
-//      .callback = handle_node_config_poll},
-//     {.command = ARES_FRAME_NODE_CONFIG_RESP,
-//      .callback = handle_node_config_response},
-//     {.command = ARES_FRAME_NODE_READY, .callback = handle_node_ready},
-//     {.command = ARES_FRAME_BLE_NODE_CONFIG, .callback = NULL},
-//     {.command = ARES_FRAME_BLE_NEIGHBOR_UPDATE, .callback = NULL},
-// };
-
 static int init_serial_handlers(void) {
     const struct ares_serial *serial = ares_serial_backend_uart_get_ptr();
 
@@ -450,8 +445,5 @@ static int init_serial_handlers(void) {
         return ret;
     }
     return 0;
-
-    // return ares_serial_register_command_callbacks(serial, commands,
-    //                                               ARRAY_SIZE(commands));
 }
 SYS_INIT(init_serial_handlers, APPLICATION, 90);
