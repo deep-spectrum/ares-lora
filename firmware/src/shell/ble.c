@@ -102,11 +102,19 @@ static void subscriptions_changed(uint32_t subscriptions) {
     LOG_INF("subscriptions_changed: {Thread Name: %s, Thread Prio: %d}",
             k_thread_name_get(k_current_get()),
             k_thread_priority_get(k_current_get()));
-    LOG_INF("Configuration response: %s",
-            (subscriptions & ARES_SUBSCRIPTION_CONFIG_RESP) ? "on" : "off");
     LOG_INF("Neighbor state: %s",
             (subscriptions & ARES_SUBSCRIPTION_NEIGHBOR_UPDATES) ? "on"
                                                                  : "off");
+    LOG_INF("Bandwidth state: %s",
+            (subscriptions & ARES_SUBSCRIPTION_BANDWIDTH) ? "on" : "off");
+    LOG_INF("Center frequency state: %s",
+            (subscriptions & ARES_SUBSCRIPTION_CENTER_FREQ) ? "on" : "off");
+    LOG_INF("Reference level state: %s",
+            (subscriptions & ARES_SUBSCRIPTION_REF_LVL) ? "on" : "off");
+    LOG_INF("Duration state: %s",
+            (subscriptions & ARES_SUBSCRIPTION_DURATION) ? "on" : "off");
+    LOG_INF("Description state: %s",
+            (subscriptions & ARES_SUBSCRIPTION_DESCRIPTION) ? "on" : "off");
 }
 
 static void connection_param_update(uint16_t interval, uint16_t latency,
