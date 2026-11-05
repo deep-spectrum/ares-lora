@@ -524,11 +524,39 @@ static void subscription_update(void *data, uint32_t subscriptions) {
     ares_serial_write_frame(ctx->serial, &frame);
 }
 
+// TODO: Combine config_update and description update under one handler
+static void config_update(void *data, uint32_t type, uint64_t config) {
+    struct ble_user_data *ctx = data;
+    struct ares_frame frame = {.type = ARES_FRAME_BLE_NODE_CONFIG,
+                               .payload.BLE_NODE_CONFIG = {
+                                   .type = type,
+                                   .data = &config,
+                               }};
+
+    switch (type) {
+    case ARES_CONFIG_BANDWIDTH:
+    case ARES_CONFIG_CENTER_FREQ:
+    case ARES_CONFIG_REF_LEVEL: {
+        frame.payload.BLE_NODE_CONFIG.data_len = sizeof(double);
+        break;
+    }
+    case ARES_CONFIG_DURATION: {
+        frame.payload.BLE_NODE_CONFIG.data_len = sizeof(uint32_t);
+        break;
+    }
+    default: {
+        return;
+    }
+    }
+
+    ares_serial_write_frame(ctx->serial, &frame);
+}
+
 static int initialize_ble(const struct ares_serial *serial) {
     struct ares_ble_init_data init_data = {
         .cb =
             {
-                .config_update = NULL,
+                .config_update = config_update,
                 .description_update = NULL,
                 .config_request = NULL,
                 .subscription_update = subscription_update,
