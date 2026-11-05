@@ -552,12 +552,24 @@ static void config_update(void *data, uint32_t type, uint64_t config) {
     ares_serial_write_frame(ctx->serial, &frame);
 }
 
+static void description_update(void *data, const uint8_t *buf, size_t len) {
+    struct ble_user_data *ctx = data;
+    struct ares_frame frame = {.type = ARES_FRAME_BLE_NODE_CONFIG,
+                               .payload.BLE_NODE_CONFIG = {
+                                   .type = ARES_CONFIG_DESCRIPTION,
+                                   .data = buf,
+                                   .data_len = len,
+                               }};
+
+    ares_serial_write_frame(ctx->serial, &frame);
+}
+
 static int initialize_ble(const struct ares_serial *serial) {
     struct ares_ble_init_data init_data = {
         .cb =
             {
                 .config_update = config_update,
-                .description_update = NULL,
+                .description_update = description_update,
                 .config_request = NULL,
                 .subscription_update = subscription_update,
                 .connected = connected,
