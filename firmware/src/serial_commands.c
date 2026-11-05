@@ -476,7 +476,24 @@ static void conn_param_updated(void *data, uint16_t interval, uint16_t latency,
                                }};
 
     ctx->interval = interval;
-    ctx->latency = latency, ctx->timeout = timeout;
+    ctx->latency = latency;
+    ctx->timeout = timeout;
+
+    ares_serial_write_frame(ctx->serial, &frame);
+}
+
+static void phy_updated(void *data, enum le_phy phy) {
+    struct ble_user_data *ctx = data;
+    struct ares_frame frame = {.type = ARES_FRAME_BLE_CONN_PARAMS,
+                               .payload.BLE_CONN_PARAMS = {
+                                   .mtu = ctx->mtu,
+                                   .interval = ctx->interval,
+                                   .latency = ctx->latency,
+                                   .phy = phy,
+                                   .timeout = ctx->timeout,
+                               }};
+
+    ctx->phy = phy;
 
     ares_serial_write_frame(ctx->serial, &frame);
 }
@@ -493,7 +510,7 @@ static int initialize_ble(const struct ares_serial *serial) {
                 .disconnected = disconnected,
                 .connection_param_updated = conn_param_updated,
                 .mtu_size_changed = mtu_size_change,
-                .phy_updated = NULL,
+                .phy_updated = phy_updated,
                 .send_config_response_error = NULL,
                 .start = NULL,
             },
