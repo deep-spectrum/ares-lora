@@ -498,6 +498,32 @@ static void phy_updated(void *data, enum le_phy phy) {
     ares_serial_write_frame(ctx->serial, &frame);
 }
 
+static uint8_t check_subscription_mask(uint32_t subscriptions, uint32_t mask) {
+    return (subscriptions & mask) != 0;
+}
+
+static void subscription_update(void *data, uint32_t subscriptions) {
+    struct ble_user_data *ctx = data;
+    struct ares_frame frame = {
+        .type = ARES_FRAME_BLE_SUBSCRIBED,
+        .payload.BLE_SUBSCRIBED = {
+            .neighbor_states_subscribed = check_subscription_mask(
+                subscriptions, ARES_SUBSCRIPTION_NEIGHBOR_UPDATES),
+            .bandwidth = check_subscription_mask(subscriptions,
+                                                 ARES_SUBSCRIPTION_BANDWIDTH),
+            .center_freq = check_subscription_mask(
+                subscriptions, ARES_SUBSCRIPTION_CENTER_FREQ),
+            .ref_lvl = check_subscription_mask(subscriptions,
+                                               ARES_SUBSCRIPTION_REF_LVL),
+            .duration = check_subscription_mask(subscriptions,
+                                                ARES_SUBSCRIPTION_DURATION),
+            .description = check_subscription_mask(
+                subscriptions, ARES_SUBSCRIPTION_DESCRIPTION),
+        }};
+
+    ares_serial_write_frame(ctx->serial, &frame);
+}
+
 static int initialize_ble(const struct ares_serial *serial) {
     struct ares_ble_init_data init_data = {
         .cb =
@@ -505,7 +531,7 @@ static int initialize_ble(const struct ares_serial *serial) {
                 .config_update = NULL,
                 .description_update = NULL,
                 .config_request = NULL,
-                .subscription_update = NULL,
+                .subscription_update = subscription_update,
                 .connected = connected,
                 .disconnected = disconnected,
                 .connection_param_updated = conn_param_updated,
