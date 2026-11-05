@@ -584,6 +584,16 @@ static void send_start(void *data, uint32_t delay) {
     ares_serial_write_frame(ctx->serial, &frame);
 }
 
+static void ble_config_response_error(void *data, uint8_t err) {
+    struct ble_user_data *ctx = data;
+    struct ares_frame frame = {
+        .type = ARES_FRAME_BLE_ATT_ERR,
+        .payload.BLE_ATT_ERR = err,
+    };
+
+    ares_serial_write_frame(ctx->serial, &frame);
+}
+
 static int initialize_ble(const struct ares_serial *serial) {
     struct ares_ble_init_data init_data = {
         .cb =
@@ -597,7 +607,7 @@ static int initialize_ble(const struct ares_serial *serial) {
                 .connection_param_updated = conn_param_updated,
                 .mtu_size_changed = mtu_size_change,
                 .phy_updated = phy_updated,
-                .send_config_response_error = NULL,
+                .send_config_response_error = ble_config_response_error,
                 .start = send_start,
             },
         .user_data = &ares_ble_user_data,
