@@ -37,22 +37,30 @@ static struct config_buffer str_configs[1] = {
                                                            .len = 5},
 };
 
-static void config_update(void *user_data, uint32_t type, uint64_t value) {
-    LOG_INF("config_update: {Thread Name: %s, Thread Prio: %d}",
+void configuration_update(void *user_data, uint32_t type, const uint8_t *buf,
+                          size_t len) {
+    LOG_INF("Configuration Update: {Thread Name %s, Thread Prio: %d}",
             k_thread_name_get(k_current_get()),
             k_thread_priority_get(k_current_get()));
-    LOG_INF("Configuration Updated. Config ID: %" PRIu32 ", value: %" PRIu64,
-            type, value);
+    LOG_INF("Configuration Updated: Config ID: %" PRIu32 ", size: %" PRIu16,
+            type, len);
+    LOG_HEXDUMP_INF(buf, len, "New setting");
 
     switch (type) {
     case ARES_CONFIG_BANDWIDTH:
     case ARES_CONFIG_CENTER_FREQ:
     case ARES_CONFIG_REF_LEVEL: {
-        u64_configs[type] = value;
+        memcpy(&u64_configs[type], buf, sizeof(u64_configs[0]));
         break;
     }
     case ARES_CONFIG_DURATION: {
-        u32_configs[type - ARES_CONFIG_DURATION] = value;
+        memcpy(&u32_configs[type - ARES_CONFIG_DURATION], buf,
+               sizeof(u32_configs[0]));
+        break;
+    }
+    case ARES_CONFIG_DESCRIPTION: {
+        memcpy(str_configs[0].config, buf, len);
+        str_configs[0].len = len;
         break;
     }
     default: {
@@ -60,17 +68,6 @@ static void config_update(void *user_data, uint32_t type, uint64_t value) {
         break;
     }
     }
-}
-
-static void description_update(void *user_data, const uint8_t *buf,
-                               size_t len) {
-    LOG_INF("description_update: {Thread Name: %s, Thread Prio: %d}",
-            k_thread_name_get(k_current_get()),
-            k_thread_priority_get(k_current_get()));
-    LOG_HEXDUMP_INF(buf, len, "New Description");
-
-    memcpy(str_configs[0].config, buf, len);
-    str_configs[0].len = len;
 }
 
 static void connected(void *user_data) {
@@ -172,8 +169,7 @@ static int initialize_ble(void) {
     struct ares_ble_init_data init_data = {
         .cb =
             {
-                .config_update = config_update,
-                .description_update = description_update,
+                .configuration_update = configuration_update,
                 .config_request = config_request,
                 .subscription_update = subscriptions_changed,
                 .connected = connected,

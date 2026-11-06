@@ -132,18 +132,11 @@ struct ares_ble_callbacks {
      *
      * @param[in] user_data Pointer to the user data.
      * @param[in] type The configuration type.
-     * @param[in] value The new value of the configuration.
+     * @param[in] buf Pointer to the buffer containing the data.
+     * @param[in] len The length of the data.
      */
-    void (*config_update)(void *user_data, uint32_t type, uint64_t value);
-
-    /**
-     * Notification that the description changed.
-     *
-     * @param[in] user_data Pointer to the user data.
-     * @param[in] buf The buffer that stores the new description.
-     * @param[in] len The length of the buffer.
-     */
-    void (*description_update)(void *user_data, const uint8_t *buf, size_t len);
+    void (*configuration_update)(void *user_data, uint32_t type,
+                                 const uint8_t *buf, size_t len);
 
     /**
      * Notification that the central device is requesting a configuration.

@@ -279,7 +279,7 @@ struct ares_frame {
         struct {
             uint16_t type;
             struct {
-                void *data;
+                const void *data;
                 size_t data_len;
             };
         } BLE_NODE_CONFIG; ///< ARES_FRAME_BLE_NODE_CONFIG

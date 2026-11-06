@@ -524,39 +524,12 @@ static void subscription_update(void *data, uint32_t subscriptions) {
     ares_serial_write_frame(ctx->serial, &frame);
 }
 
-// TODO: Combine config_update and description update under one handler
-static void config_update(void *data, uint32_t type, uint64_t config) {
+static void configuration_update(void *data, uint32_t type, const uint8_t *buf,
+                                 size_t len) {
     struct ble_user_data *ctx = data;
     struct ares_frame frame = {.type = ARES_FRAME_BLE_NODE_CONFIG,
                                .payload.BLE_NODE_CONFIG = {
                                    .type = type,
-                                   .data = &config,
-                               }};
-
-    switch (type) {
-    case ARES_CONFIG_BANDWIDTH:
-    case ARES_CONFIG_CENTER_FREQ:
-    case ARES_CONFIG_REF_LEVEL: {
-        frame.payload.BLE_NODE_CONFIG.data_len = sizeof(double);
-        break;
-    }
-    case ARES_CONFIG_DURATION: {
-        frame.payload.BLE_NODE_CONFIG.data_len = sizeof(uint32_t);
-        break;
-    }
-    default: {
-        return;
-    }
-    }
-
-    ares_serial_write_frame(ctx->serial, &frame);
-}
-
-static void description_update(void *data, const uint8_t *buf, size_t len) {
-    struct ble_user_data *ctx = data;
-    struct ares_frame frame = {.type = ARES_FRAME_BLE_NODE_CONFIG,
-                               .payload.BLE_NODE_CONFIG = {
-                                   .type = ARES_CONFIG_DESCRIPTION,
                                    .data = buf,
                                    .data_len = len,
                                }};
@@ -598,8 +571,7 @@ static int initialize_ble(const struct ares_serial *serial) {
     struct ares_ble_init_data init_data = {
         .cb =
             {
-                .config_update = config_update,
-                .description_update = description_update,
+                .configuration_update = configuration_update,
                 .config_request = config_request,
                 .subscription_update = subscription_update,
                 .connected = connected,
@@ -617,16 +589,12 @@ static int initialize_ble(const struct ares_serial *serial) {
 
     (void)retrieve_setting(ARES_SETTING_ID, &init_data.node_id);
 
-    return ares_init_ble(&init_data);
+    // return ares_init_ble(&init_data);
+    return 0;
 }
 
 static int init_serial_handlers(void) {
     const struct ares_serial *serial = ares_serial_backend_uart_get_ptr();
-
-    int ret = initialize_ble(serial);
-    if (ret != 0) {
-        return ret;
-    }
-    return 0;
+    return initialize_ble(serial);
 }
 SYS_INIT(init_serial_handlers, APPLICATION, 90);

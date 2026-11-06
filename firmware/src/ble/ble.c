@@ -43,9 +43,9 @@ static struct k_work_q ares_ble_work_q;
 #endif
 
 // todo
-#define CONFIG_ARES_BLE_NUM_RX_NET_BUFS 4
+#define CONFIG_ARES_BLE_NUM_RX_NET_BUFS 6
 #define CONFIG_ARES_BLE_NUM_TX_NET_BUFS 8
-#define CONFIG_ARES_BLE_RX_NETBUF_SIZE  1536
+#define CONFIG_ARES_BLE_RX_NETBUF_SIZE  1034
 #define CONFIG_ARES_BLE_TX_NETBUF_SIZE  244
 #define CONFIG_DESCRIPTION_BUF_SIZE     1024
 
@@ -59,27 +59,11 @@ struct config_response_ind_err_work {
     struct k_work work;
 };
 
-// todo: Make the data in the work a list. (Do this when functionality is
-// confirmed to work)
 struct config_write_work {
-    struct k_sem sem;
-    union {
-        uint64_t value;
-        struct net_buf *buf;
-    };
-    const enum ares_srv_configs config;
-    struct k_work work;
+    struct k_fifo fifo;
+    struct k_poll_event events[1];
+    struct k_work_poll work;
 };
-
-#define Z_ARES_CONFIG_WRITE_WORK_INITIALIZER(name, _config, _handler)          \
-    {                                                                          \
-        .config = (_config), .work = Z_WORK_INITIALIZER(_handler),             \
-        .sem = Z_SEM_INITIALIZER(name.sem, 1, 1)                               \
-    }
-
-#define ARES_CONFIG_WRITE_WORK_DEFINE(name, _config, _handler)                 \
-    struct config_write_work name =                                            \
-        Z_ARES_CONFIG_WRITE_WORK_INITIALIZER(name, _config, _handler)
 
 struct ble_conn_info {
     struct k_sem adv_name_sem;
@@ -132,6 +116,7 @@ static struct ble_conn_info connection_info = {
         .latency = CONFIG_BT_PERIPHERAL_PREF_LATENCY,
         .timeout = CONFIG_BT_PERIPHERAL_PREF_TIMEOUT,
     }};
+static struct config_write_work write_work;
 static struct ble_callback_data callbacks;
 
 static void config_response_indicate_work(struct k_work *work) {
@@ -146,73 +131,56 @@ static void config_response_indicate_work(struct k_work *work) {
 // Initialized in init
 
 static void write_work_handler(struct k_work *work) {
+    struct k_work_poll *pwork = CONTAINER_OF(work, struct k_work_poll, work);
     struct config_write_work *wwork =
-        CONTAINER_OF(work, struct config_write_work, work);
-    uint64_t value = wwork->value;
-    enum ares_srv_configs config = wwork->config;
-    k_sem_give(&wwork->sem);
+        CONTAINER_OF(pwork, struct config_write_work, work);
 
-    switch (wwork->config) {
-    case ARES_CONFIG_RESERVED_GET: {
-        if (callbacks.cb.config_request != NULL) {
-            callbacks.cb.config_request(callbacks.user_data, (uint32_t)value);
+    struct net_buf *buf = k_fifo_get(&wwork->fifo, K_NO_WAIT);
+    while (buf != NULL) {
+        uint32_t type = net_buf_pull_le32(buf);
+        uint16_t len = net_buf_pull_le16(buf);
+
+        switch (type) {
+        case ARES_CONFIG_RESERVED_GET: {
+            if (callbacks.cb.config_request != NULL) {
+                uint32_t config = net_buf_pull_le32(buf);
+                callbacks.cb.config_request(callbacks.user_data, config);
+            }
+            break;
         }
-        break;
-    }
-    case ARES_CONFIG_RESERVED_START: {
-        if (callbacks.cb.start != NULL) {
-            callbacks.cb.start(callbacks.user_data, (uint32_t)value);
+        case ARES_CONFIG_RESERVED_START: {
+            if (callbacks.cb.start != NULL) {
+                uint32_t delay = net_buf_pull_le32(buf);
+                callbacks.cb.start(callbacks.user_data, delay);
+            }
+            break;
         }
-        break;
-    }
-    default: {
-        if (callbacks.cb.config_update != NULL) {
-            callbacks.cb.config_update(callbacks.user_data, config, value);
+        case ARES_CONFIG_BANDWIDTH:
+        case ARES_CONFIG_CENTER_FREQ:
+        case ARES_CONFIG_REF_LEVEL:
+        case ARES_CONFIG_DURATION:
+        case ARES_CONFIG_DESCRIPTION: {
+            if (callbacks.cb.configuration_update != NULL) {
+                callbacks.cb.configuration_update(callbacks.user_data, type,
+                                                  buf->data, len);
+            }
+            break;
         }
-        break;
+        default: {
+            LOG_ERR("Unhandled case: %d", type);
+            break;
+        }
+        }
+
+        net_buf_unref(buf);
+        k_yield();
+        buf = k_fifo_get(&wwork->fifo, K_NO_WAIT);
     }
-    }
+
+    k_work_poll_submit_to_queue(connection_info.ble_work_q_lp, pwork,
+                                wwork->events, ARRAY_SIZE(wwork->events),
+                                K_FOREVER);
 }
-
-static void write_work_net_buf_handler(struct k_work *work) {
-    struct config_write_work *wwork =
-        CONTAINER_OF(work, struct config_write_work, work);
-    struct net_buf *buf = wwork->buf;
-    wwork->buf = NULL;
-    enum ares_srv_configs config = wwork->config;
-    k_sem_give(&wwork->sem);
-
-    switch (config) {
-    case ARES_CONFIG_DESCRIPTION: {
-        if (callbacks.cb.description_update) {
-            callbacks.cb.description_update(callbacks.user_data, buf->data,
-                                            buf->len);
-        }
-        break;
-    }
-    default: {
-        LOG_ERR("Unhandled case: %d", config);
-        break;
-    }
-    }
-
-    net_buf_unref(buf);
-}
-
-ARES_CONFIG_WRITE_WORK_DEFINE(bandwidth_work, ARES_CONFIG_BANDWIDTH,
-                              write_work_handler);
-ARES_CONFIG_WRITE_WORK_DEFINE(center_freq_work, ARES_CONFIG_CENTER_FREQ,
-                              write_work_handler);
-ARES_CONFIG_WRITE_WORK_DEFINE(ref_level_work, ARES_CONFIG_REF_LEVEL,
-                              write_work_handler);
-ARES_CONFIG_WRITE_WORK_DEFINE(duration_work, ARES_CONFIG_DURATION,
-                              write_work_handler);
-ARES_CONFIG_WRITE_WORK_DEFINE(description_work, ARES_CONFIG_DESCRIPTION,
-                              write_work_net_buf_handler);
-ARES_CONFIG_WRITE_WORK_DEFINE(config_request_work, ARES_CONFIG_RESERVED_GET,
-                              write_work_handler);
-ARES_CONFIG_WRITE_WORK_DEFINE(start_work, ARES_CONFIG_RESERVED_START,
-                              write_work_handler);
 
 static void connected_work_handler(struct k_work *work) {
     ARG_UNUSED(work);
@@ -485,18 +453,19 @@ static void config_response_indicate_callback(struct bt_conn *conn, uint8_t err,
 }
 
 static enum ares_srv_write_response
-submit_write_work(struct config_write_work *work, uint64_t value) {
-    int ret = k_sem_take(&work->sem, K_NO_WAIT);
-    if (ret < 0) {
-        return ARES_WRITE_BUSY;
+create_write_config_work_item(uint32_t type, void *data, uint16_t len) {
+    struct net_buf *buf;
+
+    buf = net_buf_alloc(&ares_tx_netbuf, K_NO_WAIT);
+    if (buf == NULL) {
+        return ARES_WRITE_NO_MEM;
     }
 
-    work->value = value;
-    ret = k_work_submit_to_queue(connection_info.ble_work_q_lp, &work->work);
-    if (ret < 0) {
-        k_sem_give(&work->sem);
-        return ARES_WRITE_FAILED;
-    }
+    net_buf_add_le32(buf, type);
+    net_buf_add_le16(buf, len);
+    net_buf_add_mem(buf, data, len);
+
+    k_fifo_put(&write_work.fifo, buf);
 
     return ARES_WRITE_SUCCESS;
 }
@@ -509,7 +478,8 @@ static enum ares_srv_write_response bandwidth_update(struct bt_conn *conn,
     LOG_DBG("Bandwidth update thread priority: %d",
             k_thread_priority_get(k_current_get()));
 
-    return submit_write_work(&bandwidth_work, bandwidth);
+    return create_write_config_work_item(ARES_CONFIG_BANDWIDTH, &bandwidth,
+                                         sizeof(bandwidth));
 }
 
 static enum ares_srv_write_response
@@ -520,7 +490,8 @@ center_frequency_update(struct bt_conn *conn, uint64_t center_freq) {
     LOG_DBG("Center frequency update thread priority: %d",
             k_thread_priority_get(k_current_get()));
 
-    return submit_write_work(&center_freq_work, center_freq);
+    return create_write_config_work_item(ARES_CONFIG_CENTER_FREQ, &center_freq,
+                                         sizeof(center_freq));
 }
 
 static enum ares_srv_write_response reference_level_update(struct bt_conn *conn,
@@ -531,7 +502,8 @@ static enum ares_srv_write_response reference_level_update(struct bt_conn *conn,
     LOG_DBG("Reference level update thread priority: %d",
             k_thread_priority_get(k_current_get()));
 
-    return submit_write_work(&ref_level_work, ref_level);
+    return create_write_config_work_item(ARES_CONFIG_REF_LEVEL, &ref_level,
+                                         sizeof(ref_level));
 }
 
 static enum ares_srv_write_response duration_update(struct bt_conn *conn,
@@ -541,10 +513,9 @@ static enum ares_srv_write_response duration_update(struct bt_conn *conn,
     ARG_UNUSED(conn);
     LOG_DBG("duration update thread priority: %d",
             k_thread_priority_get(k_current_get()));
-    uint64_t val = 0;
-    val = duration;
 
-    return submit_write_work(&duration_work, val);
+    return create_write_config_work_item(ARES_CONFIG_DURATION, &duration,
+                                         sizeof(duration));
 }
 
 static enum ares_srv_write_response
@@ -564,19 +535,20 @@ description_update(struct bt_conn *conn, const void *buf, uint16_t len) {
 
     net_buf_add_mem(connection_info.desc_buf, buf, len);
 
-    if (((const uint8_t *)buf)[len - 1] == '\0') {
-        int ret = k_sem_take(&description_work.sem, K_NO_WAIT);
-        if (ret < 0) {
-            net_buf_unref(connection_info.desc_buf);
-            connection_info.desc_buf = NULL;
-            return ARES_WRITE_BUSY;
-        }
-
-        description_work.buf = net_buf_ref(connection_info.desc_buf);
+    if (connection_info.desc_buf->len > CONFIG_DESCRIPTION_BUF_SIZE) {
         net_buf_unref(connection_info.desc_buf);
         connection_info.desc_buf = NULL;
-        k_work_submit_to_queue(connection_info.ble_work_q_lp,
-                               &description_work.work);
+        return ARES_WRITE_NO_MEM;
+    }
+
+    if (((const uint8_t *)buf)[len - 1] == '\0') {
+        net_buf_push_le16(connection_info.desc_buf,
+                          connection_info.desc_buf->len);
+        net_buf_push_le32(connection_info.desc_buf, ARES_CONFIG_DESCRIPTION);
+
+        k_fifo_put(&write_work.fifo, net_buf_ref(connection_info.desc_buf));
+        net_buf_unref(connection_info.desc_buf);
+        connection_info.desc_buf = NULL;
     }
 
     return ARES_WRITE_SUCCESS;
@@ -590,7 +562,8 @@ config_read_handler(struct bt_conn *conn, enum ares_srv_configs config) {
     LOG_DBG("Config read thread priority: %d",
             k_thread_priority_get(k_current_get()));
 
-    return submit_write_work(&config_request_work, config);
+    return create_write_config_work_item(ARES_CONFIG_RESERVED_GET, &config,
+                                         sizeof(uint32_t));
 }
 
 static enum ares_srv_write_response start_handler(struct bt_conn *conn,
@@ -601,7 +574,8 @@ static enum ares_srv_write_response start_handler(struct bt_conn *conn,
     LOG_DBG("Start thread priority: %d",
             k_thread_priority_get(k_current_get()));
 
-    return submit_write_work(&start_work, delay);
+    return create_write_config_work_item(ARES_CONFIG_RESERVED_START, &delay,
+                                         sizeof(delay));
 }
 
 static void config_response_indication_enable(enum ares_srv_configs config,
@@ -703,6 +677,13 @@ int ares_init_ble(const struct ares_ble_init_data *init_data) {
 
     k_work_init(&connection_info.conf_resp_work.work,
                 config_response_indicate_work);
+    k_work_poll_init(&write_work.work, write_work_handler);
+    k_fifo_init(&write_work.fifo);
+    k_poll_event_init(&write_work.events[0], K_POLL_TYPE_FIFO_DATA_AVAILABLE,
+                      K_POLL_MODE_NOTIFY_ONLY, &write_work.fifo);
+    k_work_poll_submit_to_queue(connection_info.ble_work_q_lp, &write_work.work,
+                                write_work.events,
+                                ARRAY_SIZE(write_work.events), K_FOREVER);
 
     callbacks.cb = init_data->cb;
     callbacks.user_data = init_data->user_data;
