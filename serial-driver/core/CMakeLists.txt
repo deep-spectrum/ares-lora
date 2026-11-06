@@ -28,7 +28,7 @@ set(ARES_FRAME_SRC
         src/ares_lora_serial/frames/ble/ble_connected.cpp
         src/ares_lora_serial/frames/ble/ble_disconnect.cpp
         src/ares_lora_serial/frames/ble/ble_subscribed.cpp
-        src/ares_lora_serial/frames/ble/ble_chunks.cpp
+        src/ares_lora_serial/frames/ble/ble_conn_params.cpp
         src/ares_lora_serial/frames/ble/ble_image_chunk.cpp
 
         # Debug

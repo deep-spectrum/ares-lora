@@ -66,7 +66,7 @@ enum AresFrameType : uint16_t {
     BLE_CONNECTED = 15,   ///< BLE connect state change (RX)
     BLE_DISCONNECT = 16,  ///< Disconnect BLE (TX)
     BLE_SUBSCRIBED = 17,  ///< BLE service subscription change (RX)
-    BLE_CHUNK = 18,       ///< BLE tell central how many chunks (TX)
+    BLE_CONN_PARAM = 18,  ///< BLE connection parameters (Rx)
     BLE_IMAGE_CHUNK = 19, ///< BLE transfer image chunk (TX)
 
     REBOOT = 20,           ///< Reboot (TX)

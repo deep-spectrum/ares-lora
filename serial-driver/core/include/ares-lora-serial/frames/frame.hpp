@@ -11,7 +11,7 @@
 #ifndef ARES_FRAME_HPP
 #define ARES_FRAME_HPP
 
-#include <ares-lora-serial/frames/ble/ble_chunks.hpp>
+#include <ares-lora-serial/frames/ble/ble_conn_params.hpp>
 #include <ares-lora-serial/frames/ble/ble_connected.hpp>
 #include <ares-lora-serial/frames/ble/ble_disconnect.hpp>
 #include <ares-lora-serial/frames/ble/ble_image_chunk.hpp>
@@ -61,8 +61,8 @@ class Frame {
      */
     using TxTypes =
         std::variant<std::monostate, Setting, Start, LoraConfig, Led, Heartbeat,
-                     Poll, Log, Version, BleState, BleChunk, BleImage,
-                     BleDisconnect, Reboot, Abort, NodeConfig, NodeConfigPoll,
+                     Poll, Log, Version, BleState, BleImage, BleDisconnect,
+                     Reboot, Abort, NodeConfig, NodeConfigPoll,
                      NodeConfigResponse, NodeReady, LoraAck, LogAck>;
 
     /**
@@ -73,8 +73,9 @@ class Frame {
     using RxTypes =
         std::variant<std::monostate, Setting, Start, Ack, FramingError, Led,
                      Heartbeat, Poll, Log, Version, LogAck, Dbg, PktRx, PktTx,
-                     BleState, BleConnect, BleSubscribed, LoraAck, Abort,
-                     NodeConfig, NodeConfigPoll, NodeConfigResponse, NodeReady>;
+                     BleState, BleConnParams, BleConnect, BleSubscribed,
+                     LoraAck, Abort, NodeConfig, NodeConfigPoll,
+                     NodeConfigResponse, NodeReady>;
 
     /**
      * @typedef ResponseTypes
@@ -247,6 +248,7 @@ class Frame {
         {BLE_STATE, [] { return BleState(); }},
         {BLE_CONNECTED, [] { return BleConnect(); }},
         {BLE_SUBSCRIBED, [] { return BleSubscribed(); }},
+        {BLE_CONN_PARAM, [] { return BleConnParams(); }},
         {LORA_ACK, [] { return LoraAck(); }},
         {ABORT, [] { return Abort(); }},
         {NODE_CONFIG, [] { return NodeConfig(); }},
