@@ -62,12 +62,12 @@ enum AresFrameType : uint16_t {
     PKT_RX = 12,        ///< Packet Received (RX)
     PKT_TX = 13,        ///< Packet transmitted (RX)
 
-    BLE_STATE = 14,       ///< Set or retrieve the BLE state (TX/RX)
-    BLE_CONNECTED = 15,   ///< BLE connect state change (RX)
-    BLE_DISCONNECT = 16,  ///< Disconnect BLE (TX)
-    BLE_SUBSCRIBED = 17,  ///< BLE service subscription change (RX)
-    BLE_CONN_PARAM = 18,  ///< BLE connection parameters (Rx)
-    BLE_IMAGE_CHUNK = 19, ///< BLE transfer image chunk (TX)
+    BLE_STATE = 14,      ///< Set or retrieve the BLE state (TX/RX)
+    BLE_CONNECTED = 15,  ///< BLE connect state change (RX)
+    BLE_DISCONNECT = 16, ///< Disconnect BLE (TX)
+    BLE_SUBSCRIBED = 17, ///< BLE service subscription change (RX)
+    BLE_CONN_PARAM = 18, ///< BLE connection parameters (Rx)
+    BLE_ATT_ERR = 19,    ///< BLE ATT error (RX)
 
     REBOOT = 20,           ///< Reboot (TX)
     LORA_ACK = 21,         ///< LoRa packet Acknowledge (TX/RX)
