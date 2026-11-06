@@ -161,6 +161,7 @@ static void write_work_handler(struct k_work *work) {
                                 wwork->events, ARRAY_SIZE(wwork->events),
                                 K_FOREVER);
 }
+// Initialized in init
 
 static void connected_work_handler(struct k_work *work) {
     ARG_UNUSED(work);
@@ -875,8 +876,6 @@ int ares_send_neighbor_states(uint8_t num_neighbors, const void *data,
     if (buf_len != len) {
         return -EBADMSG;
     }
-
-    buf_len += sizeof(num_neighbors);
 
     buf = net_buf_alloc(&ares_tx_netbuf, K_MSEC(100));
     if (buf == NULL) {
