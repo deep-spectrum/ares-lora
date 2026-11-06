@@ -30,11 +30,6 @@ struct BleConnect : Internal::FramePayloadBase {
     bool connected = false;
 
     /**
-     * The maximum transfer size.
-     */
-    uint16_t chunk_size = 0;
-
-    /**
      * Decode the payload from a serial buffer.
      * @param buffer Pointer to buffer that contains encoded payload
      * @param len The size of the payload.
