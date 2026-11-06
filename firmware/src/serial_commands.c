@@ -589,8 +589,7 @@ static int initialize_ble(const struct ares_serial *serial) {
 
     (void)retrieve_setting(ARES_SETTING_ID, &init_data.node_id);
 
-    // return ares_init_ble(&init_data);
-    return 0;
+    return ares_init_ble(&init_data);
 }
 
 static int init_serial_handlers(void) {

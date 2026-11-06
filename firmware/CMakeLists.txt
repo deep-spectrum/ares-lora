@@ -10,7 +10,6 @@ include_directories(include)
 set(SRC
         src/main.c
         src/settings.c
-        src/serial_commands.c
         src/lora_handlers.c
 )
 
@@ -37,6 +36,7 @@ set(SHELL_SRC
 
 target_sources(app PRIVATE ${SRC} ${SERIAL_SRC} ${LORA_SRC} ${BLE_SRC})
 target_sources_ifdef(CONFIG_SHELL app PRIVATE ${SHELL_SRC})
+target_sources_ifndef(CONFIG_SHELL app PRIVATE src/serial_commands.c)
 
 zephyr_iterable_section(NAME ares_serial_command
         KVMA RAM_REGION GROUP RODATA_REGION

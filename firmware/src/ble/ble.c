@@ -29,26 +29,6 @@ enum {
     BLE_CONNECTED,
 };
 
-// todo
-#define CONFIG_ARES_BLE_WORKQ 0
-
-#if IS_ENABLED(CONFIG_ARES_BLE_WORKQ)
-// todo
-#define CONFIG_ARES_BLE_WORKQ_PRIO       (-1)
-#define CONFIG_ARES_BLE_WORKQ_STACK_SIZE 1024
-
-K_THREAD_STACK_DEFINE(ble_workq_stack, CONFIG_ARES_BLE_WORKQ_STACK_SIZE);
-
-static struct k_work_q ares_ble_work_q;
-#endif
-
-// todo
-#define CONFIG_ARES_BLE_NUM_RX_NET_BUFS 6
-#define CONFIG_ARES_BLE_NUM_TX_NET_BUFS 8
-#define CONFIG_ARES_BLE_RX_NETBUF_SIZE  1034
-#define CONFIG_ARES_BLE_TX_NETBUF_SIZE  244
-#define CONFIG_DESCRIPTION_BUF_SIZE     1024
-
 NET_BUF_POOL_DEFINE(ares_tx_netbuf, CONFIG_ARES_BLE_NUM_TX_NET_BUFS,
                     CONFIG_ARES_BLE_TX_NETBUF_SIZE, 0, NULL);
 NET_BUF_POOL_DEFINE(ares_rx_netbuf, CONFIG_ARES_BLE_NUM_RX_NET_BUFS,
@@ -580,7 +560,7 @@ static enum ares_srv_write_response start_handler(struct bt_conn *conn,
 
 static void config_response_indication_enable(enum ares_srv_configs config,
                                               bool enabled) {
-    int bit = 0;
+    int bit;
 
     switch (config) {
     case ARES_CONFIG_BANDWIDTH: {
