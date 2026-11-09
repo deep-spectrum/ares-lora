@@ -13,6 +13,7 @@
 
 #include <ares-lora-serial/frames/ble/ble_att_error.hpp>
 #include <ares-lora-serial/frames/ble/ble_config.hpp>
+#include <ares-lora-serial/frames/ble/ble_config_request.hpp>
 #include <ares-lora-serial/frames/ble/ble_conn_params.hpp>
 #include <ares-lora-serial/frames/ble/ble_connected.hpp>
 #include <ares-lora-serial/frames/ble/ble_disconnect.hpp>
@@ -76,7 +77,8 @@ class Frame {
                      Heartbeat, Poll, Log, Version, LogAck, Dbg, PktRx, PktTx,
                      BleState, BleConnParams, BleAttErr, BleConnect,
                      BleSubscribed, LoraAck, Abort, NodeConfig, NodeConfigPoll,
-                     NodeConfigResponse, NodeReady, BleNodeConfiguration>;
+                     NodeConfigResponse, NodeReady, BleNodeConfiguration,
+                     BleConfigRequest>;
 
     /**
      * @typedef ResponseTypes
@@ -258,6 +260,7 @@ class Frame {
         {NODE_CONFIG_RESP, [] { return NodeConfigResponse(); }},
         {NODE_READY, [] { return NodeReady(); }},
         {BLE_CONFIG, [] { return BleNodeConfiguration(); }},
+        {BLE_CONFIG_REQ, [] { return BleConfigRequest(); }},
     };
 };
 
