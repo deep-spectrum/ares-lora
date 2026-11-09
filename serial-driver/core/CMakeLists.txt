@@ -30,6 +30,7 @@ set(ARES_FRAME_SRC
         src/ares_lora_serial/frames/ble/ble_subscribed.cpp
         src/ares_lora_serial/frames/ble/ble_conn_params.cpp
         src/ares_lora_serial/frames/ble/ble_att_error.cpp
+        src/ares_lora_serial/frames/ble/ble_config.cpp
 
         # Debug
         src/ares_lora_serial/frames/debug/dbg.cpp
