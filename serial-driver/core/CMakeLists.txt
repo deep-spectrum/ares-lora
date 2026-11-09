@@ -32,6 +32,7 @@ set(ARES_FRAME_SRC
         src/ares_lora_serial/frames/ble/ble_att_error.cpp
         src/ares_lora_serial/frames/ble/ble_config.cpp
         src/ares_lora_serial/frames/ble/ble_config_request.cpp
+        src/ares_lora_serial/frames/ble/ble_start.cpp
 
         # Debug
         src/ares_lora_serial/frames/debug/dbg.cpp

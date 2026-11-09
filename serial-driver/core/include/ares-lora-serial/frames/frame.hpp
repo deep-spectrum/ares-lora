@@ -17,6 +17,7 @@
 #include <ares-lora-serial/frames/ble/ble_conn_params.hpp>
 #include <ares-lora-serial/frames/ble/ble_connected.hpp>
 #include <ares-lora-serial/frames/ble/ble_disconnect.hpp>
+#include <ares-lora-serial/frames/ble/ble_start.hpp>
 #include <ares-lora-serial/frames/ble/ble_state.hpp>
 #include <ares-lora-serial/frames/ble/ble_subscribed.hpp>
 #include <ares-lora-serial/frames/debug/dbg.hpp>
@@ -78,7 +79,7 @@ class Frame {
                      BleState, BleConnParams, BleAttErr, BleConnect,
                      BleSubscribed, LoraAck, Abort, NodeConfig, NodeConfigPoll,
                      NodeConfigResponse, NodeReady, BleNodeConfiguration,
-                     BleConfigRequest>;
+                     BleConfigRequest, BleStart>;
 
     /**
      * @typedef ResponseTypes
@@ -261,7 +262,7 @@ class Frame {
         {NODE_READY, [] { return NodeReady(); }},
         {BLE_CONFIG, [] { return BleNodeConfiguration(); }},
         {BLE_CONFIG_REQ, [] { return BleConfigRequest(); }},
-    };
+        {BLE_START, [] { return BleStart(); }}};
 };
 
 } // namespace AresFrame

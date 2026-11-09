@@ -26,7 +26,7 @@ struct BleConfigRequest : Internal::FramePayloadBase {
     /**
      * Configuration type.
      */
-    BleConfigurationTypes type;
+    BleConfigurationTypes type = BANDWIDTH;
 
     /**
      * Decode the payload from a serial buffer.
