@@ -103,7 +103,7 @@ enum BtAttError : uint8_t {
 };
 
 /**
- *@enum BleConfigurationTypes
+ * @enum BleConfigurationTypes
  * Node configuration settings.
  */
 enum BleConfigurationTypes : uint16_t {
@@ -131,6 +131,22 @@ enum BleConfigurationTypes : uint16_t {
      * Description setting.
      */
     DESCRIPTION = 4,
+};
+
+/**
+ * @struct BleNeighborData
+ * Neighbor status data.
+ */
+struct BleNeighborData {
+    /**
+     * Neighbor ID.
+     */
+    uint16_t id = 0;
+
+    /**
+     * Neighbor ready flag.
+     */
+    bool ready = false;
 };
 
 } // namespace AresFrame

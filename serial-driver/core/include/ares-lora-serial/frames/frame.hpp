@@ -17,6 +17,7 @@
 #include <ares-lora-serial/frames/ble/ble_conn_params.hpp>
 #include <ares-lora-serial/frames/ble/ble_connected.hpp>
 #include <ares-lora-serial/frames/ble/ble_disconnect.hpp>
+#include <ares-lora-serial/frames/ble/ble_neighbor_update.hpp>
 #include <ares-lora-serial/frames/ble/ble_start.hpp>
 #include <ares-lora-serial/frames/ble/ble_state.hpp>
 #include <ares-lora-serial/frames/ble/ble_subscribed.hpp>
@@ -66,7 +67,7 @@ class Frame {
         std::variant<std::monostate, Setting, Start, LoraConfig, Led, Heartbeat,
                      Poll, Log, Version, BleState, BleDisconnect, Reboot, Abort,
                      NodeConfig, NodeConfigPoll, NodeConfigResponse, NodeReady,
-                     LoraAck, LogAck, BleNodeConfiguration>;
+                     LoraAck, LogAck, BleNodeConfiguration, BleNeighborUpdate>;
 
     /**
      * @typedef RxTypes

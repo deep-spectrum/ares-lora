@@ -81,8 +81,9 @@ enum AresFrameType : uint16_t {
 
     BLE_CONFIG = 27, ///< Ble configuration update notification or configuration
                      ///< response (TX/RX)
-    BLE_CONFIG_REQ = 28, ///< Ble configuration request notification (RX)
-    BLE_START = 29,      ///< Ble start notification (Rx)
+    BLE_CONFIG_REQ = 28,      ///< Ble configuration request notification (RX)
+    BLE_START = 29,           ///< Ble start notification (Rx)
+    BLE_NEIGHBOR_UPDATE = 30, ///< Send neighbor update over BLE (TX)
 
     DRIVER_STOP, ///< Frame used to stop the core driver.
     UNKNOWN,     ///< Unknown frame
