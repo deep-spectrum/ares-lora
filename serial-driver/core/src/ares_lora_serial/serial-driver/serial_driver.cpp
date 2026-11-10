@@ -460,10 +460,15 @@ bool AresSerial::wait_ble_connection_event() {
     return event.connected;
 }
 
-py::tuple AresSerial::wait_ble_subscribe_event() {
+py::dict AresSerial::wait_ble_subscribe_event() {
     AresFrame::BleSubscribed event;
     wait_event_queue_released(event, _ble_subscribed_event_q);
-    return py::make_tuple(event.chunk, event.image);
+    return ares::to_dict(NV(neighbor_states, _ble_info.subscriptions),
+                         NV(bandwidth, _ble_info.subscriptions),
+                         NV(center_frequency, _ble_info.subscriptions),
+                         NV(reference_level, _ble_info.subscriptions),
+                         NV(duration, _ble_info.subscriptions),
+                         NV(description, _ble_info.subscriptions));
 }
 
 py::tuple AresSerial::wait_abortion_event() {
@@ -857,19 +862,24 @@ void AresSerial::EventDispatcher::operator()(
 
 void AresSerial::EventDispatcher::operator()(
     const AresFrame::BleConnect &event) const {
-    LOG_DBG("Received BLE connect event (Connected: %d, MTU: %d)",
-            event.connected, event.chunk_size);
+    LOG_DBG("Received BLE connect event (Connected: %s)",
+            event.connected ? "true" : "false");
     self._ble_info.connected = event.connected;
-    self._ble_info.mtu_size = event.chunk_size;
     put_no_except(event, self._ble_connect_event_q, 100ms);
 }
 
 void AresSerial::EventDispatcher::operator()(
     const AresFrame::BleSubscribed &event) const {
-    LOG_DBG("Received BLE subscription event (chunk: %d, image: %d)",
-            event.chunk, event.image);
-    self._ble_info.subscriptions.chunk = event.chunk;
-    self._ble_info.subscriptions.image = event.image;
+    LOG_DBG("Received BLE subscription event (neighbor_states: %d, bandwidth: "
+            "%d, center_freq: %d, ref_lvl: %d, duration: %d, description: %d)",
+            event.neighbor_states, event.bandwidth, event.center_frequency,
+            event.ref_lvl, event.duration, event.description);
+    self._ble_info.subscriptions.neighbor_states = event.neighbor_states;
+    self._ble_info.subscriptions.bandwidth = event.bandwidth;
+    self._ble_info.subscriptions.center_frequency = event.center_frequency;
+    self._ble_info.subscriptions.reference_level = event.ref_lvl;
+    self._ble_info.subscriptions.duration = event.duration;
+    self._ble_info.subscriptions.description = event.description;
     put_no_except(event, self._ble_subscribed_event_q, 100ms);
 }
 

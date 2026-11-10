@@ -346,9 +346,9 @@ class AresSerial {
 
     /**
      * Wait for BLE service subscription status changes.
-     * @return tuple[subscription statuses, ...]
+     * @return dict[str, bool]
      */
-    py::tuple wait_ble_subscribe_event();
+    py::dict wait_ble_subscribe_event();
 
     /**
      * Wait in the waiting room of unplanned parenthood.
@@ -522,11 +522,19 @@ class AresSerial {
     // BLE Stuff
     struct BleInfo {
         struct {
-            bool chunk = false;
-            bool image = false;
+            bool neighbor_states = false;
+            bool bandwidth = false;
+            bool center_frequency = false;
+            bool reference_level = false;
+            bool duration = false;
+            bool description = false;
         } subscriptions;
         bool connected = false;
-        size_t mtu_size = 0;
+        uint16_t mtu = 0;
+        double interval = 0.0;
+        uint16_t latency = 0;
+        double timeout = 0.0;
+        AresFrame::BlePhy phy = AresFrame::PHY_1M;
     };
     BleInfo _ble_info;
 };
