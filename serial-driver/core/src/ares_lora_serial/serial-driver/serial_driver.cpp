@@ -499,6 +499,12 @@ int AresSerial::wait_ble_att_error_event() {
     return event.code;
 }
 
+uint32_t AresSerial::wait_run_start_event() {
+    AresFrame::BleStart event;
+    wait_event_queue_released(event, _ble_start_event_q);
+    return event.delay;
+}
+
 void AresSerial::start_driver() {
     if (_tasks_running) {
         throw std::runtime_error("Already running");
@@ -799,6 +805,8 @@ bool AresSerial::_stop_event_queues() {
     success = queue_nullptr(_ble_subscribed_event_q) && success;
     success = queue_nullptr(_abortion_event_q) && success;
     success = queue_nullptr(_run_ready_event_q) && success;
+    success = queue_nullptr(_ble_att_err_event_q) && success;
+    success = queue_nullptr(_ble_start_event_q) && success;
     LOG_DBG("Stop event queues yielded %d", success);
     return success;
 }
@@ -1039,4 +1047,10 @@ void AresSerial::EventDispatcher::operator()(
     const AresFrame::BleAttErr &event) const {
     LOG_INF("Received BLE ATT error (%d)", event.code);
     put_no_except(event, self._ble_att_err_event_q, 100ms);
+}
+
+void AresSerial::EventDispatcher::operator()(
+    const AresFrame::BleStart &event) const {
+    LOG_INF("Start event received from BLE (delay: %u)", event.delay);
+    put_no_except(event, self._ble_start_event_q, 100ms);
 }

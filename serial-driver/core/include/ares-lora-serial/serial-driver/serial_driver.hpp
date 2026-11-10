@@ -373,6 +373,12 @@ class AresSerial {
     int wait_ble_att_error_event();
 
     /**
+     * Wait for the start time from BLE.
+     * @return The amount of seconds to schedule the start time in the future.
+     */
+    uint32_t wait_run_start_event();
+
+    /**
      * Start the driver.
      */
     void start_driver();
@@ -463,7 +469,9 @@ class AresSerial {
         _ack_queue;
     ares::bounded_queue<std::unique_ptr<AresFrame::BleAttErr>, 5>
         _ble_att_err_event_q;
-    ;
+    ares::bounded_queue<std::unique_ptr<AresFrame::BleStart>>
+        _ble_start_event_q;
+
     bool _stop_event_queues();
 
     struct EventDispatcher {
@@ -499,6 +507,7 @@ class AresSerial {
         void operator()(const AresFrame::LoraAck &event) const;
         void operator()(const AresFrame::BleConnParams &event) const;
         void operator()(const AresFrame::BleAttErr &event) const;
+        void operator()(const AresFrame::BleStart &event) const;
 
         template <typename T> void operator()(const T &event) const {
             FrameResponse response;
