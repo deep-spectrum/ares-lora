@@ -253,18 +253,18 @@ struct ares_frame {
 
         struct {
             uint16_t id;
-            uint8_t type;
+            uint16_t type;
             uint64_t config;
         } NODE_CONFIG; ///< ARES_FRAME_NODE_CONFIG
 
         struct {
             uint16_t id;
-            uint8_t type;
+            uint16_t type;
         } NODE_CONFIG_POLL; ///< ARES_FRAME_NODE_CONFIG_POLL
 
         struct {
             uint16_t id;
-            uint8_t type;
+            uint16_t type;
             uint64_t config;
         } NODE_CONFIG_RESP; ///< ARES_FRAME_NODE_CONFIG_RESP
 
