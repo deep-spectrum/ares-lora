@@ -1055,3 +1055,38 @@ void AresSerial::EventDispatcher::operator()(
     LOG_INF("Start event received from BLE (delay: %u)", event.delay);
     put_no_except(event, self._ble_start_event_q, 100ms);
 }
+
+void AresSerial::EventDispatcher::operator()(
+    const AresFrame::BleNodeConfiguration &event) const {
+    LOG_INF("Received node config message over BLE (type: %d)",
+            static_cast<int>(event.type));
+
+    std::unique_lock lock(self._node_configs.sem);
+    switch (event.type) {
+    case AresFrame::BANDWIDTH: {
+        self._node_configs.bandwidth = event.as_double();
+        break;
+    }
+    case AresFrame::CENTER_FREQUENCY: {
+        self._node_configs.center_freq = event.as_double();
+        break;
+    }
+    case AresFrame::REFERENCE_LEVEL: {
+        self._node_configs.ref_level = event.as_double();
+        break;
+    }
+    case AresFrame::DURATION: {
+        self._node_configs.duration = event.as_uint32();
+        break;
+    }
+    case AresFrame::DESCRIPTION: {
+        self._node_configs.description = event.as_str();
+        break;
+    }
+    default: {
+        LOG_ERR("Invalid Node configuration received over BLE (%d)",
+                event.type);
+        break;
+    }
+    }
+}

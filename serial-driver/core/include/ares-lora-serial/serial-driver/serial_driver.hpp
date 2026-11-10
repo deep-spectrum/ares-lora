@@ -508,6 +508,7 @@ class AresSerial {
         void operator()(const AresFrame::BleConnParams &event) const;
         void operator()(const AresFrame::BleAttErr &event) const;
         void operator()(const AresFrame::BleStart &event) const;
+        void operator()(const AresFrame::BleNodeConfiguration &event) const;
 
         template <typename T> void operator()(const T &event) const {
             FrameResponse response;
@@ -538,6 +539,7 @@ class AresSerial {
         double center_freq = 0;
         double ref_level = 0;
         uint32_t duration = 0;
+        std::string description;
 
         ares::semaphore<> sem{};
     };
