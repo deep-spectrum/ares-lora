@@ -443,15 +443,15 @@ class AresSerial {
     void _process_frames_helper();
     void _process_frames();
 
-    // Lora response task stuff
-    ares::Task<void()> _lora_response_task;
-    ares::bounded_queue<AresFrame::Frame::TxTypes, 10> _lora_response_q;
-    std::chrono::milliseconds _send_lora_response_timeout = 10s;
-    static void _lora_responses_check_fw_responses(
+    // Task for driver responses
+    ares::Task<void()> _driver_response_task;
+    ares::bounded_queue<AresFrame::Frame::TxTypes, 10> _driver_response_q;
+    std::chrono::milliseconds _send_driver_response_timeout = 10ms;
+    static void _driver_response_check_fw_responses(
         const std::vector<FrameResponse> &responses,
         const AresFrame::AresFrameType &sent_type);
-    void _send_lora_responses_helper();
-    void _send_lora_responses();
+    void _send_driver_response_helper();
+    void _send_driver_responses();
 
     // event queues
     ares::bounded_queue<std::unique_ptr<AresFrame::Start>, 5> _start_event_q;
