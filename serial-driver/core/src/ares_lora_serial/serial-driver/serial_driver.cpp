@@ -1090,3 +1090,42 @@ void AresSerial::EventDispatcher::operator()(
     }
     }
 }
+
+void AresSerial::EventDispatcher::operator()(
+    const AresFrame::BleConfigRequest &event) const {
+    LOG_INF("Received node config request over BLE (type: %d)", event.type);
+    AresFrame::BleNodeConfiguration response;
+    response.type = event.type;
+
+    std::unique_lock lck(self._node_configs.sem);
+    switch (event.type) {
+    case AresFrame::BANDWIDTH: {
+        response.config = self._node_configs.bandwidth;
+        break;
+    }
+    case AresFrame::CENTER_FREQUENCY: {
+        response.config = self._node_configs.center_freq;
+        break;
+    }
+    case AresFrame::REFERENCE_LEVEL: {
+        response.config = self._node_configs.ref_level;
+        break;
+    }
+    case AresFrame::DURATION: {
+        response.config = self._node_configs.duration;
+        break;
+    }
+    case AresFrame::DESCRIPTION: {
+        response.config = self._node_configs.description;
+        break;
+    }
+    default: {
+        LOG_ERR("Invalid type requested over BLE (%d)", event.type);
+        return;
+    }
+    }
+
+    lck.unlock();
+
+    self._driver_response_q.put(response);
+}

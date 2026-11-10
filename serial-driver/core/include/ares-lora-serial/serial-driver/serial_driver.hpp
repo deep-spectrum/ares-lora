@@ -509,6 +509,7 @@ class AresSerial {
         void operator()(const AresFrame::BleAttErr &event) const;
         void operator()(const AresFrame::BleStart &event) const;
         void operator()(const AresFrame::BleNodeConfiguration &event) const;
+        void operator()(const AresFrame::BleConfigRequest &event) const;
 
         template <typename T> void operator()(const T &event) const {
             FrameResponse response;
