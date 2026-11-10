@@ -32,6 +32,7 @@ PYBIND11_MODULE(_ares_lora_serial, m, py::mod_gil_not_used()) {
         .def("notify_run_ready", &AresSerial::notify_run_ready)
         .def("ble_state", &AresSerial::ble_state)
         .def("ble_disconnect", &AresSerial::ble_disconnect)
+        .def("ble_send_neighbors", &AresSerial::ble_send_neighbor_list)
 
         // Events
         .def("wait_start_event", &AresSerial::wait_start_event)

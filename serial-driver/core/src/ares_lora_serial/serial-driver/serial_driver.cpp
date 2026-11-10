@@ -358,6 +358,25 @@ py::dict AresSerial::get_ble_connection_params() {
     return ret;
 }
 
+py::tuple AresSerial::ble_send_neighbor_list(const py::kwargs &kwargs) {
+    _check_crash();
+    AresFrame::BleNeighborUpdate payload;
+
+    if (!kwargs.contains("neighbors")) {
+        throw py::type_error("Requires keyword-only argument neighbors");
+    }
+
+    auto neighbors = kwargs["neighbor"].cast<py::dict>();
+
+    for (const auto &[key, value] : neighbors) {
+        payload.neighbor_data.emplace_back(AresFrame::BleNeighborData{
+            key.cast<uint16_t>(), value.cast<bool>()});
+    }
+
+    FrameDispatcher dispatcher(*this, false, kwargs);
+    return dispatcher.send_frame(payload).build_python_response();
+}
+
 void AresSerial::set_ready(bool new_state) {
     py::gil_scoped_release release;
     std::unique_lock lock(_ready_mtx);

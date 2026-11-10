@@ -271,6 +271,13 @@ class AresSerial {
     py::dict get_ble_connection_params();
 
     /**
+     * Share neighbor list over BLE.
+     * @param kwargs Python keyword arguments.
+     * @return tuple[tuple[code], None]
+     */
+    py::tuple ble_send_neighbor_list(const py::kwargs &kwargs);
+
+    /**
      * @}
      */
 
