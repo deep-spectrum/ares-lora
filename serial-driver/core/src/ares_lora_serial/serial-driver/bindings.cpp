@@ -59,7 +59,9 @@ PYBIND11_MODULE(_ares_lora_serial, m, py::mod_gil_not_used()) {
         .def("get_logging_level", &AresSerial::get_log_level)
 
         // Properties
-        .def_property("ready", &AresSerial::get_ready, &AresSerial::set_ready);
+        .def_property("ready", &AresSerial::get_ready, &AresSerial::set_ready)
+        .def_property_readonly("ble_connection_params",
+                               &AresSerial::get_ble_connection_params);
 
     // AresLoraConfig
     py::class_<AresLoraConfig>(m, "_AresLoraConfig",

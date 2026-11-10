@@ -346,6 +346,16 @@ py::tuple AresSerial::ble_disconnect(const py::kwargs &kwargs) {
     return dispatcher.send_frame(payload).build_python_response();
 }
 
+py::dict AresSerial::get_ble_connection_params() {
+    _check_crash();
+    std::unique_lock lck(_ble_info.lock);
+    py::dict ret =
+        ares::to_dict(NV(mtu, _ble_info), NV(interval, _ble_info),
+                      NV(latency, _ble_info), NV(timeout, _ble_info));
+    ret["phy"] = static_cast<uint8_t>(_ble_info.phy);
+    return ret;
+}
+
 void AresSerial::set_ready(bool new_state) {
     py::gil_scoped_release release;
     std::unique_lock lock(_ready_mtx);
@@ -1003,4 +1013,18 @@ void AresSerial::EventDispatcher::operator()(
             event.id, event.message_type);
     AresFrame::Frame::AckTypes ack_event = event;
     put_no_except(ack_event, self._ack_queue, 100ms);
+}
+
+void AresSerial::EventDispatcher::operator()(
+    const AresFrame::BleConnParams &event) const {
+    LOG_INF("Received BLE connection parameter update message (MTU: %u, "
+            "Interval: %u, Latency: %u, Timeout: %u, Phy: %u)",
+            event.mtu, event.interval, event.latency, event.timeout, event.phy);
+    std::unique_lock lck(self._ble_info.lock);
+    self._ble_info.mtu = event.mtu;
+    self._ble_info.interval =
+        event.interval * BleInfo::interval_scale_factor_ms;
+    self._ble_info.latency = event.latency;
+    self._ble_info.timeout = event.timeout * BleInfo::timeout_scale_factor_ms;
+    self._ble_info.phy = event.phy;
 }

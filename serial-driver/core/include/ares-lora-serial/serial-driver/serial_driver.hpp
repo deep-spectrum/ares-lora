@@ -263,8 +263,12 @@ class AresSerial {
      * @return tuple[tuple[code], None]
      */
     py::tuple ble_disconnect(const py::kwargs &kwargs);
-    // TODO: This needs some more thought put into it.
-    // py::tuple ble_send_image(const py::bytes &image);
+
+    /**
+     * Get the current BLE connection parameters.
+     * @return dict[str, float | int]
+     */
+    py::dict get_ble_connection_params();
 
     /**
      * @}
@@ -484,6 +488,7 @@ class AresSerial {
         void operator()(const AresFrame::NodeConfigResponse &event) const;
         void operator()(const AresFrame::NodeReady &event) const;
         void operator()(const AresFrame::LoraAck &event) const;
+        void operator()(const AresFrame::BleConnParams &event) const;
 
         template <typename T> void operator()(const T &event) const {
             FrameResponse response;
@@ -521,6 +526,11 @@ class AresSerial {
 
     // BLE Stuff
     struct BleInfo {
+        static constexpr double interval_scale_factor_ms = 1.25;
+        static constexpr double timeout_scale_factor_ms = 10.0;
+
+        std::mutex lock;
+
         struct {
             bool neighbor_states = false;
             bool bandwidth = false;
