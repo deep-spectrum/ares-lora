@@ -367,6 +367,12 @@ class AresSerial {
     py::tuple wait_run_ready_event();
 
     /**
+     * Wait for events indicating BLE ATT errors.
+     * @return ATT error code.
+     */
+    int wait_ble_att_error_event();
+
+    /**
      * Start the driver.
      */
     void start_driver();
@@ -455,6 +461,9 @@ class AresSerial {
         _run_ready_event_q;
     ares::bounded_queue<std::unique_ptr<AresFrame::Frame::AckTypes>, 10>
         _ack_queue;
+    ares::bounded_queue<std::unique_ptr<AresFrame::BleAttErr>, 5>
+        _ble_att_err_event_q;
+    ;
     bool _stop_event_queues();
 
     struct EventDispatcher {
@@ -489,6 +498,7 @@ class AresSerial {
         void operator()(const AresFrame::NodeReady &event) const;
         void operator()(const AresFrame::LoraAck &event) const;
         void operator()(const AresFrame::BleConnParams &event) const;
+        void operator()(const AresFrame::BleAttErr &event) const;
 
         template <typename T> void operator()(const T &event) const {
             FrameResponse response;

@@ -43,6 +43,7 @@ PYBIND11_MODULE(_ares_lora_serial, m, py::mod_gil_not_used()) {
              &AresSerial::wait_ble_connection_event)
         .def("wait_ble_subscribe_event", &AresSerial::wait_ble_subscribe_event)
         .def("wait_run_ready_event", &AresSerial::wait_run_ready_event)
+        .def("wait_ble_att_error_event", &AresSerial::wait_ble_att_error_event)
 
         // Driver utilities
         .def("start_driver", &AresSerial::start_driver)

@@ -493,6 +493,12 @@ py::tuple AresSerial::wait_run_ready_event() {
     return py::make_tuple(event.id, event.broadcast);
 }
 
+int AresSerial::wait_ble_att_error_event() {
+    AresFrame::BleAttErr event;
+    wait_event_queue_released(event, _ble_att_err_event_q);
+    return event.code;
+}
+
 void AresSerial::start_driver() {
     if (_tasks_running) {
         throw std::runtime_error("Already running");
@@ -1027,4 +1033,10 @@ void AresSerial::EventDispatcher::operator()(
     self._ble_info.latency = event.latency;
     self._ble_info.timeout = event.timeout * BleInfo::timeout_scale_factor_ms;
     self._ble_info.phy = event.phy;
+}
+
+void AresSerial::EventDispatcher::operator()(
+    const AresFrame::BleAttErr &event) const {
+    LOG_INF("Received BLE ATT error (%d)", event.code);
+    put_no_except(event, self._ble_att_err_event_q, 100ms);
 }
