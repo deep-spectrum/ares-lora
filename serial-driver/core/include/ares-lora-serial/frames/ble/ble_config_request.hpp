@@ -11,7 +11,6 @@
 #ifndef ARES_BLE_CONFIG_REQUEST_HPP
 #define ARES_BLE_CONFIG_REQUEST_HPP
 
-#include <ares-lora-serial/frames/ble/ble_types.hpp>
 #include <ares-lora-serial/frames/frame_types.hpp>
 #include <ares-lora-serial/frames/payload_base.hpp>
 
@@ -26,7 +25,7 @@ struct BleConfigRequest : Internal::FramePayloadBase {
     /**
      * Configuration type.
      */
-    BleConfigurationTypes type = BANDWIDTH;
+    NodeConfigType type = BANDWIDTH;
 
     /**
      * Decode the payload from a serial buffer.

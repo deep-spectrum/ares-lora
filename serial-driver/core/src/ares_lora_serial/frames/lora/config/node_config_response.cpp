@@ -30,8 +30,8 @@ void NodeConfigResponse::serialize(std::vector<uint8_t> &buffer) {
         break;
     }
     case BANDWIDTH:
-    case CENTER_FREQ:
-    case REF_LEVEL: {
+    case CENTER_FREQUENCY:
+    case REFERENCE_LEVEL: {
         (void)std::memcpy(&config_field, &std::get<double>(config),
                           sizeof(config_field));
         break;
@@ -67,8 +67,8 @@ void NodeConfigResponse::deserialize(const uint8_t *buffer, std::size_t len) {
         break;
     }
     case BANDWIDTH:
-    case CENTER_FREQ:
-    case REF_LEVEL: {
+    case CENTER_FREQUENCY:
+    case REFERENCE_LEVEL: {
         double ret;
         (void)std::memcpy(&ret, &config_field, sizeof(ret));
         config = ret;

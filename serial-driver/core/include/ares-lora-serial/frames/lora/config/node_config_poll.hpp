@@ -76,7 +76,7 @@ struct NodeConfigPoll : Internal::FramePayloadBase, Internal::LoraBase {
     [[nodiscard]] response_type expected_response() const;
 
   private:
-    static constexpr size_t _payload_size = 3;
+    static constexpr size_t _payload_size = sizeof(id) + sizeof(type);
 };
 } // namespace AresFrame
 

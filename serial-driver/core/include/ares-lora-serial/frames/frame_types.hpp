@@ -88,6 +88,54 @@ enum AresFrameType : uint16_t {
     DRIVER_STOP, ///< Frame used to stop the core driver.
     UNKNOWN,     ///< Unknown frame
 };
+
+/**
+ * @enum NodeConfigType
+ * The type of configurations that can be sent over LoRa.
+ */
+enum NodeConfigType : uint16_t {
+    // Shared between BLE and LoRa
+
+    /**
+     * Bandwidth setting.
+     */
+    BANDWIDTH = 0,
+
+    /**
+     * Center frequency setting.
+     */
+    CENTER_FREQUENCY = 1,
+
+    /**
+     * Reference level setting.
+     */
+    REFERENCE_LEVEL = 2,
+
+    /**
+     * Duration setting.
+     */
+    DURATION = 3,
+
+    // BLE only
+
+    /**
+     * Description setting.
+     */
+    DESCRIPTION = 4,
+
+    // LoRa only
+
+    /**
+     * The save folder name.
+     */
+    SAVE_FOLDER = 5,
+
+    /**
+     * Invalid configuration.
+     */
+    INVALID,
+};
+
 } // namespace AresFrame
 
 #endif // ARES_FRAME_TYPES_HPP

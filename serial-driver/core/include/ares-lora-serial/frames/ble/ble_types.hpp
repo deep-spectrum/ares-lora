@@ -103,37 +103,6 @@ enum BtAttError : uint8_t {
 };
 
 /**
- * @enum BleConfigurationTypes
- * Node configuration settings.
- */
-enum BleConfigurationTypes : uint16_t {
-    /**
-     * Bandwidth setting.
-     */
-    BANDWIDTH = 0,
-
-    /**
-     * Center frequency setting.
-     */
-    CENTER_FREQUENCY = 1,
-
-    /**
-     * Reference level setting.
-     */
-    REFERENCE_LEVEL = 2,
-
-    /**
-     * Duration setting.
-     */
-    DURATION = 3,
-
-    /**
-     * Description setting.
-     */
-    DESCRIPTION = 4,
-};
-
-/**
  * @struct BleNeighborData
  * Neighbor status data.
  */
