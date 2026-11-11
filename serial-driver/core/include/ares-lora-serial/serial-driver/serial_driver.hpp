@@ -401,6 +401,10 @@ class AresSerial {
      */
     py::dict get_node_config();
 
+    void set_node_config(const py::dict &value);
+
+    std::string wait_node_config_changed_event();
+
     /**
      * Cancel the event queues.
      */
@@ -478,6 +482,8 @@ class AresSerial {
         _ble_att_err_event_q;
     ares::bounded_queue<std::unique_ptr<AresFrame::BleStart>>
         _ble_start_event_q;
+    ares::bounded_queue<std::unique_ptr<AresFrame::BleNodeConfiguration>, 5>
+        _ble_node_config_event_q;
 
     bool _stop_event_queues();
 
@@ -542,11 +548,17 @@ class AresSerial {
     struct NodeConfigs {
         NodeConfigs() = default;
 
-        ares::DateTime save_folder;
         double bandwidth = 0;
         double center_freq = 0;
         double ref_level = 0;
         uint32_t duration = 0;
+
+        // Note: Determined by the wrapper application (not set or readable
+        // through BLE)
+        ares::DateTime save_folder;
+
+        // Note: Not sent over LoRa. The description is used in the root meta
+        // file for the run.
         std::string description;
 
         ares::semaphore<> sem{};

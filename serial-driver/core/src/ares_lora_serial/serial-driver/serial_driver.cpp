@@ -18,6 +18,7 @@ constexpr const char *bw = "bandwidth";
 constexpr const char *center_f = "center_freq";
 constexpr const char *duration = "duration";
 constexpr const char *ref_level = "ref_level";
+constexpr const char *description = "description";
 
 LOG_MODULE_REGISTER(serial_logger);
 
@@ -633,6 +634,7 @@ py::dict AresSerial::get_node_config() {
         copy.duration = _node_configs.duration;
         copy.ref_level = _node_configs.ref_level;
         copy.save_folder = _node_configs.save_folder;
+        copy.description = _node_configs.description;
     }
 
     py::dict ret;
@@ -641,8 +643,32 @@ py::dict AresSerial::get_node_config() {
     ret[center_f] = copy.center_freq;
     ret[duration] = copy.duration;
     ret[ref_level] = copy.ref_level;
+    ret[description] = copy.description;
 
     return ret;
+}
+
+std::string AresSerial::wait_node_config_changed_event() {
+    AresFrame::BleNodeConfiguration event;
+    wait_event_queue_released(event, _ble_node_config_event_q);
+
+    switch (event.type) {
+    case AresFrame::BANDWIDTH:
+        return bw;
+    case AresFrame::CENTER_FREQUENCY:
+        return center_f;
+    case AresFrame::REFERENCE_LEVEL:
+        return ref_level;
+    case AresFrame::DURATION:
+        return duration;
+    case AresFrame::DESCRIPTION:
+        return description;
+    default:
+        LOG_ERR("Invalid type for event: %d", event.type);
+        break;
+    }
+
+    return "";
 }
 
 void AresSerial::cancel_events() {
@@ -1108,6 +1134,10 @@ void AresSerial::EventDispatcher::operator()(
         break;
     }
     }
+
+    lock.unlock();
+
+    put_no_except(event, self._ble_node_config_event_q, 100ms);
 }
 
 void AresSerial::EventDispatcher::operator()(
