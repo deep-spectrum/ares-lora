@@ -21,7 +21,6 @@ set(SERIAL_SRC
 
 set(LORA_SRC
         src/lora/lora.c
-        src/lora/lora_backend.c
         src/lora/packet.c
 )
 
@@ -37,6 +36,9 @@ set(SHELL_SRC
 target_sources(app PRIVATE ${SRC} ${SERIAL_SRC} ${LORA_SRC} ${BLE_SRC})
 target_sources_ifdef(CONFIG_SHELL app PRIVATE ${SHELL_SRC})
 target_sources_ifndef(CONFIG_SHELL app PRIVATE src/serial_commands.c)
+
+target_sources_ifdef(CONFIG_LORA_BACKEND_LORA app PRIVATE src/lora/backends/lora_backend.c)
+target_sources_ifndef(CONFIG_LORA_BACKEND_LORA app PRIVATE src/lora/backends/dummy_backend.c)
 
 zephyr_iterable_section(NAME ares_serial_command
         KVMA RAM_REGION GROUP RODATA_REGION
