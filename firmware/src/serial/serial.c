@@ -261,7 +261,11 @@ int ares_serial_write_frame(const struct ares_serial *serial,
         return -EINVAL;
     }
 
+    LOG_INF("Responding with frame %d", frame->type);
+
     len = ares_serialize_frame(buffer, sizeof(buffer), frame);
+
+    LOG_HEXDUMP_INF(buffer, len, "Frame buffer");
 
     if (len < 0) {
         return len;

@@ -13,31 +13,33 @@
 static int dummy_init(const struct ares_lora_transport *transport,
                       const void *config, lora_transport_handler_t evt_handler,
                       void *context) {
-    return -ENOTSUP;
+    return 0;
 }
 
 static int dummy_uninit(const struct ares_lora_transport *transport) {
-    return -ENOTSUP;
+    return 0;
 }
 
 static int dummy_enable(const struct ares_lora_transport *transport,
                         bool block_tx) {
-    return -ENOTSUP;
+    return 0;
 }
 
 static int dummy_write(const struct ares_lora_transport *transport,
                        const void *data, size_t length, size_t *cnt) {
-    return -ENOTSUP;
+    *cnt = length;
+    return 0;
 }
 
 static int dummy_read(const struct ares_lora_transport *transport, void *data,
                       size_t length, size_t *cnt) {
-    return -ENOTSUP;
+    *cnt = 0;
+    return 0;
 }
 
 static int dummy_configure(const struct ares_lora_transport *transport,
                            const struct lora_modem_config *config) {
-    return -ENOTSUP;
+    return 0;
 }
 
 const struct ares_lora_transport_api ares_lora_transport_api = {

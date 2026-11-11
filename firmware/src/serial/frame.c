@@ -200,10 +200,10 @@ static size_t calculate_frame_length(const struct ares_frame *frame) {
 static void serialize(uint8_t *buf, const struct ares_frame *frame,
                       size_t frame_len) {
     uint64_t payload_len = frame_len - ARES_FRAME_OVERHEAD;
+    uint16_t type = frame->type;
     uint8_t *payload = &buf[ARES_FRAME_PAYLOAD_OFFSET];
     buf[ARES_FRAME_HEADER_OFFSET] = ARES_FRAME_HEADER;
-    (void)memcpy(&buf[ARES_FRAME_TYPE_OFFSET], &frame->type,
-                 ARES_FRAME_TYPE_OVERHEAD);
+    (void)memcpy(&buf[ARES_FRAME_TYPE_OFFSET], &type, ARES_FRAME_TYPE_OVERHEAD);
     (void)memcpy(&buf[ARES_FRAME_LEN_OFFSET], &payload_len,
                  ARES_FRAME_LEN_OVERHEAD);
 
