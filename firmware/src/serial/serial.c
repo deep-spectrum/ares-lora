@@ -12,7 +12,7 @@
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
 
-LOG_MODULE_REGISTER(ares_serial);
+LOG_MODULE_REGISTER(ares_serial, CONFIG_ARES_SERIAL_LOG_LEVEL);
 
 #define SERIAL_API_CALL(_serial, _api, ...)                                    \
     COND_CODE_1(IS_EMPTY(__VA_ARGS__),                                         \
@@ -138,6 +138,11 @@ static void dispatch(const struct ares_serial *serial, int start_index,
 
     ret = ares_deserialize_frame(&frame, &serial->ctx->rx_buf.buf[start_index],
                                  length);
+
+    LOG_INF("Attempting to dispatch frame: %d", frame.type);
+    LOG_HEXDUMP_INF(&serial->ctx->rx_buf.buf[start_index], length,
+                    "Recieved Frame");
+
     if (ret < 0) {
         report_error(serial, ARES_FRAME_ERROR_BAD_FRAME);
         return;
