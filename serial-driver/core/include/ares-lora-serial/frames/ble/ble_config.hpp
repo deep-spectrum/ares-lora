@@ -22,7 +22,7 @@ namespace AresFrame {
  * Payload data for AresFrame::BLE_CONFIG frames.
  */
 struct BleNodeConfiguration : Internal::FramePayloadBase {
-    static constexpr size_t frame_type = BLE_CONFIG;
+    static constexpr AresFrameType frame_type = BLE_CONFIG;
 
     /**
      * Configuration type.

@@ -794,20 +794,6 @@ class LoraSerial:
         ret = self._dev.ble_disconnect()
         self._check_ret_code(ret[0])
 
-    # @lora_serial_command
-    # def ble_send(self, data: bytes):
-    #     """Send data over the BLE connection.
-    #
-    #     Args:
-    #         data: Data to send over BLE.
-    #
-    #     Raises:
-    #         TimeoutError: No response from the firmware within the configured timeout.
-    #         LoraException: Firmware responded with an error code.
-    #     """
-    #     codes = self._dev.ble_send_image(data)
-    #     self._check_ret_code(codes)
-
     def wait_connection_changed_event(self, block: bool = True, timeout: float | None = None) -> bool:
         """Wait for a connection event from BLE.
 
