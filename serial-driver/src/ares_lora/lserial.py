@@ -150,6 +150,21 @@ class LoraLedState(IntEnum):
     FETCH = 4
 
 
+class BlePhy(IntEnum):
+    """BLE PHYs for communication over Bluetooth LE
+
+    Attributes:
+        PHY_1M: 1Mbps
+        PHY_2M: 2Mbps
+        PHY_CODED_S2: Coded PHY S=2
+        PHY_CODED_S8: Coded PHY S=8
+    """
+    PHY_1M = 0
+    PHY_2M = 1
+    PHY_CODED_S2 = 2
+    PHY_CODED_S8 = 3
+
+
 # @dataclass
 # class LoraSerialConfig:
 #     """Configurations for the LoRa serial driver.
