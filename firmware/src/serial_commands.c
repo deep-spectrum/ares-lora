@@ -24,128 +24,17 @@
 #include <zephyr/sys/reboot.h>
 #include <zephyr/version.h>
 
-enum connected_state {
-    DISCONNECTED,
-    CONNECTED,
-};
-
-struct connect_work {
-    enum connected_state state;
-    uint16_t mtu_size;
-    const struct ares_serial *serial;
-    struct k_work work;
-};
-
-struct subscribe_work {
-    bool chunk_enabled;
-    bool image_enabled;
-    const struct ares_serial *serial;
-    struct k_work work;
-    struct k_spinlock lock;
-};
-
-static struct connect_work connect_work = {};
-static struct subscribe_work subscribe_work = {};
-
-static void connected_work_handler(struct k_work *work) {
-    struct connect_work *cwork = CONTAINER_OF(work, struct connect_work, work);
-    struct ares_frame frame = {
-        .type = ARES_FRAME_BLE_CONNECTED,
-        .payload.BLE_CONNECTED.connected = cwork->state == CONNECTED,
-    };
-
-    if (cwork->state == DISCONNECTED) {
-        cwork->mtu_size = 0;
-    }
-
-    frame.payload.BLE_CONNECTED.mtu_size = cwork->mtu_size;
-    ares_serial_write_frame(cwork->serial, &frame);
-}
-
-static void subscribe_work_handler(struct k_work *work) {
-    struct subscribe_work *swork =
-        CONTAINER_OF(work, struct subscribe_work, work);
-    struct ares_frame frame = {
-        .type = ARES_FRAME_BLE_SUBSCRIBED,
-    };
-
-    K_SPINLOCK(&swork->lock) {
-        frame.payload.BLE_SUBSCRIBED.chunks_subscribed = swork->chunk_enabled;
-        frame.payload.BLE_SUBSCRIBED.image_subscribed = swork->image_enabled;
-    }
-
-    ares_serial_write_frame(swork->serial, &frame);
-}
-
 static void reboot_work_handler(struct k_work *work) {
     ARG_UNUSED(work);
     sys_reboot(SYS_REBOOT_COLD);
 }
 K_WORK_DELAYABLE_DEFINE(reboot_work, reboot_work_handler);
 
-static void ble_connected(void) {
-    // This is guaranteed to run before the mtu exchange.
-    connect_work.state = CONNECTED;
-}
-
-static void mtu_size_change(size_t new_mtu) {
-    connect_work.mtu_size = (uint16_t)new_mtu;
-    k_work_submit(&connect_work.work);
-}
-
-static void ble_disconnected(void) {
-    connect_work.state = DISCONNECTED;
-    k_work_submit(&connect_work.work);
-}
-
-static void chunks_enabled(bool enable) {
-    K_SPINLOCK(&subscribe_work.lock) { subscribe_work.chunk_enabled = enable; }
-    k_work_submit(&subscribe_work.work);
-}
-
-static void image_enabled(bool enable) {
-    K_SPINLOCK(&subscribe_work.lock) { subscribe_work.image_enabled = enable; }
-    k_work_submit(&subscribe_work.work);
-}
-
 static void send_ack_frame(const struct ares_serial *serial,
                            struct ares_frame *frame, int code) {
     frame->type = ARES_FRAME_ACK;
     frame->payload.ACK = -code;
     ares_serial_write_frame(serial, frame);
-}
-
-static void handle_setting(const struct ares_serial *serial,
-                           struct ares_frame *frame) {
-    uint32_t setting;
-    int ret;
-
-    if (!frame->payload.SETTING.set) {
-        ret = retrieve_setting(frame->payload.SETTING.setting, &setting);
-        if (ret < 0) {
-            send_ack_frame(serial, frame, ret);
-            return;
-        }
-
-        frame->payload.SETTING.value = setting;
-        ares_serial_write_frame(serial, frame);
-        return;
-    }
-
-    setting = frame->payload.SETTING.value;
-
-    ret = update_setting(frame->payload.SETTING.setting, setting);
-    if (ret < 0) {
-        send_ack_frame(serial, frame, ret);
-        return;
-    }
-
-    if (frame->payload.SETTING.setting == ARES_SETTING_ID ||
-        frame->payload.SETTING.setting == ARES_SETTING_PANID) {
-        refresh_modem_id();
-    }
-
-    send_ack_frame(serial, frame, 0);
 }
 
 static void send_lora_transmission(const struct ares_serial *serial,
@@ -204,8 +93,39 @@ static void send_lora_transmission(const struct ares_serial *serial,
 #endif
 }
 
-static void handle_start(const struct ares_serial *serial,
-                         struct ares_frame *frame) {
+ARES_FRAME_HANDLER(ARES_FRAME_SETTING) {
+    uint32_t setting;
+    int ret;
+
+    if (!frame->payload.SETTING.set) {
+        ret = retrieve_setting(frame->payload.SETTING.setting, &setting);
+        if (ret < 0) {
+            send_ack_frame(serial, frame, ret);
+            return;
+        }
+
+        frame->payload.SETTING.value = setting;
+        ares_serial_write_frame(serial, frame);
+        return;
+    }
+
+    setting = frame->payload.SETTING.value;
+
+    ret = update_setting(frame->payload.SETTING.setting, setting);
+    if (ret < 0) {
+        send_ack_frame(serial, frame, ret);
+        return;
+    }
+
+    if (frame->payload.SETTING.setting == ARES_SETTING_ID ||
+        frame->payload.SETTING.setting == ARES_SETTING_PANID) {
+        refresh_modem_id();
+    }
+
+    send_ack_frame(serial, frame, 0);
+}
+
+ARES_FRAME_HANDLER(ARES_FRAME_START) {
     struct ares_packet packet = {
         .payload = {.type = ARES_PKT_PAYLOAD_START,
                     .payload.START =
@@ -222,8 +142,7 @@ static void handle_start(const struct ares_serial *serial,
                            (frame->payload.START.broadcast) ? -1 : 1);
 }
 
-static void handle_lora_config(const struct ares_serial *serial,
-                               struct ares_frame *frame) {
+ARES_FRAME_HANDLER(ARES_FRAME_LORA_CONFIG) {
     const struct ares_lora *lora = ares_lora_backend_lora_get_ptr();
     struct lora_modem_config config = {
         .frequency = frame->payload.LORA_CONFIG.freq_hz,
@@ -239,8 +158,7 @@ static void handle_lora_config(const struct ares_serial *serial,
     send_ack_frame(serial, frame, ret);
 }
 
-static void handle_led(const struct ares_serial *serial,
-                       struct ares_frame *frame) {
+ARES_FRAME_HANDLER(ARES_FRAME_LED) {
     int ret =
         update_led_state(frame->payload.LED.led, frame->payload.LED.state);
 
@@ -253,8 +171,7 @@ static void handle_led(const struct ares_serial *serial,
     send_ack_frame(serial, frame, ret);
 }
 
-static void handle_heartbeat(const struct ares_serial *serial,
-                             struct ares_frame *frame) {
+ARES_FRAME_HANDLER(ARES_FRAME_HEARTBEAT) {
     struct ares_packet packet = {
         .type = ARES_PKT_TYPE_DIRECT,
         .destination_id = frame->payload.HEARTBEAT.id,
@@ -266,8 +183,7 @@ static void handle_heartbeat(const struct ares_serial *serial,
     send_lora_transmission(serial, frame, &packet, 1);
 }
 
-static void handle_poll(const struct ares_serial *serial,
-                        struct ares_frame *frame) {
+ARES_FRAME_HANDLER(ARES_FRAME_POLL) {
     struct ares_packet packet = {.type = ARES_PKT_TYPE_DIRECT,
                                  .destination_id = frame->payload.POLL,
                                  .payload = {
@@ -277,8 +193,7 @@ static void handle_poll(const struct ares_serial *serial,
     send_lora_transmission(serial, frame, &packet, 1);
 }
 
-static void handle_log(const struct ares_serial *serial,
-                       struct ares_frame *frame) {
+ARES_FRAME_HANDLER(ARES_FRAME_LOG) {
     struct ares_packet packet = {
         .type = frame->payload.LOG.broadcast ? ARES_PKT_TYPE_BROADCAST
                                              : ARES_PKT_TYPE_DIRECT,
@@ -297,8 +212,7 @@ static void handle_log(const struct ares_serial *serial,
     send_lora_transmission(serial, frame, &packet, frame->payload.LOG.tx_cnt);
 }
 
-static void handle_log_ack(const struct ares_serial *serial,
-                           struct ares_frame *frame) {
+ARES_FRAME_HANDLER(ARES_FRAME_LOG_ACK) {
     struct ares_packet packet = {
         .type = ARES_PKT_TYPE_DIRECT,
         .destination_id = frame->payload.LOG_ACK.id,
@@ -312,8 +226,7 @@ static void handle_log_ack(const struct ares_serial *serial,
     send_lora_transmission(serial, frame, &packet, 1);
 }
 
-static void handle_version(const struct ares_serial *serial,
-                           struct ares_frame *frame) {
+ARES_FRAME_HANDLER(ARES_FRAME_VERSION) {
     frame->payload.VERSION.app = (uint32_t)APP_VERSION_NUMBER;
     frame->payload.VERSION.kernel = (uint32_t)KERNEL_VERSION_NUMBER;
     frame->payload.VERSION.ncs = (uint32_t)NCS_VERSION_NUMBER;
@@ -341,8 +254,7 @@ static int helper_ble_enable(void) {
     return ares_enable_ble();
 }
 
-static void handle_ble_state(const struct ares_serial *serial,
-                             struct ares_frame *frame) {
+ARES_FRAME_HANDLER(ARES_FRAME_BLE_STATE) {
     switch (frame->payload.BLE_STATE) {
     case 0: {
         frame->type = ARES_FRAME_ACK;
@@ -368,26 +280,11 @@ static void handle_ble_state(const struct ares_serial *serial,
     ares_serial_write_frame(serial, frame);
 }
 
-static void handle_ble_disconnect(const struct ares_serial *serial,
-                                  struct ares_frame *frame) {
+ARES_FRAME_HANDLER(ARES_FRAME_BLE_DISCONNECT) {
     send_ack_frame(serial, frame, ares_disconnect_ble());
 }
 
-static void handle_ble_chunks(const struct ares_serial *serial,
-                              struct ares_frame *frame) {
-    int ret = ares_ble_indicate_chunks(frame->payload.BLE_CHUNKS);
-    send_ack_frame(serial, frame, ret);
-}
-
-static void handle_ble_image_chunk(const struct ares_serial *serial,
-                                   struct ares_frame *frame) {
-    int ret = ares_ble_send_chunk(frame->payload.BLE_IMAGE_CHUNK.buf,
-                                  frame->payload.BLE_IMAGE_CHUNK.len);
-    send_ack_frame(serial, frame, ret);
-}
-
-static void handle_reboot(const struct ares_serial *serial,
-                          struct ares_frame *frame) {
+ARES_FRAME_HANDLER(ARES_FRAME_REBOOT) {
     const uint8_t min = 5, max = 30;
     uint8_t reboot_time = frame->payload.REBOOT;
     int ret;
@@ -407,8 +304,7 @@ static void handle_reboot(const struct ares_serial *serial,
     send_ack_frame(serial, frame, ret);
 }
 
-static void handle_lora_ack(const struct ares_serial *serial,
-                            struct ares_frame *frame) {
+ARES_FRAME_HANDLER(ARES_FRAME_LORA_ACK) {
     struct ares_packet packet = {
         .type = ARES_PKT_TYPE_DIRECT,
         .destination_id = frame->payload.LORA_ACK.id,
@@ -419,8 +315,7 @@ static void handle_lora_ack(const struct ares_serial *serial,
     send_lora_transmission(serial, frame, &packet, 1);
 }
 
-static void handle_abort(const struct ares_serial *serial,
-                         struct ares_frame *frame) {
+ARES_FRAME_HANDLER(ARES_FRAME_ABORT) {
     struct ares_packet packet = {.type = (frame->payload.ABORT.flags.broadcast)
                                              ? ARES_PKT_TYPE_BROADCAST
                                              : ARES_PKT_TYPE_DIRECT,
@@ -433,8 +328,7 @@ static void handle_abort(const struct ares_serial *serial,
                            (frame->payload.ABORT.flags.broadcast) ? -1 : 1);
 }
 
-static void handle_node_config(const struct ares_serial *serial,
-                               struct ares_frame *frame) {
+ARES_FRAME_HANDLER(ARES_FRAME_NODE_CONFIG) {
     struct ares_packet packet = {
         .type = ARES_PKT_TYPE_DIRECT,
         .destination_id = frame->payload.NODE_CONFIG.id,
@@ -452,8 +346,7 @@ static void handle_node_config(const struct ares_serial *serial,
     send_lora_transmission(serial, frame, &packet, 1);
 }
 
-static void handle_node_config_poll(const struct ares_serial *serial,
-                                    struct ares_frame *frame) {
+ARES_FRAME_HANDLER(ARES_FRAME_NODE_CONFIG_POLL) {
     struct ares_packet packet = {
         .type = ARES_PKT_TYPE_DIRECT,
         .destination_id = frame->payload.NODE_CONFIG_POLL.id,
@@ -467,8 +360,7 @@ static void handle_node_config_poll(const struct ares_serial *serial,
     send_lora_transmission(serial, frame, &packet, 1);
 }
 
-static void handle_node_config_response(const struct ares_serial *serial,
-                                        struct ares_frame *frame) {
+ARES_FRAME_HANDLER(ARES_FRAME_NODE_CONFIG_RESP) {
     struct ares_packet packet = {
         .type = ARES_PKT_TYPE_DIRECT,
         .destination_id = frame->payload.NODE_CONFIG_RESP.id,
@@ -486,8 +378,7 @@ static void handle_node_config_response(const struct ares_serial *serial,
     send_lora_transmission(serial, frame, &packet, 1);
 }
 
-static void handle_node_ready(const struct ares_serial *serial,
-                              struct ares_frame *frame) {
+ARES_FRAME_HANDLER(ARES_FRAME_NODE_READY) {
     struct ares_packet packet = {
         .type = (frame->payload.NODE_READY.flags.broadcast)
                     ? ARES_PKT_TYPE_BROADCAST
@@ -504,59 +395,205 @@ static void handle_node_ready(const struct ares_serial *serial,
                                                                        : 1);
 }
 
-static int initialize_ble(const struct ares_serial *serial) {
-    struct ares_ble_init_data init_data = {
-        .cb = {
-            .connected = ble_connected,
-            .disconnected = ble_disconnected,
-            .mtu_size_changed = mtu_size_change,
-            .chunks_enabled = chunks_enabled,
-            .image_enabled = image_enabled,
+ARES_FRAME_HANDLER(ARES_FRAME_BLE_NODE_CONFIG) {
+    frame->type = ARES_FRAME_ACK;
+    frame->payload.ACK =
+        ares_send_config_response(frame->payload.BLE_NODE_CONFIG.type,
+                                  frame->payload.BLE_NODE_CONFIG.data,
+                                  frame->payload.BLE_NODE_CONFIG.data_len);
+    ares_serial_write_frame(serial, frame);
+}
+
+ARES_FRAME_HANDLER(ARES_FRAME_BLE_NEIGHBOR_UPDATE) {
+    int ret = ares_send_neighbor_states(
+        frame->payload.BLE_NEIGHBOR_UPDATE.num_neighbors,
+        frame->payload.BLE_NEIGHBOR_UPDATE.neighbor_data,
+        frame->payload.BLE_NEIGHBOR_UPDATE.neighbor_data_len);
+
+    frame->type = ARES_FRAME_ACK;
+    frame->payload.ACK = ret;
+
+    ares_serial_write_frame(serial, frame);
+}
+
+struct ble_user_data {
+    const struct ares_serial *serial;
+    uint16_t mtu;
+    uint16_t interval;
+    uint16_t latency;
+    uint16_t timeout;
+    uint8_t phy;
+};
+
+struct ble_user_data ares_ble_user_data;
+
+static void connected(void *data) {
+    struct ble_user_data *ctx = data;
+    struct ares_frame frame = {
+        .type = ARES_FRAME_BLE_CONNECTED,
+        .payload.BLE_CONNECTED = true,
+    };
+
+    ares_serial_write_frame(ctx->serial, &frame);
+}
+
+static void disconnected(void *data) {
+    struct ble_user_data *ctx = data;
+    struct ares_frame frame = {
+        .type = ARES_FRAME_BLE_CONNECTED,
+        .payload.BLE_CONNECTED = false,
+    };
+
+    ares_serial_write_frame(ctx->serial, &frame);
+}
+
+static void mtu_size_change(void *data, size_t mtu) {
+    struct ble_user_data *ctx = data;
+    struct ares_frame frame = {.type = ARES_FRAME_BLE_CONN_PARAMS,
+                               .payload.BLE_CONN_PARAMS = {
+                                   .mtu = mtu,
+                                   .interval = ctx->interval,
+                                   .latency = ctx->latency,
+                                   .phy = ctx->phy,
+                                   .timeout = ctx->timeout,
+                               }};
+
+    ctx->mtu = mtu;
+
+    ares_serial_write_frame(ctx->serial, &frame);
+}
+
+static void conn_param_updated(void *data, uint16_t interval, uint16_t latency,
+                               uint16_t timeout) {
+    struct ble_user_data *ctx = data;
+    struct ares_frame frame = {.type = ARES_FRAME_BLE_CONN_PARAMS,
+                               .payload.BLE_CONN_PARAMS = {
+                                   .mtu = ctx->mtu,
+                                   .interval = interval,
+                                   .latency = latency,
+                                   .phy = ctx->phy,
+                                   .timeout = timeout,
+                               }};
+
+    ctx->interval = interval;
+    ctx->latency = latency;
+    ctx->timeout = timeout;
+
+    ares_serial_write_frame(ctx->serial, &frame);
+}
+
+static void phy_updated(void *data, enum le_phy phy) {
+    struct ble_user_data *ctx = data;
+    struct ares_frame frame = {.type = ARES_FRAME_BLE_CONN_PARAMS,
+                               .payload.BLE_CONN_PARAMS = {
+                                   .mtu = ctx->mtu,
+                                   .interval = ctx->interval,
+                                   .latency = ctx->latency,
+                                   .phy = phy,
+                                   .timeout = ctx->timeout,
+                               }};
+
+    ctx->phy = phy;
+
+    ares_serial_write_frame(ctx->serial, &frame);
+}
+
+static uint8_t check_subscription_mask(uint32_t subscriptions, uint32_t mask) {
+    return (subscriptions & mask) != 0;
+}
+
+static void subscription_update(void *data, uint32_t subscriptions) {
+    struct ble_user_data *ctx = data;
+    struct ares_frame frame = {
+        .type = ARES_FRAME_BLE_SUBSCRIBED,
+        .payload.BLE_SUBSCRIBED = {
+            .neighbor_states_subscribed = check_subscription_mask(
+                subscriptions, ARES_SUBSCRIPTION_NEIGHBOR_UPDATES),
+            .bandwidth = check_subscription_mask(subscriptions,
+                                                 ARES_SUBSCRIPTION_BANDWIDTH),
+            .center_freq = check_subscription_mask(
+                subscriptions, ARES_SUBSCRIPTION_CENTER_FREQ),
+            .ref_lvl = check_subscription_mask(subscriptions,
+                                               ARES_SUBSCRIPTION_REF_LVL),
+            .duration = check_subscription_mask(subscriptions,
+                                                ARES_SUBSCRIPTION_DURATION),
+            .description = check_subscription_mask(
+                subscriptions, ARES_SUBSCRIPTION_DESCRIPTION),
         }};
 
-    connect_work.serial = serial;
-    subscribe_work.serial = serial;
+    ares_serial_write_frame(ctx->serial, &frame);
+}
 
-    k_work_init(&connect_work.work, connected_work_handler);
-    k_work_init(&subscribe_work.work, subscribe_work_handler);
+static void configuration_update(void *data, uint32_t type, const uint8_t *buf,
+                                 size_t len) {
+    struct ble_user_data *ctx = data;
+    struct ares_frame frame = {.type = ARES_FRAME_BLE_NODE_CONFIG,
+                               .payload.BLE_NODE_CONFIG = {
+                                   .type = type,
+                                   .data = buf,
+                                   .data_len = len,
+                               }};
+
+    ares_serial_write_frame(ctx->serial, &frame);
+}
+
+static void config_request(void *data, uint32_t type) {
+    struct ble_user_data *ctx = data;
+    struct ares_frame frame = {
+        .type = ARES_FRAME_BLE_CONFIG_REQUEST,
+        .payload.BLE_CONFIG_REQUEST = type,
+    };
+
+    ares_serial_write_frame(ctx->serial, &frame);
+}
+
+static void send_start(void *data, uint32_t delay) {
+    struct ble_user_data *ctx = data;
+    struct ares_frame frame = {
+        .type = ARES_FRAME_BLE_START,
+        .payload.BLE_START = delay,
+    };
+
+    ares_serial_write_frame(ctx->serial, &frame);
+}
+
+static void ble_config_response_error(void *data, uint8_t err) {
+    struct ble_user_data *ctx = data;
+    struct ares_frame frame = {
+        .type = ARES_FRAME_BLE_ATT_ERR,
+        .payload.BLE_ATT_ERR = err,
+    };
+
+    ares_serial_write_frame(ctx->serial, &frame);
+}
+
+static int initialize_ble(const struct ares_serial *serial) {
+    struct ares_ble_init_data init_data = {
+        .cb =
+            {
+                .configuration_update = configuration_update,
+                .config_request = config_request,
+                .subscription_update = subscription_update,
+                .connected = connected,
+                .disconnected = disconnected,
+                .connection_param_updated = conn_param_updated,
+                .mtu_size_changed = mtu_size_change,
+                .phy_updated = phy_updated,
+                .send_config_response_error = ble_config_response_error,
+                .start = send_start,
+            },
+        .user_data = &ares_ble_user_data,
+    };
+
+    ares_ble_user_data.serial = serial;
 
     (void)retrieve_setting(ARES_SETTING_ID, &init_data.node_id);
 
     return ares_init_ble(&init_data);
 }
 
-static struct ares_serial_command commands[] = {
-    {ARES_FRAME_SETTING, handle_setting},
-    {ARES_FRAME_START, handle_start},
-    {ARES_FRAME_LORA_CONFIG, handle_lora_config},
-    {ARES_FRAME_LED, handle_led},
-    {ARES_FRAME_HEARTBEAT, handle_heartbeat},
-    {ARES_FRAME_POLL, handle_poll},
-    {ARES_FRAME_LOG, handle_log},
-    {ARES_FRAME_LOG_ACK, handle_log_ack},
-    {ARES_FRAME_VERSION, handle_version},
-    {ARES_FRAME_BLE_STATE, handle_ble_state},
-    {ARES_FRAME_BLE_DISCONNECT, handle_ble_disconnect},
-    {ARES_FRAME_BLE_CHUNKS, handle_ble_chunks},
-    {ARES_FRAME_BLE_IMAGE_CHUNK, handle_ble_image_chunk},
-    {ARES_FRAME_REBOOT, handle_reboot},
-    {ARES_FRAME_LORA_ACK, handle_lora_ack},
-    {ARES_FRAME_ABORT, handle_abort},
-    {ARES_FRAME_NODE_CONFIG, handle_node_config},
-    {ARES_FRAME_NODE_CONFIG_POLL, handle_node_config_poll},
-    {ARES_FRAME_NODE_CONFIG_RESP, handle_node_config_response},
-    {ARES_FRAME_NODE_READY, handle_node_ready},
-};
-
 static int init_serial_handlers(void) {
     const struct ares_serial *serial = ares_serial_backend_uart_get_ptr();
-
-    int ret = initialize_ble(serial);
-    if (ret != 0) {
-        return ret;
-    }
-
-    return ares_serial_register_command_callbacks(serial, commands,
-                                                  ARRAY_SIZE(commands));
+    return initialize_ble(serial);
 }
 SYS_INIT(init_serial_handlers, APPLICATION, 90);

@@ -10,7 +10,6 @@ include_directories(include)
 set(SRC
         src/main.c
         src/settings.c
-        src/serial_commands.c
         src/lora_handlers.c
 )
 
@@ -22,7 +21,6 @@ set(SERIAL_SRC
 
 set(LORA_SRC
         src/lora/lora.c
-        src/lora/lora_backend.c
         src/lora/packet.c
 )
 
@@ -31,4 +29,18 @@ set(BLE_SRC
         src/ble/services/ares_service.c
 )
 
+set(SHELL_SRC
+        src/shell/ble.c
+)
+
 target_sources(app PRIVATE ${SRC} ${SERIAL_SRC} ${LORA_SRC} ${BLE_SRC})
+target_sources_ifdef(CONFIG_SHELL app PRIVATE ${SHELL_SRC})
+target_sources_ifndef(CONFIG_SHELL app PRIVATE src/serial_commands.c)
+
+target_sources_ifdef(CONFIG_LORA_BACKEND_LORA app PRIVATE src/lora/backends/lora_backend.c)
+target_sources_ifndef(CONFIG_LORA_BACKEND_LORA app PRIVATE src/lora/backends/dummy_backend.c)
+
+zephyr_iterable_section(NAME ares_serial_command
+        KVMA RAM_REGION GROUP RODATA_REGION
+        SUBALIGN Z_LINK_ITERABLE_SUBALIGN)
+zephyr_linker_sources(SECTIONS linker/ares_iterables_rom.ld)

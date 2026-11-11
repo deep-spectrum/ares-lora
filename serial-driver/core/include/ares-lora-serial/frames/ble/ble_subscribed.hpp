@@ -24,14 +24,34 @@ struct BleSubscribed : Internal::FramePayloadBase {
     static constexpr AresFrameType frame_type = BLE_SUBSCRIBED;
 
     /**
-     * Flag indicating if the chunks attribute has been subscribed to.
+     * Neighbor states characteristic subscription status.
      */
-    bool chunk = false;
+    bool neighbor_states = false;
 
     /**
-     * Flag indicating if the image attribute has been subscribed to.
+     * Bandwidth characteristic subscription status.
      */
-    bool image = false;
+    bool bandwidth = false;
+
+    /**
+     * Center frequency characteristic subscription status.
+     */
+    bool center_frequency = false;
+
+    /**
+     * Reference level characteristic subscription status.
+     */
+    bool ref_lvl = false;
+
+    /**
+     * Duration characteristic subscription status.
+     */
+    bool duration = false;
+
+    /**
+     * Description characteristic subscription status.
+     */
+    bool description = false;
 
     /**
      * Decode the payload from a serial buffer.

@@ -11,10 +11,14 @@
 #ifndef ARES_FRAME_HPP
 #define ARES_FRAME_HPP
 
-#include <ares-lora-serial/frames/ble/ble_chunks.hpp>
+#include <ares-lora-serial/frames/ble/ble_att_error.hpp>
+#include <ares-lora-serial/frames/ble/ble_config.hpp>
+#include <ares-lora-serial/frames/ble/ble_config_request.hpp>
+#include <ares-lora-serial/frames/ble/ble_conn_params.hpp>
 #include <ares-lora-serial/frames/ble/ble_connected.hpp>
 #include <ares-lora-serial/frames/ble/ble_disconnect.hpp>
-#include <ares-lora-serial/frames/ble/ble_image_chunk.hpp>
+#include <ares-lora-serial/frames/ble/ble_neighbor_update.hpp>
+#include <ares-lora-serial/frames/ble/ble_start.hpp>
 #include <ares-lora-serial/frames/ble/ble_state.hpp>
 #include <ares-lora-serial/frames/ble/ble_subscribed.hpp>
 #include <ares-lora-serial/frames/debug/dbg.hpp>
@@ -61,9 +65,9 @@ class Frame {
      */
     using TxTypes =
         std::variant<std::monostate, Setting, Start, LoraConfig, Led, Heartbeat,
-                     Poll, Log, Version, BleState, BleChunk, BleImage,
-                     BleDisconnect, Reboot, Abort, NodeConfig, NodeConfigPoll,
-                     NodeConfigResponse, NodeReady, LoraAck, LogAck>;
+                     Poll, Log, Version, BleState, BleDisconnect, Reboot, Abort,
+                     NodeConfig, NodeConfigPoll, NodeConfigResponse, NodeReady,
+                     LoraAck, LogAck, BleNodeConfiguration, BleNeighborUpdate>;
 
     /**
      * @typedef RxTypes
@@ -73,8 +77,10 @@ class Frame {
     using RxTypes =
         std::variant<std::monostate, Setting, Start, Ack, FramingError, Led,
                      Heartbeat, Poll, Log, Version, LogAck, Dbg, PktRx, PktTx,
-                     BleState, BleConnect, BleSubscribed, LoraAck, Abort,
-                     NodeConfig, NodeConfigPoll, NodeConfigResponse, NodeReady>;
+                     BleState, BleConnParams, BleAttErr, BleConnect,
+                     BleSubscribed, LoraAck, Abort, NodeConfig, NodeConfigPoll,
+                     NodeConfigResponse, NodeReady, BleNodeConfiguration,
+                     BleConfigRequest, BleStart>;
 
     /**
      * @typedef ResponseTypes
@@ -247,13 +253,17 @@ class Frame {
         {BLE_STATE, [] { return BleState(); }},
         {BLE_CONNECTED, [] { return BleConnect(); }},
         {BLE_SUBSCRIBED, [] { return BleSubscribed(); }},
+        {BLE_CONN_PARAM, [] { return BleConnParams(); }},
+        {BLE_ATT_ERR, [] { return BleAttErr(); }},
         {LORA_ACK, [] { return LoraAck(); }},
         {ABORT, [] { return Abort(); }},
         {NODE_CONFIG, [] { return NodeConfig(); }},
         {NODE_CONFIG_POLL, [] { return NodeConfigPoll(); }},
         {NODE_CONFIG_RESP, [] { return NodeConfigResponse(); }},
         {NODE_READY, [] { return NodeReady(); }},
-    };
+        {BLE_CONFIG, [] { return BleNodeConfiguration(); }},
+        {BLE_CONFIG_REQ, [] { return BleConfigRequest(); }},
+        {BLE_START, [] { return BleStart(); }}};
 };
 
 } // namespace AresFrame

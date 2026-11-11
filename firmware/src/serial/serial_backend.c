@@ -301,7 +301,7 @@ static void sample_msg_cb(struct usbd_context *const ctx,
 #endif
 
 static int enable_ares_serial_uart(void) {
-    const struct device *const dev = DEVICE_DT_GET(DT_CHOSEN(zephyr_console));
+    const struct device *const dev = DEVICE_DT_GET(DT_CHOSEN(ares_serial_uart));
     int ret;
 
     if (!device_is_ready(dev)) {

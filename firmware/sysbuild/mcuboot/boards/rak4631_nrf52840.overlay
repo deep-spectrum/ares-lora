@@ -1,9 +1,5 @@
 / {
 	aliases {
-		// For nrf52840dk
-		//mcuboot-led0 = &led2;
-
-		// For the rak
 		mcuboot-led0 = &green_led;
 	};
 };

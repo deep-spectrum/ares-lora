@@ -263,8 +263,19 @@ class AresSerial {
      * @return tuple[tuple[code], None]
      */
     py::tuple ble_disconnect(const py::kwargs &kwargs);
-    // TODO: This needs some more thought put into it.
-    // py::tuple ble_send_image(const py::bytes &image);
+
+    /**
+     * Get the current BLE connection parameters.
+     * @return dict[str, float | int]
+     */
+    py::dict get_ble_connection_params();
+
+    /**
+     * Share neighbor list over BLE.
+     * @param kwargs Python keyword arguments.
+     * @return tuple[tuple[code], None]
+     */
+    py::tuple ble_send_neighbor_list(const py::kwargs &kwargs);
 
     /**
      * @}
@@ -346,9 +357,9 @@ class AresSerial {
 
     /**
      * Wait for BLE service subscription status changes.
-     * @return tuple[subscription statuses, ...]
+     * @return dict[str, bool]
      */
-    py::tuple wait_ble_subscribe_event();
+    py::dict wait_ble_subscribe_event();
 
     /**
      * Wait in the waiting room of unplanned parenthood.
@@ -361,6 +372,18 @@ class AresSerial {
      * @return tuple[src_id, broadcast]
      */
     py::tuple wait_run_ready_event();
+
+    /**
+     * Wait for events indicating BLE ATT errors.
+     * @return ATT error code.
+     */
+    int wait_ble_att_error_event();
+
+    /**
+     * Wait for the start time from BLE.
+     * @return The amount of seconds to schedule the start time in the future.
+     */
+    uint32_t wait_run_start_event();
 
     /**
      * Start the driver.
@@ -427,15 +450,15 @@ class AresSerial {
     void _process_frames_helper();
     void _process_frames();
 
-    // Lora response task stuff
-    ares::Task<void()> _lora_response_task;
-    ares::bounded_queue<AresFrame::Frame::TxTypes, 10> _lora_response_q;
-    std::chrono::milliseconds _send_lora_response_timeout = 10s;
-    static void _lora_responses_check_fw_responses(
+    // Task for driver responses
+    ares::Task<void()> _driver_response_task;
+    ares::bounded_queue<AresFrame::Frame::TxTypes, 10> _driver_response_q;
+    std::chrono::milliseconds _send_driver_response_timeout = 10ms;
+    static void _driver_response_check_fw_responses(
         const std::vector<FrameResponse> &responses,
         const AresFrame::AresFrameType &sent_type);
-    void _send_lora_responses_helper();
-    void _send_lora_responses();
+    void _send_driver_response_helper();
+    void _send_driver_responses();
 
     // event queues
     ares::bounded_queue<std::unique_ptr<AresFrame::Start>, 5> _start_event_q;
@@ -451,6 +474,11 @@ class AresSerial {
         _run_ready_event_q;
     ares::bounded_queue<std::unique_ptr<AresFrame::Frame::AckTypes>, 10>
         _ack_queue;
+    ares::bounded_queue<std::unique_ptr<AresFrame::BleAttErr>, 5>
+        _ble_att_err_event_q;
+    ares::bounded_queue<std::unique_ptr<AresFrame::BleStart>>
+        _ble_start_event_q;
+
     bool _stop_event_queues();
 
     struct EventDispatcher {
@@ -484,6 +512,11 @@ class AresSerial {
         void operator()(const AresFrame::NodeConfigResponse &event) const;
         void operator()(const AresFrame::NodeReady &event) const;
         void operator()(const AresFrame::LoraAck &event) const;
+        void operator()(const AresFrame::BleConnParams &event) const;
+        void operator()(const AresFrame::BleAttErr &event) const;
+        void operator()(const AresFrame::BleStart &event) const;
+        void operator()(const AresFrame::BleNodeConfiguration &event) const;
+        void operator()(const AresFrame::BleConfigRequest &event) const;
 
         template <typename T> void operator()(const T &event) const {
             FrameResponse response;
@@ -514,6 +547,7 @@ class AresSerial {
         double center_freq = 0;
         double ref_level = 0;
         uint32_t duration = 0;
+        std::string description;
 
         ares::semaphore<> sem{};
     };
@@ -521,12 +555,25 @@ class AresSerial {
 
     // BLE Stuff
     struct BleInfo {
+        static constexpr double interval_scale_factor_ms = 1.25;
+        static constexpr double timeout_scale_factor_ms = 10.0;
+
+        std::mutex lock;
+
         struct {
-            bool chunk = false;
-            bool image = false;
+            bool neighbor_states = false;
+            bool bandwidth = false;
+            bool center_frequency = false;
+            bool reference_level = false;
+            bool duration = false;
+            bool description = false;
         } subscriptions;
         bool connected = false;
-        size_t mtu_size = 0;
+        uint16_t mtu = 0;
+        double interval = 0.0;
+        uint16_t latency = 0;
+        double timeout = 0.0;
+        AresFrame::BlePhy phy = AresFrame::PHY_1M;
     };
     BleInfo _ble_info;
 };

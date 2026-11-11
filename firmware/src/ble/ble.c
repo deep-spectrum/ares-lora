@@ -16,8 +16,9 @@
 #include <zephyr/bluetooth/gatt.h>
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
+#include <zephyr/net_buf.h>
 
-LOG_MODULE_REGISTER(ble_app);
+LOG_MODULE_REGISTER(ble_app, CONFIG_BLE_APP_LOG_LEVEL);
 
 #define NAME_SD_IDX 0
 
@@ -28,24 +29,54 @@ enum {
     BLE_CONNECTED,
 };
 
-enum {
-    BLE_SIGNAL_CHUNK_IND,
-    BLE_SIGNAL_IMAGE_IND,
+NET_BUF_POOL_DEFINE(ares_tx_netbuf, CONFIG_ARES_BLE_NUM_TX_NET_BUFS,
+                    CONFIG_ARES_BLE_TX_NETBUF_SIZE, 0, NULL);
+NET_BUF_POOL_DEFINE(ares_rx_netbuf, CONFIG_ARES_BLE_NUM_RX_NET_BUFS,
+                    CONFIG_ARES_BLE_RX_NETBUF_SIZE, 0, NULL);
 
-    BLE_SIGNAL_LAST,
+struct config_response_ind_err_work {
+    uint8_t err;
+    struct k_work work;
+};
+
+struct config_write_work {
+    struct k_fifo fifo;
+    struct k_poll_event events[1];
+    struct k_work_poll work;
 };
 
 struct ble_conn_info {
-    struct k_poll_signal signals[BLE_SIGNAL_LAST];
-    struct k_poll_event events[BLE_SIGNAL_LAST];
     struct k_sem adv_name_sem;
 
     atomic_t state;
-    size_t payload_mtu_size;
     struct bt_conn *conn;
+
+    struct net_buf *desc_buf;
+
+    struct config_response_ind_err_work conf_resp_work;
+
+    struct k_work_q *ble_work_q_lp;
+
+    struct {
+        uint16_t interval;
+        uint16_t latency;
+        uint16_t timeout;
+        uint16_t mtu_size;
+        enum le_phy phy;
+    } conn_params;
+
+    atomic_t subscriptions;
+};
+
+struct ble_callback_data {
+    struct ares_ble_callbacks cb;
+    void *user_data;
 };
 
 static char adv_name[16] = "Ares";
+
+K_MUTEX_DEFINE(pref_phy_mtx);
+static enum le_phy preferred_phy = LE_PHY_1M;
 
 static const struct bt_le_adv_param *adv_param = BT_LE_ADV_PARAM(
     (BT_LE_ADV_OPT_CONN | BT_LE_ADV_OPT_USE_IDENTITY), 800, 801, NULL);
@@ -59,8 +90,129 @@ static struct bt_data sd[] = {
     BT_DATA(BT_DATA_NAME_COMPLETE, adv_name, 4),
 };
 
-static struct ble_conn_info connection_info;
-static struct ares_ble_callbacks callbacks;
+static struct ble_conn_info connection_info = {
+    .conn_params = {
+        .interval = CONFIG_BT_PERIPHERAL_PREF_MIN_INT,
+        .latency = CONFIG_BT_PERIPHERAL_PREF_LATENCY,
+        .timeout = CONFIG_BT_PERIPHERAL_PREF_TIMEOUT,
+    }};
+static struct config_write_work write_work;
+static struct ble_callback_data callbacks;
+
+static void config_response_indicate_work(struct k_work *work) {
+    struct config_response_ind_err_work *cwork =
+        CONTAINER_OF(work, struct config_response_ind_err_work, work);
+
+    if (callbacks.cb.send_config_response_error != NULL) {
+        callbacks.cb.send_config_response_error(callbacks.user_data,
+                                                cwork->err);
+    }
+}
+// Initialized in init
+
+static void write_work_handler(struct k_work *work) {
+    struct k_work_poll *pwork = CONTAINER_OF(work, struct k_work_poll, work);
+    struct config_write_work *wwork =
+        CONTAINER_OF(pwork, struct config_write_work, work);
+
+    struct net_buf *buf = k_fifo_get(&wwork->fifo, K_NO_WAIT);
+    while (buf != NULL) {
+        uint32_t type = net_buf_pull_le32(buf);
+        uint16_t len = net_buf_pull_le16(buf);
+
+        switch (type) {
+        case ARES_CONFIG_RESERVED_GET: {
+            if (callbacks.cb.config_request != NULL) {
+                uint32_t config = net_buf_pull_le32(buf);
+                callbacks.cb.config_request(callbacks.user_data, config);
+            }
+            break;
+        }
+        case ARES_CONFIG_RESERVED_START: {
+            if (callbacks.cb.start != NULL) {
+                uint32_t delay = net_buf_pull_le32(buf);
+                callbacks.cb.start(callbacks.user_data, delay);
+            }
+            break;
+        }
+        case ARES_CONFIG_BANDWIDTH:
+        case ARES_CONFIG_CENTER_FREQ:
+        case ARES_CONFIG_REF_LEVEL:
+        case ARES_CONFIG_DURATION:
+        case ARES_CONFIG_DESCRIPTION: {
+            if (callbacks.cb.configuration_update != NULL) {
+                callbacks.cb.configuration_update(callbacks.user_data, type,
+                                                  buf->data, len);
+            }
+            break;
+        }
+        default: {
+            LOG_ERR("Unhandled case: %d", type);
+            break;
+        }
+        }
+
+        net_buf_unref(buf);
+        k_yield();
+        buf = k_fifo_get(&wwork->fifo, K_NO_WAIT);
+    }
+
+    k_work_poll_submit_to_queue(connection_info.ble_work_q_lp, pwork,
+                                wwork->events, ARRAY_SIZE(wwork->events),
+                                K_FOREVER);
+}
+// Initialized in init
+
+static void connected_work_handler(struct k_work *work) {
+    ARG_UNUSED(work);
+
+    if (callbacks.cb.connected) {
+        callbacks.cb.connected(callbacks.user_data);
+    }
+}
+K_WORK_DEFINE(connected_work, connected_work_handler);
+
+static void param_update_work_handler(struct k_work *work) {
+    ARG_UNUSED(work);
+
+    if (callbacks.cb.connection_param_updated != NULL) {
+        callbacks.cb.connection_param_updated(
+            callbacks.user_data, connection_info.conn_params.interval,
+            connection_info.conn_params.latency,
+            connection_info.conn_params.timeout);
+    }
+}
+K_WORK_DEFINE(param_updated_work, param_update_work_handler);
+
+static void phy_update_work_handler(struct k_work *work) {
+    ARG_UNUSED(work);
+
+    if (callbacks.cb.phy_updated != NULL) {
+        callbacks.cb.phy_updated(callbacks.user_data,
+                                 connection_info.conn_params.phy);
+    }
+}
+K_WORK_DEFINE(phy_update_work, phy_update_work_handler);
+
+static void mtu_update_work_handler(struct k_work *work) {
+    ARG_UNUSED(work);
+
+    if (callbacks.cb.mtu_size_changed != NULL) {
+        callbacks.cb.mtu_size_changed(callbacks.user_data,
+                                      connection_info.conn_params.mtu_size);
+    }
+}
+K_WORK_DEFINE(mtu_change_work, mtu_update_work_handler);
+
+static void subscription_changed_work_handler(struct k_work *work) {
+    ARG_UNUSED(work);
+
+    if (callbacks.cb.subscription_update != NULL) {
+        uint32_t states = atomic_get(&connection_info.subscriptions);
+        callbacks.cb.subscription_update(callbacks.user_data, states);
+    }
+}
+K_WORK_DEFINE(subscription_changed_work, subscription_changed_work_handler);
 
 static void adv_work_handler(struct k_work *work) {
     ARG_UNUSED(work);
@@ -90,32 +242,13 @@ static void advertising_start(void) { k_work_submit(&adv_work); }
 
 static void recycled_cb(void) { advertising_start(); }
 
-static void chunks_indicate_callback(struct bt_conn *conn, uint8_t err) {
-    __ASSERT_NO_MSG(conn == connection_info.conn);
-    __ASSERT_NO_MSG(atomic_test_bit(connection_info.state, BLE_INITIALIZED));
-    ARG_UNUSED(conn);
-
-    k_poll_signal_raise(&connection_info.signals[BLE_SIGNAL_CHUNK_IND], err);
-}
-
-static void image_indicate_callback(struct bt_conn *conn, uint8_t err) {
-    __ASSERT_NO_MSG(conn == connection_info.conn);
-    __ASSERT_NO_MSG(atomic_test_bit(connection_info.state, BLE_INITIALIZED) &&
-                    atomic_test_bit(connection_info.state, BLE_CONNECTED));
-    ARG_UNUSED(conn);
-
-    k_poll_signal_raise(&connection_info.signals[BLE_SIGNAL_IMAGE_IND], err);
-}
-
 static void exchange_mtu_cb(struct bt_conn *conn, uint8_t att_err,
                             struct bt_gatt_exchange_params *params) {
     ARG_UNUSED(params);
     LOG_INF("MTU exchange %s", att_err == 0 ? "successful" : "failed");
     if (att_err == 0) {
-        connection_info.payload_mtu_size = bt_gatt_get_mtu(conn) - 3;
-        if (callbacks.mtu_size_changed != NULL) {
-            callbacks.mtu_size_changed(connection_info.payload_mtu_size);
-        }
+        connection_info.conn_params.mtu_size = bt_gatt_get_mtu(conn) - 3;
+        k_work_submit_to_queue(connection_info.ble_work_q_lp, &mtu_change_work);
     }
 }
 
@@ -125,6 +258,101 @@ static void update_mtu(struct bt_conn *conn) {
     if (err != 0) {
         LOG_ERR("bt_gatt_exchange_mtu(): %d", err);
     }
+}
+
+static int update_phy(struct bt_conn *conn) {
+    int err;
+    struct bt_conn_le_phy_param preferred_phy_param = {
+        .pref_rx_phy = BT_GAP_LE_PHY_NONE,
+        .pref_tx_phy = BT_GAP_LE_PHY_NONE,
+        .options = BT_CONN_LE_PHY_OPT_NONE,
+    };
+
+    err = k_mutex_lock(&pref_phy_mtx, K_USEC(10));
+    if (err < 0) {
+        return err;
+    }
+
+    switch (preferred_phy) {
+    case LE_PHY_1M: {
+        LOG_DBG("Attempting to update to 1M");
+        preferred_phy_param.pref_rx_phy = BT_GAP_LE_PHY_1M;
+        preferred_phy_param.pref_tx_phy = BT_GAP_LE_PHY_1M;
+        break;
+    }
+    case LE_PHY_2M: {
+        LOG_DBG("Attempting to update to 2M");
+        preferred_phy_param.pref_rx_phy = BT_GAP_LE_PHY_2M;
+        preferred_phy_param.pref_tx_phy = BT_GAP_LE_PHY_2M;
+        break;
+    }
+    case LE_PHY_CODED_S2: {
+        LOG_DBG("Attempting to update to Coded S=2");
+        preferred_phy_param.pref_rx_phy = BT_GAP_LE_PHY_CODED;
+        preferred_phy_param.pref_tx_phy = BT_GAP_LE_PHY_CODED;
+        preferred_phy_param.options = BT_CONN_LE_PHY_OPT_CODED_S2;
+        break;
+    }
+    case LE_PHY_CODED_S8: {
+        LOG_DBG("Attempting to update to Coded S=8");
+        preferred_phy_param.pref_rx_phy = BT_GAP_LE_PHY_CODED;
+        preferred_phy_param.pref_tx_phy = BT_GAP_LE_PHY_CODED;
+        preferred_phy_param.options = BT_CONN_LE_PHY_OPT_CODED_S8;
+        break;
+    }
+    case LE_PHY_CODED: {
+        LOG_DBG("Attempting to update to Coded with no codfing preference");
+        preferred_phy_param.pref_rx_phy = BT_GAP_LE_PHY_CODED;
+        preferred_phy_param.pref_tx_phy = BT_GAP_LE_PHY_CODED;
+        break;
+    }
+    default: {
+        LOG_DBG("Attempting to indicate no preference");
+        // nop
+        break;
+    }
+    }
+    k_mutex_unlock(&pref_phy_mtx);
+
+    LOG_INF("Now updating PHY");
+    err = bt_conn_le_phy_update(conn, &preferred_phy_param);
+    if (err < 0) {
+        LOG_DBG("Failed to update: %d", err);
+    }
+
+    return err;
+}
+
+static void on_le_phy_updated(struct bt_conn *conn,
+                              struct bt_conn_le_phy_info *param) {
+    __ASSERT_NO_MSG(conn == connection_info.conn);
+    ARG_UNUSED(conn);
+    LOG_DBG("PHY Updated (TX: %d, RX: %d)", param->tx_phy, param->rx_phy);
+
+    switch (param->tx_phy) {
+    case BT_CONN_LE_TX_POWER_PHY_1M: {
+        connection_info.conn_params.phy = LE_PHY_1M;
+        break;
+    }
+    case BT_CONN_LE_TX_POWER_PHY_2M: {
+        connection_info.conn_params.phy = LE_PHY_2M;
+        break;
+    }
+    case BT_CONN_LE_TX_POWER_PHY_CODED_S2: {
+        connection_info.conn_params.phy = LE_PHY_CODED_S2;
+        break;
+    }
+    case BT_CONN_LE_TX_POWER_PHY_CODED_S8: {
+        connection_info.conn_params.phy = LE_PHY_CODED_S8;
+        break;
+    }
+    default: {
+        connection_info.conn_params.phy = LE_PHY_NONE;
+        break;
+    }
+    }
+
+    k_work_submit_to_queue(connection_info.ble_work_q_lp, &phy_update_work);
 }
 
 static void on_connected(struct bt_conn *conn, uint8_t bt_err) {
@@ -137,7 +365,6 @@ static void on_connected(struct bt_conn *conn, uint8_t bt_err) {
     }
 
     connection_info.conn = bt_conn_ref(conn);
-    atomic_set_bit(&connection_info.state, BLE_CONNECTED);
     atomic_clear_bit(&connection_info.state, BLE_ADVERTISING);
 
     err = bt_conn_get_info(conn, &info);
@@ -146,11 +373,12 @@ static void on_connected(struct bt_conn *conn, uint8_t bt_err) {
         return;
     }
 
-    if (callbacks.connected != NULL) {
-        callbacks.connected();
-    }
+    k_work_submit_to_queue(connection_info.ble_work_q_lp, &connected_work);
 
+    update_phy(conn);
     update_mtu(conn);
+
+    atomic_set_bit(&connection_info.state, BLE_CONNECTED);
 }
 
 static void on_disconnected(struct bt_conn *conn, uint8_t reason) {
@@ -161,22 +389,261 @@ static void on_disconnected(struct bt_conn *conn, uint8_t reason) {
     connection_info.conn = NULL;
     atomic_clear_bit(&connection_info.state, BLE_CONNECTED);
 
-    if (callbacks.disconnected != NULL) {
-        callbacks.disconnected();
+    if (callbacks.cb.disconnected != NULL) {
+        callbacks.cb.disconnected(callbacks.user_data);
     }
+
+    if (connection_info.desc_buf != NULL) {
+        net_buf_unref(connection_info.desc_buf);
+        connection_info.desc_buf = NULL;
+    }
+}
+
+static void on_le_param_updated(struct bt_conn *conn, uint16_t interval,
+                                uint16_t latency, uint16_t timeout) {
+    __ASSERT_NO_MSG(conn == connection_info.conn);
+    ARG_UNUSED(conn);
+
+    connection_info.conn_params.interval = interval;
+    connection_info.conn_params.latency = latency;
+    connection_info.conn_params.timeout = timeout;
+
+    k_work_submit_to_queue(connection_info.ble_work_q_lp, &param_updated_work);
 }
 
 BT_CONN_CB_DEFINE(conn_cb) = {
     .connected = on_connected,
     .disconnected = on_disconnected,
     .recycled = recycled_cb,
+    .le_param_updated = on_le_param_updated,
+    .le_phy_updated = on_le_phy_updated,
 };
+
+static void config_response_indicate_callback(struct bt_conn *conn, uint8_t err,
+                                              struct net_buf *buf) {
+    __ASSERT_NO_MSG(conn == connection_info.conn);
+    __ASSERT_NO_MSG(atomic_test_bit(connection_info.state, BLE_INITIALIZED));
+    ARG_UNUSED(conn);
+
+    net_buf_unref(buf);
+
+    if (err != BT_ATT_ERR_SUCCESS) {
+        connection_info.conf_resp_work.err = err;
+        k_work_submit(&connection_info.conf_resp_work.work);
+    }
+}
+
+static enum ares_srv_write_response
+create_write_config_work_item(uint32_t type, void *data, uint16_t len) {
+    struct net_buf *buf;
+
+    buf = net_buf_alloc(&ares_tx_netbuf, K_NO_WAIT);
+    if (buf == NULL) {
+        return ARES_WRITE_NO_MEM;
+    }
+
+    net_buf_add_le32(buf, type);
+    net_buf_add_le16(buf, len);
+    net_buf_add_mem(buf, data, len);
+
+    k_fifo_put(&write_work.fifo, buf);
+
+    return ARES_WRITE_SUCCESS;
+}
+
+static enum ares_srv_write_response bandwidth_update(struct bt_conn *conn,
+                                                     uint64_t bandwidth) {
+    __ASSERT_NO_MSG(conn == connection_info.conn);
+    __ASSERT_NO_MSG(atomic_test_bit(connection_info.state, BLE_INITIALIZED));
+    ARG_UNUSED(conn);
+    LOG_DBG("Bandwidth update thread priority: %d",
+            k_thread_priority_get(k_current_get()));
+
+    return create_write_config_work_item(ARES_CONFIG_BANDWIDTH, &bandwidth,
+                                         sizeof(bandwidth));
+}
+
+static enum ares_srv_write_response
+center_frequency_update(struct bt_conn *conn, uint64_t center_freq) {
+    __ASSERT_NO_MSG(conn == connection_info.conn);
+    __ASSERT_NO_MSG(atomic_test_bit(connection_info.state, BLE_INITIALIZED));
+    ARG_UNUSED(conn);
+    LOG_DBG("Center frequency update thread priority: %d",
+            k_thread_priority_get(k_current_get()));
+
+    return create_write_config_work_item(ARES_CONFIG_CENTER_FREQ, &center_freq,
+                                         sizeof(center_freq));
+}
+
+static enum ares_srv_write_response reference_level_update(struct bt_conn *conn,
+                                                           uint64_t ref_level) {
+    __ASSERT_NO_MSG(conn == connection_info.conn);
+    __ASSERT_NO_MSG(atomic_test_bit(connection_info.state, BLE_INITIALIZED));
+    ARG_UNUSED(conn);
+    LOG_DBG("Reference level update thread priority: %d",
+            k_thread_priority_get(k_current_get()));
+
+    return create_write_config_work_item(ARES_CONFIG_REF_LEVEL, &ref_level,
+                                         sizeof(ref_level));
+}
+
+static enum ares_srv_write_response duration_update(struct bt_conn *conn,
+                                                    uint32_t duration) {
+    __ASSERT_NO_MSG(conn == connection_info.conn);
+    __ASSERT_NO_MSG(atomic_test_bit(connection_info.state, BLE_INITIALIZED));
+    ARG_UNUSED(conn);
+    LOG_DBG("duration update thread priority: %d",
+            k_thread_priority_get(k_current_get()));
+
+    return create_write_config_work_item(ARES_CONFIG_DURATION, &duration,
+                                         sizeof(duration));
+}
+
+static enum ares_srv_write_response
+description_update(struct bt_conn *conn, const void *buf, uint16_t len) {
+    __ASSERT_NO_MSG(conn == connection_info.conn);
+    __ASSERT_NO_MSG(atomic_test_bit(connection_info.state, BLE_INITIALIZED));
+    ARG_UNUSED(conn);
+    LOG_DBG("Description update thread priority: %d",
+            k_thread_priority_get(k_current_get()));
+
+    if (connection_info.desc_buf == NULL) {
+        connection_info.desc_buf = net_buf_alloc(&ares_rx_netbuf, K_NO_WAIT);
+        if (connection_info.desc_buf == NULL) {
+            return ARES_WRITE_NO_MEM;
+        }
+    }
+
+    net_buf_add_mem(connection_info.desc_buf, buf, len);
+
+    if (connection_info.desc_buf->len > CONFIG_DESCRIPTION_BUF_SIZE) {
+        net_buf_unref(connection_info.desc_buf);
+        connection_info.desc_buf = NULL;
+        return ARES_WRITE_NO_MEM;
+    }
+
+    if (((const uint8_t *)buf)[len - 1] == '\0') {
+        net_buf_push_le16(connection_info.desc_buf,
+                          connection_info.desc_buf->len);
+        net_buf_push_le32(connection_info.desc_buf, ARES_CONFIG_DESCRIPTION);
+
+        k_fifo_put(&write_work.fifo, net_buf_ref(connection_info.desc_buf));
+        net_buf_unref(connection_info.desc_buf);
+        connection_info.desc_buf = NULL;
+    }
+
+    return ARES_WRITE_SUCCESS;
+}
+
+static enum ares_srv_write_response
+config_read_handler(struct bt_conn *conn, enum ares_srv_configs config) {
+    __ASSERT_NO_MSG(conn == connection_info.conn);
+    __ASSERT_NO_MSG(atomic_test_bit(connection_info.state, BLE_INITIALIZED));
+    ARG_UNUSED(conn);
+    LOG_DBG("Config read thread priority: %d",
+            k_thread_priority_get(k_current_get()));
+
+    return create_write_config_work_item(ARES_CONFIG_RESERVED_GET, &config,
+                                         sizeof(uint32_t));
+}
+
+static enum ares_srv_write_response start_handler(struct bt_conn *conn,
+                                                  uint32_t delay) {
+    __ASSERT_NO_MSG(conn == connection_info.conn);
+    __ASSERT_NO_MSG(atomic_test_bit(connection_info.state, BLE_INITIALIZED));
+    ARG_UNUSED(conn);
+    LOG_DBG("Start thread priority: %d",
+            k_thread_priority_get(k_current_get()));
+
+    return create_write_config_work_item(ARES_CONFIG_RESERVED_START, &delay,
+                                         sizeof(delay));
+}
+
+static void config_response_indication_enable(enum ares_srv_configs config,
+                                              bool enabled) {
+    int bit;
+
+    switch (config) {
+    case ARES_CONFIG_BANDWIDTH: {
+        bit = ARES_SUBSCRIPTION_BANDWIDTH_BIT;
+        break;
+    }
+    case ARES_CONFIG_CENTER_FREQ: {
+        bit = ARES_SUBSCRIPTION_CENTER_FREQ_BIT;
+        break;
+    }
+    case ARES_CONFIG_REF_LEVEL: {
+        bit = ARES_SUBSCRIPTION_REF_LVL_BIT;
+        break;
+    }
+    case ARES_CONFIG_DURATION: {
+        bit = ARES_SUBSCRIPTION_DURATION_BIT;
+        break;
+    }
+    case ARES_CONFIG_DESCRIPTION: {
+        bit = ARES_SUBSCRIPTION_DESCRIPTION_BIT;
+        break;
+    }
+    default: {
+        LOG_ERR("Invalid config subscribed to: %d", config);
+        return;
+    }
+    }
+
+    if (enabled) {
+        atomic_set_bit(&connection_info.subscriptions, bit);
+    } else {
+        atomic_clear_bit(&connection_info.subscriptions, bit);
+    }
+
+    k_work_submit_to_queue(connection_info.ble_work_q_lp,
+                           &subscription_changed_work);
+}
+
+static void neighbor_updates_enabled(bool enabled) {
+    if (enabled) {
+        atomic_set_bit(&connection_info.subscriptions,
+                       ARES_SUBSCRIPTION_NEIGHBOR_UPDATES_BIT);
+    } else {
+        atomic_clear_bit(&connection_info.subscriptions,
+                         ARES_SUBSCRIPTION_NEIGHBOR_UPDATES_BIT);
+    }
+
+    k_work_submit_to_queue(connection_info.ble_work_q_lp,
+                           &subscription_changed_work);
+}
+
+static void initialize_workq(void) {
+#if IS_ENABLED(CONFIG_ARES_BLE_WORKQ)
+    struct k_work_queue_config workq_config = {
+        .essential = true,
+        .name = "Ares BLE RX WQ LP",
+    };
+
+    k_work_queue_init(&ares_ble_work_q);
+    k_work_queue_start(&ares_ble_work_q, ble_workq_stack,
+                       K_THREAD_STACK_SIZEOF(ble_workq_stack),
+                       CONFIG_ARES_BLE_WORKQ_PRIO, &workq_config);
+    connection_info.ble_work_q_lp = &ares_ble_work_q;
+#else
+    connection_info.ble_work_q_lp = &k_sys_work_q;
+#endif
+}
 
 int ares_init_ble(const struct ares_ble_init_data *init_data) {
     struct ares_service_cb service_cb = {
-        .num_chunks_ind_cb = chunks_indicate_callback,
-        .image_ind_cb = image_indicate_callback,
+        .bandwidth_update = bandwidth_update,
+        .center_frequency_update = center_frequency_update,
+        .reference_level_update = reference_level_update,
+        .duration_update = duration_update,
+        .description_update = description_update,
+        .config_read = config_read_handler,
+        .config_response_ind_cb = config_response_indicate_callback,
+        .start = start_handler,
+        .config_subscription_update = config_response_indication_enable,
+        .neighbor_state_enabled = neighbor_updates_enabled,
     };
+
     int err;
 
     if (init_data == NULL) {
@@ -187,18 +654,22 @@ int ares_init_ble(const struct ares_ble_init_data *init_data) {
         return -EALREADY;
     }
 
-    callbacks = init_data->cb;
+    initialize_workq();
 
-    for (size_t i = 0; i < BLE_SIGNAL_LAST; i++) {
-        k_poll_signal_init(&connection_info.signals[i]);
-        k_poll_event_init(&connection_info.events[i], K_POLL_TYPE_SIGNAL,
-                          K_POLL_MODE_NOTIFY_ONLY, &connection_info.signals[i]);
-    }
+    k_work_init(&connection_info.conf_resp_work.work,
+                config_response_indicate_work);
+    k_work_poll_init(&write_work.work, write_work_handler);
+    k_fifo_init(&write_work.fifo);
+    k_poll_event_init(&write_work.events[0], K_POLL_TYPE_FIFO_DATA_AVAILABLE,
+                      K_POLL_MODE_NOTIFY_ONLY, &write_work.fifo);
+    k_work_poll_submit_to_queue(connection_info.ble_work_q_lp, &write_work.work,
+                                write_work.events,
+                                ARRAY_SIZE(write_work.events), K_FOREVER);
+
+    callbacks.cb = init_data->cb;
+    callbacks.user_data = init_data->user_data;
 
     k_sem_init(&connection_info.adv_name_sem, 1, 1);
-
-    service_cb.num_chunks_ind_enabled = callbacks.chunks_enabled;
-    service_cb.image_ind_enabled = callbacks.image_enabled;
 
     bt_ares_srv_init(&service_cb);
 
@@ -239,7 +710,7 @@ int ares_disable_ble(void) {
         if (ret != 0) {
             LOG_ERR("bt_le_adv_stop(): %d", ret);
         }
-        // TODO: Bugfix clear advertising flag
+        atomic_clear_bit(&connection_info.state, BLE_ADVERTISING);
     }
 
     return ret;
@@ -279,50 +750,144 @@ int ares_set_ble_node(uint32_t node_id) {
     return 0;
 }
 
-int ares_ble_indicate_chunks(uint64_t chunks) {
-    int ret;
-    unsigned int signaled;
+int ares_ble_update_phy(enum le_phy phy) {
+    int ret = 0;
+    k_mutex_lock(&pref_phy_mtx, K_FOREVER);
 
-    if (!atomic_test_bit(&connection_info.state, BLE_INITIALIZED)) {
-        return -ECANCELED;
+    preferred_phy = phy;
+
+    if (atomic_test_bit(&connection_info.state, BLE_CONNECTED)) {
+        ret = update_phy(connection_info.conn);
     }
 
-    ret = bt_ares_srv_ind_chunks(chunks);
-    if (ret != 0) {
-        return ret;
-    }
-
-    k_poll(&connection_info.events[BLE_SIGNAL_CHUNK_IND], 1, K_FOREVER);
-    k_poll_signal_check(&connection_info.signals[BLE_SIGNAL_CHUNK_IND],
-                        &signaled, &ret);
-
-    __ASSERT_NO_MSG(signaled);
+    k_mutex_unlock(&pref_phy_mtx);
 
     return ret;
 }
 
-int ares_ble_send_chunk(const uint8_t *chunk, size_t num_bytes) {
+#define ARES_BLE_CHECK_MSG_LEN(ret, len, type)                                 \
+    do {                                                                       \
+        if (len != sizeof(type)) {                                             \
+            ret = -EBADMSG;                                                    \
+        }                                                                      \
+    } while (false)
+
+static int check_response_size(enum ares_srv_configs type, size_t len) {
+    int ret = 0;
+
+    switch (type) {
+    case ARES_CONFIG_BANDWIDTH:
+    case ARES_CONFIG_CENTER_FREQ:
+    case ARES_CONFIG_REF_LEVEL: {
+        ARES_BLE_CHECK_MSG_LEN(ret, len, uint64_t);
+        break;
+    }
+    case ARES_CONFIG_DURATION: {
+        ARES_BLE_CHECK_MSG_LEN(ret, len, uint32_t);
+        break;
+    }
+    case ARES_CONFIG_DESCRIPTION: {
+        if (len >= (size_t)CONFIG_DESCRIPTION_BUF_SIZE) {
+            ret = -ENOMEM;
+        }
+        break;
+    }
+    default: {
+        ret = -EINVAL;
+        break;
+    }
+    }
+
+    return ret;
+}
+
+static int indicate_config_response_simple(enum ares_srv_configs type,
+                                           const void *config, size_t len) {
     int ret;
-    unsigned int signaled;
+
+    struct net_buf *buffer = net_buf_alloc(&ares_tx_netbuf, K_MSEC(100));
+    if (buffer == NULL) {
+        return -ENOMEM;
+    }
+
+    net_buf_add_mem(buffer, config, len);
+
+    ret = bt_ares_config_response(connection_info.conn, type, buffer);
+    if (ret < 0) {
+        net_buf_unref(buffer);
+    }
+
+    return ret;
+}
+
+static int indicate_config_response_chunked(enum ares_srv_configs type,
+                                            const void *config, size_t len) {
+    ssize_t bytes_left = (ssize_t)len,
+            chunk_size = connection_info.conn_params.mtu_size;
+    int ret = 0;
+
+    for (size_t index = 0; bytes_left > 0 && ret == 0;
+         index += chunk_size, chunk_size = MIN(chunk_size, bytes_left)) {
+        ret = indicate_config_response_simple(
+            type, (const uint8_t *)config + index, chunk_size);
+        bytes_left -= chunk_size;
+        LOG_DBG("Sent %d bytes, %d bytes remaining", chunk_size, bytes_left);
+    }
+
+    return ret;
+}
+
+static int indicate_config_response(enum ares_srv_configs type,
+                                    const void *config, size_t len) {
+    if (len <= connection_info.conn_params.mtu_size) {
+        return indicate_config_response_simple(type, config, len);
+    }
+
+    return indicate_config_response_chunked(type, config, len);
+}
+
+int ares_send_config_response(enum ares_srv_configs type, const void *config,
+                              size_t len) {
+    int ret;
 
     if (!atomic_test_bit(&connection_info.state, BLE_INITIALIZED)) {
         return -ECANCELED;
     }
 
-    if (num_bytes > connection_info.payload_mtu_size) {
-        return -ENOBUFS;
-    }
-
-    ret = bt_ares_srv_ind_image_chunk(chunk, num_bytes);
-    if (ret != 0) {
+    ret = check_response_size(type, len);
+    if (ret < 0) {
         return ret;
     }
 
-    k_poll(&connection_info.events[BLE_SIGNAL_IMAGE_IND], 1, K_FOREVER);
-    k_poll_signal_check(&connection_info.signals[BLE_SIGNAL_IMAGE_IND],
-                        &signaled, &ret);
+    return indicate_config_response(type, config, len);
+}
 
-    __ASSERT_NO_MSG(signaled);
+int ares_send_neighbor_states(uint8_t num_neighbors, const void *data,
+                              size_t len) {
+    size_t buf_len;
+    struct net_buf *buf;
+    int ret;
 
+    if (!atomic_test_bit(&connection_info.state, BLE_INITIALIZED)) {
+        return -ECANCELED;
+    }
+
+    buf_len = (size_t)num_neighbors * 3;
+    if (buf_len != len) {
+        return -EBADMSG;
+    }
+
+    buf = net_buf_alloc(&ares_tx_netbuf, K_MSEC(100));
+    if (buf == NULL) {
+        return -ENOMEM;
+    }
+
+    net_buf_add_mem(buf, &num_neighbors, sizeof(num_neighbors));
+    net_buf_add_mem(buf, data, len);
+
+    ret = bt_ares_notify_neighbor_state(connection_info.conn, buf->data,
+                                        buf->len);
+
+    net_buf_unref(buf);
     return ret;
 }

@@ -83,7 +83,9 @@ struct NodeConfigResponse : Internal::FramePayloadBase, Internal::LoraBase {
     bool operator==(const NodeConfigResponse &rhs) const;
 
   private:
-    static constexpr size_t _payload_size = 3 + Internal::NodeConfigDataSizeof;
+    static constexpr size_t _payload_size = sizeof(id) + sizeof(type) +
+                                            sizeof(config) +
+                                            Internal::NodeConfigDataSizeof;
 };
 } // namespace AresFrame
 

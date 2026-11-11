@@ -43,7 +43,7 @@ AresFrame::Frame AresLoraConfig::generate_frame() const {
 AresSerial::AresSerial(const std::string &port, const py::kwargs &kwargs)
     : _rx_task([this] { _read_serial(); }),
       _processing_task([this] { _process_frames(); }),
-      _lora_response_task([this] { _send_lora_responses(); }) {
+      _driver_response_task([this] { _send_driver_responses(); }) {
     SerialInternal::SerialAttributes attr;
 
     std::chrono::milliseconds serial_timeout = 100ms;
@@ -230,13 +230,14 @@ static void _parse_node_config_kwargs(
     }
 
     if (kwargs.contains("center_freq")) {
-        payloads["center_freq"] = AresFrame::NodeConfig(
-            0, AresFrame::CENTER_FREQ, kwargs["center_freq"].cast<double>());
+        payloads["center_freq"] =
+            AresFrame::NodeConfig(0, AresFrame::CENTER_FREQUENCY,
+                                  kwargs["center_freq"].cast<double>());
     }
 
     if (kwargs.contains("ref_level")) {
         payloads["ref_level"] = AresFrame::NodeConfig(
-            0, AresFrame::REF_LEVEL, kwargs["ref_level"].cast<double>());
+            0, AresFrame::REFERENCE_LEVEL, kwargs["ref_level"].cast<double>());
     }
 
     if (kwargs.contains("duration")) {
@@ -285,7 +286,7 @@ static void _parse_node_config_args(
 
         if (val == "center_freq") {
             payloads[val] =
-                AresFrame::NodeConfigPoll(0, AresFrame::CENTER_FREQ);
+                AresFrame::NodeConfigPoll(0, AresFrame::CENTER_FREQUENCY);
             continue;
         }
 
@@ -295,7 +296,8 @@ static void _parse_node_config_args(
         }
 
         if (val == "ref_level") {
-            payloads[val] = AresFrame::NodeConfigPoll(0, AresFrame::REF_LEVEL);
+            payloads[val] =
+                AresFrame::NodeConfigPoll(0, AresFrame::REFERENCE_LEVEL);
         }
     }
 }
@@ -342,6 +344,35 @@ py::tuple AresSerial::ble_state(const py::kwargs &kwargs) {
 py::tuple AresSerial::ble_disconnect(const py::kwargs &kwargs) {
     _check_crash();
     AresFrame::BleDisconnect payload;
+    FrameDispatcher dispatcher(*this, false, kwargs);
+    return dispatcher.send_frame(payload).build_python_response();
+}
+
+py::dict AresSerial::get_ble_connection_params() {
+    _check_crash();
+    std::unique_lock lck(_ble_info.lock);
+    py::dict ret =
+        ares::to_dict(NV(mtu, _ble_info), NV(interval, _ble_info),
+                      NV(latency, _ble_info), NV(timeout, _ble_info));
+    ret["phy"] = static_cast<uint8_t>(_ble_info.phy);
+    return ret;
+}
+
+py::tuple AresSerial::ble_send_neighbor_list(const py::kwargs &kwargs) {
+    _check_crash();
+    AresFrame::BleNeighborUpdate payload;
+
+    if (!kwargs.contains("neighbors")) {
+        throw py::type_error("Requires keyword-only argument neighbors");
+    }
+
+    auto neighbors = kwargs["neighbor"].cast<py::dict>();
+
+    for (const auto &[key, value] : neighbors) {
+        payload.neighbor_data.emplace_back(AresFrame::BleNeighborData{
+            key.cast<uint16_t>(), value.cast<bool>()});
+    }
+
     FrameDispatcher dispatcher(*this, false, kwargs);
     return dispatcher.send_frame(payload).build_python_response();
 }
@@ -460,10 +491,15 @@ bool AresSerial::wait_ble_connection_event() {
     return event.connected;
 }
 
-py::tuple AresSerial::wait_ble_subscribe_event() {
+py::dict AresSerial::wait_ble_subscribe_event() {
     AresFrame::BleSubscribed event;
     wait_event_queue_released(event, _ble_subscribed_event_q);
-    return py::make_tuple(event.chunk, event.image);
+    return ares::to_dict(NV(neighbor_states, _ble_info.subscriptions),
+                         NV(bandwidth, _ble_info.subscriptions),
+                         NV(center_frequency, _ble_info.subscriptions),
+                         NV(reference_level, _ble_info.subscriptions),
+                         NV(duration, _ble_info.subscriptions),
+                         NV(description, _ble_info.subscriptions));
 }
 
 py::tuple AresSerial::wait_abortion_event() {
@@ -476,6 +512,18 @@ py::tuple AresSerial::wait_run_ready_event() {
     AresFrame::NodeReady event;
     wait_event_queue_released(event, _run_ready_event_q);
     return py::make_tuple(event.id, event.broadcast);
+}
+
+int AresSerial::wait_ble_att_error_event() {
+    AresFrame::BleAttErr event;
+    wait_event_queue_released(event, _ble_att_err_event_q);
+    return event.code;
+}
+
+uint32_t AresSerial::wait_run_start_event() {
+    AresFrame::BleStart event;
+    wait_event_queue_released(event, _ble_start_event_q);
+    return event.delay;
 }
 
 void AresSerial::start_driver() {
@@ -498,7 +546,7 @@ void AresSerial::start_driver() {
     LOG_DBG("Clearing message queues");
     _frame_q.clear();
     _response_queue.clear();
-    _lora_response_q.clear();
+    _driver_response_q.clear();
 
     _exception = nullptr;
     if (_serial.is_closed()) {
@@ -508,8 +556,8 @@ void AresSerial::start_driver() {
 
     LOG_DBG("Starting LoRa Response Task");
     _tasks_running = true;
-    _lora_response_task.set_essential(true);
-    _lora_response_task.start();
+    _driver_response_task.set_essential(true);
+    _driver_response_task.start();
 
     LOG_DBG("Starting processing task");
     _processing_task.set_essential(true);
@@ -553,7 +601,7 @@ void AresSerial::stop_driver() {
     bool failed_proc_task_shutdown = stop_driver_task(
         _processing_task, _frame_q, terminate_request, max_attempts);
     bool failed_lora_resp_task_shutdown =
-        stop_driver_task(_lora_response_task, _lora_response_q,
+        stop_driver_task(_driver_response_task, _driver_response_q,
                          terminate_request.tx_payload(), max_attempts);
 
     if (failed_proc_task_shutdown || failed_lora_resp_task_shutdown) {
@@ -571,7 +619,7 @@ void AresSerial::stop_driver() {
     }
 
     _response_queue.clear();
-    _lora_response_q.clear();
+    _driver_response_q.clear();
     _frame_q.clear();
 }
 
@@ -691,10 +739,9 @@ void AresSerial::_process_frames() {
     }
 }
 
-void AresSerial::_lora_responses_check_fw_responses(
+void AresSerial::_driver_response_check_fw_responses(
     const std::vector<FrameResponse> &responses,
     const AresFrame::AresFrameType &sent_type) {
-
     for (const auto &response : responses) {
         switch (response.type) {
         case FrameResponse::ACK: {
@@ -715,16 +762,16 @@ void AresSerial::_lora_responses_check_fw_responses(
     }
 }
 
-void AresSerial::_send_lora_responses_helper() {
+void AresSerial::_send_driver_response_helper() {
     while (_tasks_running) {
         std::vector<FrameResponse> responses;
-        auto payload = _lora_response_q.get();
+        auto payload = _driver_response_q.get();
 
         if (std::holds_alternative<std::monostate>(payload)) {
             continue;
         }
 
-        FrameDispatcher dispatcher(*this, _send_lora_response_timeout);
+        FrameDispatcher dispatcher(*this, _send_driver_response_timeout);
 
         try {
             dispatcher.send_frame_released(payload, responses);
@@ -732,22 +779,22 @@ void AresSerial::_send_lora_responses_helper() {
             LOG_ERR("_send_frame_released(): %s", exc.what());
         }
 
-        _lora_responses_check_fw_responses(responses,
-                                           dispatcher.type_dispatched());
+        _driver_response_check_fw_responses(responses,
+                                            dispatcher.type_dispatched());
     }
 }
 
-void AresSerial::_send_lora_responses() {
+void AresSerial::_send_driver_responses() {
     LOG_DBG("Starting response task");
     while (_tasks_running) {
         try {
-            _send_lora_responses_helper();
+            _send_driver_response_helper();
         } catch (const std::exception &exc) {
             _exception = std::current_exception();
             _tasks_running = false;
-            LOG_ERR(
-                "Send LoRa response task crashed. Stopping driver. Reason: %s",
-                exc.what());
+            LOG_ERR("Send driver response task crashed. Stopping driver. "
+                    "Reason: %s",
+                    exc.what());
         }
     }
 }
@@ -778,6 +825,8 @@ bool AresSerial::_stop_event_queues() {
     success = queue_nullptr(_ble_subscribed_event_q) && success;
     success = queue_nullptr(_abortion_event_q) && success;
     success = queue_nullptr(_run_ready_event_q) && success;
+    success = queue_nullptr(_ble_att_err_event_q) && success;
+    success = queue_nullptr(_ble_start_event_q) && success;
     LOG_DBG("Stop event queues yielded %d", success);
     return success;
 }
@@ -789,7 +838,7 @@ void AresSerial::EventDispatcher::operator()(
             event.packet_id);
 
     if (!event.broadcast) {
-        self._lora_response_q.put(
+        self._driver_response_q.put(
             AresFrame::LoraAck{event.id, AresFrame::START});
     }
 
@@ -809,7 +858,7 @@ void AresSerial::EventDispatcher::operator()(
     std::unique_lock lock(self._ready_mtx);
     bool ready = self._ready;
     lock.unlock();
-    self._lora_response_q.put(AresFrame::Heartbeat{ready, event.id});
+    self._driver_response_q.put(AresFrame::Heartbeat{ready, event.id});
 }
 
 void AresSerial::EventDispatcher::operator()(
@@ -820,8 +869,8 @@ void AresSerial::EventDispatcher::operator()(
     LOG_DBG("Log ID: %d", event.log_id);
 
     if (!event.broadcast) {
-        self._lora_response_q.put(AresFrame::LogAck{event.part, event.num_parts,
-                                                    event.log_id, event.id});
+        self._driver_response_q.put(AresFrame::LogAck{
+            event.part, event.num_parts, event.log_id, event.id});
     }
 
     put_no_except(event, self._log_event_q, 100ms);
@@ -857,19 +906,24 @@ void AresSerial::EventDispatcher::operator()(
 
 void AresSerial::EventDispatcher::operator()(
     const AresFrame::BleConnect &event) const {
-    LOG_DBG("Received BLE connect event (Connected: %d, MTU: %d)",
-            event.connected, event.chunk_size);
+    LOG_DBG("Received BLE connect event (Connected: %s)",
+            event.connected ? "true" : "false");
     self._ble_info.connected = event.connected;
-    self._ble_info.mtu_size = event.chunk_size;
     put_no_except(event, self._ble_connect_event_q, 100ms);
 }
 
 void AresSerial::EventDispatcher::operator()(
     const AresFrame::BleSubscribed &event) const {
-    LOG_DBG("Received BLE subscription event (chunk: %d, image: %d)",
-            event.chunk, event.image);
-    self._ble_info.subscriptions.chunk = event.chunk;
-    self._ble_info.subscriptions.image = event.image;
+    LOG_DBG("Received BLE subscription event (neighbor_states: %d, bandwidth: "
+            "%d, center_freq: %d, ref_lvl: %d, duration: %d, description: %d)",
+            event.neighbor_states, event.bandwidth, event.center_frequency,
+            event.ref_lvl, event.duration, event.description);
+    self._ble_info.subscriptions.neighbor_states = event.neighbor_states;
+    self._ble_info.subscriptions.bandwidth = event.bandwidth;
+    self._ble_info.subscriptions.center_frequency = event.center_frequency;
+    self._ble_info.subscriptions.reference_level = event.ref_lvl;
+    self._ble_info.subscriptions.duration = event.duration;
+    self._ble_info.subscriptions.description = event.description;
     put_no_except(event, self._ble_subscribed_event_q, 100ms);
 }
 
@@ -879,7 +933,7 @@ void AresSerial::EventDispatcher::operator()(
             event.broadcast);
 
     if (!event.broadcast) {
-        self._lora_response_q.put(
+        self._driver_response_q.put(
             AresFrame::LoraAck{event.id, AresFrame::ABORT});
     }
 
@@ -891,7 +945,7 @@ void AresSerial::EventDispatcher::operator()(
     LOG_INF("Received node config message from %d (type: %d)", event.id,
             static_cast<int>(event.type));
 
-    self._lora_response_q.put(
+    self._driver_response_q.put(
         AresFrame::LoraAck{event.id, AresFrame::NODE_CONFIG});
 
     std::unique_lock lock(self._node_configs.sem);
@@ -905,11 +959,11 @@ void AresSerial::EventDispatcher::operator()(
         ;
         break;
     }
-    case AresFrame::CENTER_FREQ: {
+    case AresFrame::CENTER_FREQUENCY: {
         self._node_configs.center_freq = std::get<double>(event.config);
         break;
     }
-    case AresFrame::REF_LEVEL: {
+    case AresFrame::REFERENCE_LEVEL: {
         self._node_configs.ref_level = std::get<double>(event.config);
         break;
     }
@@ -941,11 +995,11 @@ void AresSerial::EventDispatcher::operator()(
         config = self._node_configs.bandwidth;
         break;
     }
-    case AresFrame::CENTER_FREQ: {
+    case AresFrame::CENTER_FREQUENCY: {
         config = self._node_configs.center_freq;
         break;
     }
-    case AresFrame::REF_LEVEL: {
+    case AresFrame::REFERENCE_LEVEL: {
         config = self._node_configs.ref_level;
         break;
     }
@@ -961,7 +1015,7 @@ void AresSerial::EventDispatcher::operator()(
 
     lock.unlock();
 
-    self._lora_response_q.put(
+    self._driver_response_q.put(
         AresFrame::NodeConfigResponse{event.id, event.type, config});
 }
 
@@ -979,7 +1033,7 @@ void AresSerial::EventDispatcher::operator()(
             event.broadcast);
 
     if (!event.broadcast) {
-        self._lora_response_q.put(
+        self._driver_response_q.put(
             AresFrame::LoraAck{event.id, AresFrame::NODE_READY});
     }
 
@@ -993,4 +1047,104 @@ void AresSerial::EventDispatcher::operator()(
             event.id, event.message_type);
     AresFrame::Frame::AckTypes ack_event = event;
     put_no_except(ack_event, self._ack_queue, 100ms);
+}
+
+void AresSerial::EventDispatcher::operator()(
+    const AresFrame::BleConnParams &event) const {
+    LOG_INF("Received BLE connection parameter update message (MTU: %u, "
+            "Interval: %u, Latency: %u, Timeout: %u, Phy: %u)",
+            event.mtu, event.interval, event.latency, event.timeout, event.phy);
+    std::unique_lock lck(self._ble_info.lock);
+    self._ble_info.mtu = event.mtu;
+    self._ble_info.interval =
+        event.interval * BleInfo::interval_scale_factor_ms;
+    self._ble_info.latency = event.latency;
+    self._ble_info.timeout = event.timeout * BleInfo::timeout_scale_factor_ms;
+    self._ble_info.phy = event.phy;
+}
+
+void AresSerial::EventDispatcher::operator()(
+    const AresFrame::BleAttErr &event) const {
+    LOG_INF("Received BLE ATT error (%d)", event.code);
+    put_no_except(event, self._ble_att_err_event_q, 100ms);
+}
+
+void AresSerial::EventDispatcher::operator()(
+    const AresFrame::BleStart &event) const {
+    LOG_INF("Start event received from BLE (delay: %u)", event.delay);
+    put_no_except(event, self._ble_start_event_q, 100ms);
+}
+
+void AresSerial::EventDispatcher::operator()(
+    const AresFrame::BleNodeConfiguration &event) const {
+    LOG_INF("Received node config message over BLE (type: %d)",
+            static_cast<int>(event.type));
+
+    std::unique_lock lock(self._node_configs.sem);
+    switch (event.type) {
+    case AresFrame::BANDWIDTH: {
+        self._node_configs.bandwidth = event.as_double();
+        break;
+    }
+    case AresFrame::CENTER_FREQUENCY: {
+        self._node_configs.center_freq = event.as_double();
+        break;
+    }
+    case AresFrame::REFERENCE_LEVEL: {
+        self._node_configs.ref_level = event.as_double();
+        break;
+    }
+    case AresFrame::DURATION: {
+        self._node_configs.duration = event.as_uint32();
+        break;
+    }
+    case AresFrame::DESCRIPTION: {
+        self._node_configs.description = event.as_str();
+        break;
+    }
+    default: {
+        LOG_ERR("Invalid Node configuration received over BLE (%d)",
+                event.type);
+        break;
+    }
+    }
+}
+
+void AresSerial::EventDispatcher::operator()(
+    const AresFrame::BleConfigRequest &event) const {
+    LOG_INF("Received node config request over BLE (type: %d)", event.type);
+    AresFrame::BleNodeConfiguration response;
+    response.type = event.type;
+
+    std::unique_lock lck(self._node_configs.sem);
+    switch (event.type) {
+    case AresFrame::BANDWIDTH: {
+        response.config = self._node_configs.bandwidth;
+        break;
+    }
+    case AresFrame::CENTER_FREQUENCY: {
+        response.config = self._node_configs.center_freq;
+        break;
+    }
+    case AresFrame::REFERENCE_LEVEL: {
+        response.config = self._node_configs.ref_level;
+        break;
+    }
+    case AresFrame::DURATION: {
+        response.config = self._node_configs.duration;
+        break;
+    }
+    case AresFrame::DESCRIPTION: {
+        response.config = self._node_configs.description;
+        break;
+    }
+    default: {
+        LOG_ERR("Invalid type requested over BLE (%d)", event.type);
+        return;
+    }
+    }
+
+    lck.unlock();
+
+    self._driver_response_q.put(response);
 }

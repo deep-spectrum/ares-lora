@@ -150,6 +150,21 @@ class LoraLedState(IntEnum):
     FETCH = 4
 
 
+class BlePhy(IntEnum):
+    """BLE PHYs for communication over Bluetooth LE
+
+    Attributes:
+        PHY_1M: 1Mbps
+        PHY_2M: 2Mbps
+        PHY_CODED_S2: Coded PHY S=2
+        PHY_CODED_S8: Coded PHY S=8
+    """
+    PHY_1M = 0
+    PHY_2M = 1
+    PHY_CODED_S2 = 2
+    PHY_CODED_S8 = 3
+
+
 # @dataclass
 # class LoraSerialConfig:
 #     """Configurations for the LoRa serial driver.
@@ -749,7 +764,7 @@ class LoraSerial:
         return None
 
     @lora_serial_command
-    def ble_state(self, state: BleState = BleState.REQUEST) -> BleState | None:
+    def ble_state(self, state: BleState = BleState.REQUEST, **kwargs) -> BleState | None:
         """Retrieve or update the BLE state.
 
         Args:
@@ -762,7 +777,7 @@ class LoraSerial:
             TimeoutError: No response from the firmware within the configured timeout.
             LoraException: Firmware responded with an error code.
         """
-        ret = self._dev.ble_state(state=state.value)
+        ret = self._dev.ble_state(state=state.value, **kwargs)
         self._check_ret_code(ret[0])
         if state == BleState.REQUEST:
             return BleState(ret[1][0])
@@ -778,20 +793,6 @@ class LoraSerial:
         """
         ret = self._dev.ble_disconnect()
         self._check_ret_code(ret[0])
-
-    # @lora_serial_command
-    # def ble_send(self, data: bytes):
-    #     """Send data over the BLE connection.
-    #
-    #     Args:
-    #         data: Data to send over BLE.
-    #
-    #     Raises:
-    #         TimeoutError: No response from the firmware within the configured timeout.
-    #         LoraException: Firmware responded with an error code.
-    #     """
-    #     codes = self._dev.ble_send_image(data)
-    #     self._check_ret_code(codes)
 
     def wait_connection_changed_event(self, block: bool = True, timeout: float | None = None) -> bool:
         """Wait for a connection event from BLE.
