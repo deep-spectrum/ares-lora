@@ -401,8 +401,10 @@ class AresSerial {
      */
     py::dict get_node_config();
 
+    // todo
     void set_node_config(const py::dict &value);
 
+    // todo
     std::string wait_node_config_changed_event();
 
     /**
@@ -564,6 +566,26 @@ class AresSerial {
         ares::semaphore<> sem{};
     };
     NodeConfigs _node_configs;
+
+    template <typename T>
+    void _set_node_config(const char *name, T &param,
+                          const AresFrame::NodeConfigType &type,
+                          const py::dict &d) {
+        if (!d.contains(name)) {
+            return;
+        }
+
+        auto val = d[name].cast<T>();
+        {
+            std::unique_lock lck(_node_configs.sem);
+            param = val;
+        }
+
+        AresFrame::BleNodeConfiguration config_update;
+        config_update.type = type;
+        config_update.config = val;
+        _driver_response_q.put(config_update, 100ms);
+    }
 
     // BLE Stuff
     struct BleInfo {

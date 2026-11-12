@@ -648,6 +648,20 @@ py::dict AresSerial::get_node_config() {
     return ret;
 }
 
+void AresSerial::set_node_config(const py::dict &value) {
+    py::gil_scoped_release release;
+
+    _set_node_config(bw, _node_configs.bandwidth, AresFrame::BANDWIDTH, value);
+    _set_node_config(center_f, _node_configs.center_freq,
+                     AresFrame::CENTER_FREQUENCY, value);
+    _set_node_config(ref_level, _node_configs.ref_level,
+                     AresFrame::REFERENCE_LEVEL, value);
+    _set_node_config(duration, _node_configs.duration, AresFrame::DURATION,
+                     value);
+    _set_node_config(description, _node_configs.description,
+                     AresFrame::DESCRIPTION, value);
+}
+
 std::string AresSerial::wait_node_config_changed_event() {
     AresFrame::BleNodeConfiguration event;
     wait_event_queue_released(event, _ble_node_config_event_q);
