@@ -1187,3 +1187,9 @@ class LoraSerial:
     @node_configs.setter
     def node_configs(self, value: dict[str, float | int | datetime]):
         self._dev.node_configs = value
+
+    @property
+    def ble_connection_parameters(self):
+        ret = self._dev.ble_connection_params
+        ret['phy'] = BlePhy(ret['phy'])
+        return ret

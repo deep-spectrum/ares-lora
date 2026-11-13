@@ -459,7 +459,7 @@ class AresSerial {
     // Task for driver responses
     ares::Task<void()> _driver_response_task;
     ares::bounded_queue<AresFrame::Frame::TxTypes, 10> _driver_response_q;
-    std::chrono::milliseconds _send_driver_response_timeout = 100ms;
+    std::chrono::milliseconds _send_driver_response_timeout = 1000ms;
     static void _driver_response_check_fw_responses(
         const std::vector<FrameResponse> &responses,
         const AresFrame::AresFrameType &sent_type);

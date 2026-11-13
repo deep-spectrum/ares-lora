@@ -65,9 +65,8 @@ PYBIND11_MODULE(_ares_lora_serial, m, py::mod_gil_not_used()) {
 
         // Properties
         .def_property("ready", &AresSerial::get_ready, &AresSerial::set_ready)
-        .def_property("ble_connection_params",
-                      &AresSerial::get_ble_connection_params,
-                      &AresSerial::set_node_config) // todo
+        .def_property_readonly("ble_connection_params",
+                               &AresSerial::get_ble_connection_params)
         .def_property("node_configs", &AresSerial::get_node_config,
                       &AresSerial::set_node_config);
 

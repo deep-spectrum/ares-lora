@@ -25,5 +25,7 @@ print(s.node_configs)
 
 s.node_configs = d
 
+print(s.ble_connection_parameters)
+
 time.sleep(5)
 s.stop_driver()
