@@ -385,6 +385,9 @@ class AresSerial {
      */
     uint32_t wait_run_start_event();
 
+    // todo
+    std::string wait_node_config_changed_event();
+
     /**
      * Start the driver.
      */
@@ -403,9 +406,6 @@ class AresSerial {
 
     // todo
     void set_node_config(const py::dict &value);
-
-    // todo
-    std::string wait_node_config_changed_event();
 
     /**
      * Cancel the event queues.
@@ -459,7 +459,7 @@ class AresSerial {
     // Task for driver responses
     ares::Task<void()> _driver_response_task;
     ares::bounded_queue<AresFrame::Frame::TxTypes, 10> _driver_response_q;
-    std::chrono::milliseconds _send_driver_response_timeout = 10ms;
+    std::chrono::milliseconds _send_driver_response_timeout = 100ms;
     static void _driver_response_check_fw_responses(
         const std::vector<FrameResponse> &responses,
         const AresFrame::AresFrameType &sent_type);
@@ -576,6 +576,7 @@ class AresSerial {
         }
 
         auto val = d[name].cast<T>();
+        py::gil_scoped_release release;
         {
             std::unique_lock lck(_node_configs.sem);
             param = val;

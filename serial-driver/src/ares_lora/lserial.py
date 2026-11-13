@@ -267,6 +267,9 @@ class LoraSerial:
         self._run_ready_hook_lock = threading.Lock()
         self._run_ready_hook: Callable[[int, bool], None] | None = None
 
+        self._node_config_changed_hook_lock = threading.Lock()
+        self._node_config_changed_hook: Callable[[str, float | int], None] | None = None
+
         self._dev = _AresSerial(port, **kwargs)
         self._nodes: dict[int, int] = {}
         self._log_msg: dict[int, LogMessage] = {}
@@ -285,6 +288,7 @@ class LoraSerial:
         self._pkt_tx_thread: Thread | None = None
         self._abort_event_thread: Thread | None = None
         self._node_ready_event_thread: Thread | None = None
+        self._node_config_changed_thread: Thread | None = None
 
         self._wait_ble_connect_event: Thread | None = None
         self._wait_ble_subscribe_event: Thread | None = None
@@ -386,6 +390,18 @@ class LoraSerial:
             with self._run_ready_hook_lock:
                 if self._run_ready_hook is not None:
                     self._run_ready_hook(source_id, broadcast)
+
+    def _node_config_changed_event_handler(self):
+        while True:
+            try:
+                config = self._dev.wait_node_config_changed_event()
+            except AresThreadTerminate:
+                break
+
+            with self._node_config_changed_hook_lock:
+                if self._node_config_changed_hook is not None:
+                    configs = self._dev.node_configs
+                    self._node_config_changed_hook(config, configs[config])
 
     def _ble_connect_event_handle(self):
         while True:
@@ -784,6 +800,20 @@ class LoraSerial:
         return None
 
     @lora_serial_command
+    def ble_send_neighbor_data(self, neighbor_status: dict[int, bool], **kwargs):
+        """Send neighbor status data over BLE.
+
+        Args:
+            neighbor_status: A dictionary of the neighbor statuses.
+            **kwargs: Keyword arguments
+
+        Returns:
+
+        """
+        ret = self._dev.ble_send_neighbors(neighbors=neighbor_status, **kwargs)
+        self._check_ret_code(ret[0])
+
+    @lora_serial_command
     def ble_disconnect(self):
         """Terminate the current BLE connection, but keep BLE active.
 
@@ -935,6 +965,22 @@ class LoraSerial:
         with self._run_ready_hook_lock:
             self._run_ready_hook = hook
 
+    def register_config_changed_event_hook(self, hook: Callable[[str, float | int], None] | None):
+        """Register a configuration changed event hook.
+
+        Args:
+            hook: The function to call when a configuration change event occurs over BLE. `None` to unregister the hook.
+
+        Notes:
+            The hook signature is [config_name, value] -> None.
+
+        Warning:
+            Registering or unregistering a hook performs a blocking action. It is highly recommended
+            that hooks should be kept short and fast and offload work to other threads.
+        """
+        with self._node_config_changed_hook_lock:
+            self._node_config_changed_hook = hook
+
     def get_logging_level(self) -> int:
         """Retrieve the current logging level of the core logger.
 
@@ -1009,6 +1055,10 @@ class LoraSerial:
         assert isinstance(self._node_ready_event_thread, Thread)
         self._node_ready_event_thread.start()
 
+        self._node_config_changed_thread = Thread(target=self._node_config_changed_event_handler)
+        assert isinstance(self._node_config_changed_thread, Thread)
+        self._node_config_changed_thread.start()
+
         self._driver_started.set()
 
         global _instances
@@ -1061,6 +1111,10 @@ class LoraSerial:
         if self._node_ready_event_thread is not None:
             self._node_ready_event_thread.join()
             self._node_ready_event_thread = None
+
+        if self._node_config_changed_thread is not None:
+            self._node_config_changed_thread.join()
+            self._node_config_changed_thread = None
 
         self._driver_started.clear()
 
@@ -1129,3 +1183,7 @@ class LoraSerial:
     @property
     def node_configs(self) -> dict[str, float | int | datetime]:
         return self._dev.node_configs
+
+    @node_configs.setter
+    def node_configs(self, value: dict[str, float | int | datetime]):
+        self._dev.node_configs = value

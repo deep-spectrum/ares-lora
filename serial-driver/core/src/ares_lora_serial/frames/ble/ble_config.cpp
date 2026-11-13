@@ -62,6 +62,9 @@ void BleNodeConfiguration::serialize(std::vector<uint8_t> &buffer) {
     case DESCRIPTION: {
         std::string s = as_str();
         buffer.insert(buffer.end(), s.begin(), s.end());
+        if (buffer.back() != 0) {
+            buffer.emplace_back(0);
+        }
         break;
     }
     default: {

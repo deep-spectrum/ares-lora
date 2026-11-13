@@ -37,7 +37,7 @@ struct BleConnect : Internal::FramePayloadBase {
     void deserialize(const uint8_t *buffer, std::size_t len) override;
 
   private:
-    static constexpr size_t _payload_size = 3;
+    static constexpr size_t _payload_size = 1;
 };
 } // namespace AresFrame
 

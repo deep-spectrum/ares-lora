@@ -527,6 +527,29 @@ uint32_t AresSerial::wait_run_start_event() {
     return event.delay;
 }
 
+std::string AresSerial::wait_node_config_changed_event() {
+    AresFrame::BleNodeConfiguration event;
+    wait_event_queue_released(event, _ble_node_config_event_q);
+
+    switch (event.type) {
+    case AresFrame::BANDWIDTH:
+        return bw;
+    case AresFrame::CENTER_FREQUENCY:
+        return center_f;
+    case AresFrame::REFERENCE_LEVEL:
+        return ref_level;
+    case AresFrame::DURATION:
+        return duration;
+    case AresFrame::DESCRIPTION:
+        return description;
+    default:
+        LOG_ERR("Invalid type for event: %d", event.type);
+        break;
+    }
+
+    return "";
+}
+
 void AresSerial::start_driver() {
     if (_tasks_running) {
         throw std::runtime_error("Already running");
@@ -649,8 +672,6 @@ py::dict AresSerial::get_node_config() {
 }
 
 void AresSerial::set_node_config(const py::dict &value) {
-    py::gil_scoped_release release;
-
     _set_node_config(bw, _node_configs.bandwidth, AresFrame::BANDWIDTH, value);
     _set_node_config(center_f, _node_configs.center_freq,
                      AresFrame::CENTER_FREQUENCY, value);
@@ -660,29 +681,6 @@ void AresSerial::set_node_config(const py::dict &value) {
                      value);
     _set_node_config(description, _node_configs.description,
                      AresFrame::DESCRIPTION, value);
-}
-
-std::string AresSerial::wait_node_config_changed_event() {
-    AresFrame::BleNodeConfiguration event;
-    wait_event_queue_released(event, _ble_node_config_event_q);
-
-    switch (event.type) {
-    case AresFrame::BANDWIDTH:
-        return bw;
-    case AresFrame::CENTER_FREQUENCY:
-        return center_f;
-    case AresFrame::REFERENCE_LEVEL:
-        return ref_level;
-    case AresFrame::DURATION:
-        return duration;
-    case AresFrame::DESCRIPTION:
-        return description;
-    default:
-        LOG_ERR("Invalid type for event: %d", event.type);
-        break;
-    }
-
-    return "";
 }
 
 void AresSerial::cancel_events() {
@@ -867,6 +865,7 @@ bool AresSerial::_stop_event_queues() {
     success = queue_nullptr(_run_ready_event_q) && success;
     success = queue_nullptr(_ble_att_err_event_q) && success;
     success = queue_nullptr(_ble_start_event_q) && success;
+    success = queue_nullptr(_ble_node_config_event_q) && success;
     LOG_DBG("Stop event queues yielded %d", success);
     return success;
 }
