@@ -367,7 +367,7 @@ py::tuple AresSerial::ble_send_neighbor_list(const py::kwargs &kwargs) {
         throw py::type_error("Requires keyword-only argument neighbors");
     }
 
-    auto neighbors = kwargs["neighbor"].cast<py::dict>();
+    auto neighbors = kwargs["neighbors"].cast<py::dict>();
 
     for (const auto &[key, value] : neighbors) {
         payload.neighbor_data.emplace_back(AresFrame::BleNeighborData{

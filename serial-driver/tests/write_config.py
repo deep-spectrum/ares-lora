@@ -5,7 +5,12 @@ def config_changed_hook(name, value):
     print(f"{name}: {value}")
 
 
+def start_event_hook(delay: int):
+    print(f"Start event received. Start run in {delay} seconds")
+
+
 s.register_config_changed_event_hook(config_changed_hook)
+s.register_ble_start_event_hook(start_event_hook)
 
 if s.ble_state() == BleState.OFF:
     s.ble_state(BleState.ON)
@@ -27,5 +32,18 @@ s.node_configs = d
 
 print(s.ble_connection_parameters)
 
-time.sleep(5)
+neighbors = {
+    1: True,
+    2: False,
+    3: False,
+    4: True,
+}
+s.ble_send_neighbor_data(neighbors)
+
+while True:
+    try:
+        pass
+    except KeyboardInterrupt:
+        break
+
 s.stop_driver()
