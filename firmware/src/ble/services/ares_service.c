@@ -38,6 +38,8 @@ struct ares_srv_indicate_params {
     struct net_buf *buf;
 };
 
+K_FIFO_DEFINE(ind_destroy_q);
+
 NET_BUF_POOL_DEFINE(ares_srv_tx_pool, 4, 64, 0, NULL);
 
 static struct ares_srv_ctx srv_ctx;
@@ -306,12 +308,12 @@ static ssize_t write_config_read(struct bt_conn *conn,
                                  uint8_t flags) {
     ARG_UNUSED(flags);
     struct ares_srv_ctx *ctx = attr->user_data;
-    ssize_t ret = write_config_common(conn, attr, len, offset,
-                                      sizeof(enum ares_srv_configs));
+    ssize_t ret =
+        write_config_common(conn, attr, len, offset, sizeof(uint16_t));
 
     if (ctx->ares_service_cb.config_read != NULL &&
         ret == BT_GATT_ERR(BT_ATT_ERR_NOT_SUPPORTED)) {
-        enum ares_srv_configs config = *((enum ares_srv_configs *)buf);
+        uint16_t config = *((uint16_t *)buf);
 
         if (verify_subscription(ctx, config) != 0) {
             ret = BT_GATT_ERR(BT_ATT_ERR_WRITE_REQ_REJECTED);
@@ -404,9 +406,28 @@ static void config_response_ind_cb(struct bt_conn *conn,
         srv_ctx.ares_service_cb.config_response_ind_cb(conn, err,
                                                        srv_params->user_buf);
     }
+}
+
+static void indicate_destroy_work_handler(struct k_work *work) {
+    ARG_UNUSED(work);
+    struct net_buf *buf;
+
+    buf = k_fifo_get(&ind_destroy_q, K_NO_WAIT);
+    while (buf != NULL) {
+        net_buf_unref(buf);
+        buf = k_fifo_get(&ind_destroy_q, K_NO_WAIT);
+    }
+}
+K_WORK_DEFINE(indicate_destroy_work, indicate_destroy_work_handler);
+
+static void
+config_response_ind_destroy(struct bt_gatt_indicate_params *params) {
+    struct ares_srv_indicate_params *srv_params =
+        CONTAINER_OF(params, struct ares_srv_indicate_params, params);
 
     net_buf_unref(srv_params->user_buf);
-    net_buf_unref(srv_params->buf);
+    k_fifo_put(&ind_destroy_q, srv_params->buf);
+    k_work_submit(&indicate_destroy_work);
 }
 
 static int setup_config_indication(enum ares_srv_configs config,
@@ -458,7 +479,7 @@ static int setup_config_indication(enum ares_srv_configs config,
     params->buf = buf;
     params->user_buf = net_buf_ref(net_buf);
     params->params.func = config_response_ind_cb;
-    params->params.destroy = NULL;
+    params->params.destroy = config_response_ind_destroy;
     params->params.data = params->user_buf->data;
     params->params.len = params->user_buf->len;
     params->params.uuid = NULL;

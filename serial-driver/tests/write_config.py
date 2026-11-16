@@ -9,6 +9,10 @@ def start_event_hook(delay: int):
     print(f"Start event received. Start run in {delay} seconds")
 
 
+if s.setting(SettingId.ID) == 0:
+    s.setting(SettingId.ID, value=70)
+
+
 s.register_config_changed_event_hook(config_changed_hook)
 s.register_ble_start_event_hook(start_event_hook)
 

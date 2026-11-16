@@ -123,7 +123,7 @@ static void write_work_handler(struct k_work *work) {
         switch (type) {
         case ARES_CONFIG_RESERVED_GET: {
             if (callbacks.cb.config_request != NULL) {
-                uint32_t config = net_buf_pull_le32(buf);
+                uint16_t config = net_buf_pull_le16(buf);
                 callbacks.cb.config_request(callbacks.user_data, config);
             }
             break;
@@ -542,9 +542,10 @@ config_read_handler(struct bt_conn *conn, enum ares_srv_configs config) {
     ARG_UNUSED(conn);
     LOG_DBG("Config read thread priority: %d",
             k_thread_priority_get(k_current_get()));
+    uint16_t config_val_u16 = config;
 
-    return create_write_config_work_item(ARES_CONFIG_RESERVED_GET, &config,
-                                         sizeof(uint32_t));
+    return create_write_config_work_item(
+        ARES_CONFIG_RESERVED_GET, &config_val_u16, sizeof(config_val_u16));
 }
 
 static enum ares_srv_write_response start_handler(struct bt_conn *conn,
@@ -565,22 +566,27 @@ static void config_response_indication_enable(enum ares_srv_configs config,
 
     switch (config) {
     case ARES_CONFIG_BANDWIDTH: {
+        LOG_INF("Bandwidth subscription: %s", enabled ? "on" : "off");
         bit = ARES_SUBSCRIPTION_BANDWIDTH_BIT;
         break;
     }
     case ARES_CONFIG_CENTER_FREQ: {
+        LOG_INF("Center frequency subscription: %s", enabled ? "on" : "off");
         bit = ARES_SUBSCRIPTION_CENTER_FREQ_BIT;
         break;
     }
     case ARES_CONFIG_REF_LEVEL: {
+        LOG_INF("Reference level subscription: %s", enabled ? "on" : "off");
         bit = ARES_SUBSCRIPTION_REF_LVL_BIT;
         break;
     }
     case ARES_CONFIG_DURATION: {
+        LOG_INF("Duration subscription: %s", enabled ? "on" : "off");
         bit = ARES_SUBSCRIPTION_DURATION_BIT;
         break;
     }
     case ARES_CONFIG_DESCRIPTION: {
+        LOG_INF("Description subscription: %s", enabled ? "on" : "off");
         bit = ARES_SUBSCRIPTION_DESCRIPTION_BIT;
         break;
     }
@@ -601,6 +607,7 @@ static void config_response_indication_enable(enum ares_srv_configs config,
 }
 
 static void neighbor_updates_enabled(bool enabled) {
+    LOG_INF("Neighbor updates subscription: %s", enabled ? "on" : "off");
     if (enabled) {
         atomic_set_bit(&connection_info.subscriptions,
                        ARES_SUBSCRIPTION_NEIGHBOR_UPDATES_BIT);
