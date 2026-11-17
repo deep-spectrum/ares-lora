@@ -118,7 +118,6 @@ static void write_work_handler(struct k_work *work) {
     struct net_buf *buf = k_fifo_get(&wwork->fifo, K_NO_WAIT);
     while (buf != NULL) {
         uint32_t type = net_buf_pull_le32(buf);
-        uint16_t len = net_buf_pull_le16(buf);
 
         switch (type) {
         case ARES_CONFIG_RESERVED_GET: {
@@ -142,7 +141,7 @@ static void write_work_handler(struct k_work *work) {
         case ARES_CONFIG_DESCRIPTION: {
             if (callbacks.cb.configuration_update != NULL) {
                 callbacks.cb.configuration_update(callbacks.user_data, type,
-                                                  buf->data, len);
+                                                  buf->data, buf->len);
             }
             break;
         }
@@ -385,6 +384,8 @@ static void on_disconnected(struct bt_conn *conn, uint8_t reason) {
     ARG_UNUSED(conn);
     ARG_UNUSED(reason);
     LOG_INF("Diconnected (%d: %s)", reason, bt_att_err_to_str(reason));
+
+    LOG_INF("BT Connection reference count: %ld", bt_conn_get_ref_count(conn));
     bt_conn_unref(connection_info.conn);
     connection_info.conn = NULL;
     atomic_clear_bit(&connection_info.state, BLE_CONNECTED);
@@ -443,7 +444,6 @@ create_write_config_work_item(uint32_t type, void *data, uint16_t len) {
     }
 
     net_buf_add_le32(buf, type);
-    net_buf_add_le16(buf, len);
     net_buf_add_mem(buf, data, len);
 
     k_fifo_put(&write_work.fifo, buf);
@@ -512,21 +512,18 @@ description_update(struct bt_conn *conn, const void *buf, uint16_t len) {
         if (connection_info.desc_buf == NULL) {
             return ARES_WRITE_NO_MEM;
         }
+        net_buf_add_le32(connection_info.desc_buf, ARES_CONFIG_DESCRIPTION);
     }
 
     net_buf_add_mem(connection_info.desc_buf, buf, len);
 
-    if (connection_info.desc_buf->len > CONFIG_DESCRIPTION_BUF_SIZE) {
+    if (connection_info.desc_buf->len > (CONFIG_DESCRIPTION_BUF_SIZE + 4)) {
         net_buf_unref(connection_info.desc_buf);
         connection_info.desc_buf = NULL;
         return ARES_WRITE_NO_MEM;
     }
 
     if (((const uint8_t *)buf)[len - 1] == '\0') {
-        net_buf_push_le16(connection_info.desc_buf,
-                          connection_info.desc_buf->len);
-        net_buf_push_le32(connection_info.desc_buf, ARES_CONFIG_DESCRIPTION);
-
         k_fifo_put(&write_work.fifo, net_buf_ref(connection_info.desc_buf));
         net_buf_unref(connection_info.desc_buf);
         connection_info.desc_buf = NULL;

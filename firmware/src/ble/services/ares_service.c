@@ -430,36 +430,40 @@ config_response_ind_destroy(struct bt_gatt_indicate_params *params) {
     k_work_submit(&indicate_destroy_work);
 }
 
-static int setup_config_indication(enum ares_srv_configs config,
-                                   struct net_buf *net_buf,
-                                   struct ares_srv_indicate_params *params) {
+static int
+setup_config_indication(enum ares_srv_configs config, struct net_buf *net_buf,
+                        struct ares_srv_indicate_params **out_params) {
     struct net_buf *buf;
     uint8_t bit;
+    const struct bt_gatt_attr *attr;
+    struct ares_srv_indicate_params *params;
+
+    __ASSERT_NO_MSG(out_params);
 
     switch (config) {
     case ARES_CONFIG_BANDWIDTH: {
         bit = ARES_BW_SUBSCRIBED;
-        params->params.attr = &ares_srv_svc.attrs[0x0002];
+        attr = &ares_srv_svc.attrs[0x0002];
         break;
     }
     case ARES_CONFIG_CENTER_FREQ: {
         bit = ARES_CENTER_FREQ_SUBSCRIBED;
-        params->params.attr = &ares_srv_svc.attrs[0x0005];
+        attr = &ares_srv_svc.attrs[0x0005];
         break;
     }
     case ARES_CONFIG_REF_LEVEL: {
         bit = ARES_REF_LVL_SUBSCRIBED;
-        params->params.attr = &ares_srv_svc.attrs[0x0008];
+        attr = &ares_srv_svc.attrs[0x0008];
         break;
     }
     case ARES_CONFIG_DURATION: {
         bit = ARES_DURATION_SUBSCRIBED;
-        params->params.attr = &ares_srv_svc.attrs[0x000B];
+        attr = &ares_srv_svc.attrs[0x000B];
         break;
     }
     case ARES_CONFIG_DESCRIPTION: {
         bit = ARES_DESCRIPTION_SUBSCRIBED;
-        params->params.attr = &ares_srv_svc.attrs[0x000E];
+        attr = &ares_srv_svc.attrs[0x000E];
         break;
     }
     default: {
@@ -476,20 +480,26 @@ static int setup_config_indication(enum ares_srv_configs config,
         return -ENOMEM;
     }
 
+    params = net_buf_add(buf, sizeof(struct ares_srv_indicate_params));
+
     params->buf = buf;
     params->user_buf = net_buf_ref(net_buf);
+    params->params.attr = attr;
     params->params.func = config_response_ind_cb;
     params->params.destroy = config_response_ind_destroy;
     params->params.data = params->user_buf->data;
     params->params.len = params->user_buf->len;
     params->params.uuid = NULL;
 
+    *out_params = params;
+
     return 0;
 }
 
 int bt_ares_config_response(struct bt_conn *conn, enum ares_srv_configs config,
                             struct net_buf *net_buf) {
-    struct ares_srv_indicate_params params;
+    struct ares_srv_indicate_params *params = NULL;
+
     int ret;
 
     if (net_buf == NULL) {
@@ -502,13 +512,10 @@ int bt_ares_config_response(struct bt_conn *conn, enum ares_srv_configs config,
         return ret;
     }
 
-    net_buf_add_mem(params.buf, &params, sizeof(params));
-
-    ret = bt_gatt_indicate(
-        conn, &((struct ares_srv_indicate_params *)params.buf->data)->params);
+    ret = bt_gatt_indicate(conn, &params->params);
     if (ret < 0) {
         net_buf_unref(net_buf);
-        net_buf_unref(params.buf);
+        net_buf_unref(params->buf);
     }
 
     return ret;
