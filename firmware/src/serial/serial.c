@@ -275,6 +275,20 @@ int ares_serial_write_frame(const struct ares_serial *serial,
     return 0;
 }
 
+int ares_serial_write_frame_blocking(const struct ares_serial *serial,
+                                     const struct ares_frame *frame) {
+    bool current = SERIAL_API_CALL(serial, is_tx_blocking);
+    int err = SERIAL_API_CALL(serial, enable, true);
+    if (err < 0) {
+        return err;
+    }
+
+    err = ares_serial_write_frame(serial, frame);
+
+    SERIAL_API_CALL(serial, enable, current);
+    return err;
+}
+
 void ares_serial_flush_out(const struct ares_serial *serial,
                            k_timeout_t timeout) {
     unsigned int set;

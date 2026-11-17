@@ -515,15 +515,20 @@ description_update(struct bt_conn *conn, const void *buf, uint16_t len) {
         net_buf_add_le32(connection_info.desc_buf, ARES_CONFIG_DESCRIPTION);
     }
 
+    LOG_HEXDUMP_INF(buf, len, "Recieved Description update");
     net_buf_add_mem(connection_info.desc_buf, buf, len);
 
     if (connection_info.desc_buf->len > (CONFIG_DESCRIPTION_BUF_SIZE + 4)) {
+        LOG_ERR("Description too long");
         net_buf_unref(connection_info.desc_buf);
         connection_info.desc_buf = NULL;
         return ARES_WRITE_NO_MEM;
     }
 
     if (((const uint8_t *)buf)[len - 1] == '\0') {
+        LOG_INF("Description length: %d", connection_info.desc_buf->len);
+        LOG_HEXDUMP_INF(connection_info.desc_buf->data,
+                        connection_info.desc_buf->len, "Received description");
         k_fifo_put(&write_work.fifo, net_buf_ref(connection_info.desc_buf));
         net_buf_unref(connection_info.desc_buf);
         connection_info.desc_buf = NULL;

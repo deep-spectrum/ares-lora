@@ -142,6 +142,16 @@ struct ares_serial_transport_api {
      */
     void (*block_no_usb_host)(const struct ares_serial_transport *transport,
                               bool block);
+
+    /**
+     * @brief Function that checks if transmissions will block.
+     *
+     * @param[in] transport Pointer ot the transfer instance.
+     *
+     * @return @p true if the transport will block while transmitting. @p false
+     * otherwise.
+     */
+    bool (*is_tx_blocking)(const struct ares_serial_transport *transport);
 };
 
 /**
@@ -341,6 +351,9 @@ int ares_serial_init(const struct ares_serial *serial,
  */
 int ares_serial_write_frame(const struct ares_serial *serial,
                             const struct ares_frame *frame);
+
+int ares_serial_write_frame_blocking(const struct ares_serial *serial,
+                                     const struct ares_frame *frame);
 
 /**
  * @brief Function to flush the serial transfer layer transmit buffer.

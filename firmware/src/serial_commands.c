@@ -434,7 +434,7 @@ static void connected(void *data) {
         .payload.BLE_CONNECTED = true,
     };
 
-    ares_serial_write_frame(ctx->serial, &frame);
+    ares_serial_write_frame_blocking(ctx->serial, &frame);
 }
 
 static void disconnected(void *data) {
@@ -444,7 +444,7 @@ static void disconnected(void *data) {
         .payload.BLE_CONNECTED = false,
     };
 
-    ares_serial_write_frame(ctx->serial, &frame);
+    ares_serial_write_frame_blocking(ctx->serial, &frame);
 }
 
 static void mtu_size_change(void *data, size_t mtu) {
@@ -460,7 +460,7 @@ static void mtu_size_change(void *data, size_t mtu) {
 
     ctx->mtu = mtu;
 
-    ares_serial_write_frame(ctx->serial, &frame);
+    ares_serial_write_frame_blocking(ctx->serial, &frame);
 }
 
 static void conn_param_updated(void *data, uint16_t interval, uint16_t latency,
@@ -479,7 +479,7 @@ static void conn_param_updated(void *data, uint16_t interval, uint16_t latency,
     ctx->latency = latency;
     ctx->timeout = timeout;
 
-    ares_serial_write_frame(ctx->serial, &frame);
+    ares_serial_write_frame_blocking(ctx->serial, &frame);
 }
 
 static void phy_updated(void *data, enum le_phy phy) {
@@ -495,7 +495,7 @@ static void phy_updated(void *data, enum le_phy phy) {
 
     ctx->phy = phy;
 
-    ares_serial_write_frame(ctx->serial, &frame);
+    ares_serial_write_frame_blocking(ctx->serial, &frame);
 }
 
 static uint8_t check_subscription_mask(uint32_t subscriptions, uint32_t mask) {
@@ -521,7 +521,7 @@ static void subscription_update(void *data, uint32_t subscriptions) {
                 subscriptions, ARES_SUBSCRIPTION_DESCRIPTION),
         }};
 
-    ares_serial_write_frame(ctx->serial, &frame);
+    ares_serial_write_frame_blocking(ctx->serial, &frame);
 }
 
 static void configuration_update(void *data, uint32_t type, const uint8_t *buf,
@@ -534,7 +534,7 @@ static void configuration_update(void *data, uint32_t type, const uint8_t *buf,
                                    .data_len = len,
                                }};
 
-    ares_serial_write_frame(ctx->serial, &frame);
+    ares_serial_write_frame_blocking(ctx->serial, &frame);
 }
 
 static void config_request(void *data, uint32_t type) {
@@ -544,7 +544,7 @@ static void config_request(void *data, uint32_t type) {
         .payload.BLE_CONFIG_REQUEST = type,
     };
 
-    ares_serial_write_frame(ctx->serial, &frame);
+    ares_serial_write_frame_blocking(ctx->serial, &frame);
 }
 
 static void send_start(void *data, uint32_t delay) {
@@ -554,7 +554,7 @@ static void send_start(void *data, uint32_t delay) {
         .payload.BLE_START = delay,
     };
 
-    ares_serial_write_frame(ctx->serial, &frame);
+    ares_serial_write_frame_blocking(ctx->serial, &frame);
 }
 
 static void ble_config_response_error(void *data, uint8_t err) {
@@ -564,7 +564,7 @@ static void ble_config_response_error(void *data, uint8_t err) {
         .payload.BLE_ATT_ERR = err,
     };
 
-    ares_serial_write_frame(ctx->serial, &frame);
+    ares_serial_write_frame_blocking(ctx->serial, &frame);
 }
 
 static int initialize_ble(const struct ares_serial *serial) {
