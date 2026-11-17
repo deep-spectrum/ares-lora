@@ -273,6 +273,9 @@ class LoraSerial:
         self._ble_start_event_hook_lock = threading.Lock()
         self._ble_start_event_hook: Callable[[int], None] | None = None
 
+        self._ble_att_error_event_hook_lock = threading.Lock()
+        self._ble_att_error_event_hook: Callable[[int], None] | None = None
+
         self._dev = _AresSerial(port, **kwargs)
         self._nodes: dict[int, int] = {}
         self._log_msg: dict[int, LogMessage] = {}
@@ -293,6 +296,7 @@ class LoraSerial:
         self._node_ready_event_thread: Thread | None = None
         self._node_config_changed_thread: Thread | None = None
         self._ble_start_event_thread: Thread | None = None
+        self._ble_att_error_thread: Thread | None = None
 
         self._wait_ble_connect_event: Thread | None = None
         self._wait_ble_subscribe_event: Thread | None = None
@@ -435,6 +439,17 @@ class LoraSerial:
             with self._ble_start_event_hook_lock:
                 if self._ble_start_event_hook is not None:
                     self._ble_start_event_hook(start_delay)
+
+    def _ble_att_error_event_handler(self):
+        while True:
+            try:
+                code = self._dev.wait_ble_att_error_event()
+            except AresThreadTerminate:
+                break
+
+            with self._ble_att_error_event_hook_lock:
+                if self._ble_att_error_event_hook is not None:
+                    self._ble_att_error_event_hook(code)
 
     @staticmethod
     def _check_ret_code(code: int | tuple[int, ...] | dict[str, int]):
@@ -1012,6 +1027,22 @@ class LoraSerial:
         with self._ble_start_event_hook_lock:
             self._ble_start_event_hook = hook
 
+    def register_ble_att_error_event_hook(self, hook: Callable[[int], None] | None):
+        """Register a ble ATT error event hook.
+
+        Args:
+            hook: The function to call when a BLE ATT error occurs. `None` to unregister the hook.
+
+        Notes:
+            The hook signature is [att_code] -> None.
+
+        Warning:
+            Registering or unregistering a hook performs a blocking action. It is highly recommended
+            that hooks should be kept short and fast and offload work to other threads.
+        """
+        with self._ble_att_error_event_hook_lock:
+            self._ble_att_error_event_hook = hook
+
     def get_logging_level(self) -> int:
         """Retrieve the current logging level of the core logger.
 
@@ -1094,6 +1125,10 @@ class LoraSerial:
         assert isinstance(self._ble_start_event_thread, Thread)
         self._ble_start_event_thread.start()
 
+        self._ble_start_event_thread = Thread(target=self._ble_att_error_event_handler)
+        assert isinstance(self._ble_att_error_thread, Thread)
+        self._ble_att_error_thread.start()
+
         self._driver_started.set()
 
         global _instances
@@ -1154,6 +1189,10 @@ class LoraSerial:
         if self._ble_start_event_thread is not None:
             self._ble_start_event_thread.join()
             self._ble_start_event_thread = None
+
+        if self._ble_att_error_thread is not None:
+            self._ble_att_error_thread.join()
+            self._ble_att_error_thread = None
 
         self._driver_started.clear()
 
