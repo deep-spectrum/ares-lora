@@ -1125,7 +1125,7 @@ class LoraSerial:
         assert isinstance(self._ble_start_event_thread, Thread)
         self._ble_start_event_thread.start()
 
-        self._ble_start_event_thread = Thread(target=self._ble_att_error_event_handler)
+        self._ble_att_error_thread = Thread(target=self._ble_att_error_event_handler)
         assert isinstance(self._ble_att_error_thread, Thread)
         self._ble_att_error_thread.start()
 

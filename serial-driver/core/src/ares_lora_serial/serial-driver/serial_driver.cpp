@@ -777,6 +777,18 @@ void AresSerial::_process_frames() {
     }
 }
 
+std::chrono::milliseconds AresSerial::_get_driver_timeout() {
+    std::unique_lock lck(_driver_response_timeout_lock);
+    return _send_driver_response_timeout;
+}
+
+void AresSerial::_set_driver_timeout(double timeout) {
+    LOG_DBG("Setting the driver response timeout to %f ms", timeout);
+    std::unique_lock lck(_driver_response_timeout_lock);
+    _send_driver_response_timeout =
+        std::chrono::duration_cast<std::chrono::milliseconds>(timeout * 1ms);
+}
+
 void AresSerial::_driver_response_check_fw_responses(
     const std::vector<FrameResponse> &responses,
     const AresFrame::AresFrameType &sent_type) {
@@ -809,7 +821,7 @@ void AresSerial::_send_driver_response_helper() {
             continue;
         }
 
-        FrameDispatcher dispatcher(*this, _send_driver_response_timeout);
+        FrameDispatcher dispatcher(*this, _get_driver_timeout());
 
         try {
             dispatcher.send_frame_released(payload, responses);
@@ -949,6 +961,9 @@ void AresSerial::EventDispatcher::operator()(
             event.connected ? "true" : "false");
     self._ble_info.connected = event.connected;
     put_no_except(event, self._ble_connect_event_q, 100ms);
+    if (!event.connected) {
+        self._set_driver_timeout(_driver_response_buffer);
+    }
 }
 
 void AresSerial::EventDispatcher::operator()(
@@ -1100,6 +1115,7 @@ void AresSerial::EventDispatcher::operator()(
     self._ble_info.latency = event.latency;
     self._ble_info.timeout = event.timeout * BleInfo::timeout_scale_factor_ms;
     self._ble_info.phy = event.phy;
+    self._set_driver_timeout(self._ble_info.timeout + _driver_response_buffer);
 }
 
 void AresSerial::EventDispatcher::operator()(
