@@ -1263,6 +1263,9 @@ class AresBleContextManager:
         self._s = s
         self._connect_timeout = connect_timeout
         self._subscribe_timeout = subscribe_timeout
+        id_ = self._s.setting(SettingId.ID)
+        assert id_ is not None
+        self._id = id_
 
     def __enter__(self):
         self._s.clear_ble_events()
@@ -1287,3 +1290,7 @@ class AresBleContextManager:
             self._s.ble_state(BleState.OFF)
 
         self._s.clear_ble_events()
+
+    def notify_neighbor_updates(self, neighbors: dict[int, bool]):
+        neighbors[self._id] = self._s.ready
+        self._s.ble_send_neighbor_data(neighbors)
