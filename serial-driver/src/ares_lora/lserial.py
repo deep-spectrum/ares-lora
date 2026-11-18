@@ -14,6 +14,7 @@ from weakref import WeakSet
 from queue import Queue, Empty
 from datetime import datetime, timedelta
 from pathlib import Path
+from types import TracebackType
 
 logger = logging.getLogger("ares_lora")
 
@@ -165,22 +166,6 @@ class BlePhy(IntEnum):
     PHY_CODED_S8 = 3
 
 
-# @dataclass
-# class LoraSerialConfig:
-#     """Configurations for the LoRa serial driver.
-#
-#     Attributes:
-#         port: The serial port to connect to.
-#         response_timeout: The amount of time (in seconds) to wait for a response from the firmware.
-#         rx_period: How often (in seconds) the serial driver polls the serial receive buffer.
-#         serial_timeout: The serial RX timeout (in seconds).
-#     """
-#     port: str = ""
-#     response_timeout: float = 2.0
-#     rx_period: float = 0.1
-#     serial_timeout: float = 0.1
-
-
 @dataclass
 class LogMessage:
     msg_id: int
@@ -302,7 +287,7 @@ class LoraSerial:
         self._wait_ble_subscribe_event: Thread | None = None
 
         self._ble_connect_events: Queue[bool] = Queue()
-        self._ble_subscribe_events: Queue[tuple[bool, ...]] = Queue()
+        self._ble_subscribe_events: Queue[dict[str, bool]] = Queue()
 
         self._driver_started = Event()
 
@@ -423,7 +408,7 @@ class LoraSerial:
     def _ble_subscribe_event_handle(self):
         while True:
             try:
-                subscriptions: tuple[bool, ...] = self._dev.wait_ble_subscribe_event()
+                subscriptions: dict[str, bool] = self._dev.wait_ble_subscribe_event()
             except AresThreadTerminate:
                 break
 
@@ -869,7 +854,7 @@ class LoraSerial:
         """
         return self._ble_connect_events.get(block, timeout)
 
-    def wait_subscription_change_event(self, block: bool = True, timeout: float | None = None) -> tuple[bool, ...]:
+    def wait_subscription_change_event(self, block: bool = True, timeout: float | None = None) -> dict[str, bool]:
         """Wait for subscription update event from BLE.
 
         Args:
@@ -1271,3 +1256,34 @@ class LoraSerial:
         ret = self._dev.ble_connection_params
         ret['phy'] = BlePhy(ret['phy'])
         return ret
+
+
+class AresBleContextManager:
+    def __init__(self, s: LoraSerial, connect_timeout: float = 180, subscribe_timeout: float = 30):
+        self._s = s
+        self._connect_timeout = connect_timeout
+        self._subscribe_timeout = subscribe_timeout
+
+    def __enter__(self):
+        self._s.clear_ble_events()
+        if self._s.ble_state() == BleState.ON:
+            try:
+                self._s.ble_disconnect()
+            except LoraException:
+                pass
+            self._s.clear_ble_events()
+        self._s.ble_state(BleState.ON)
+
+        self._s.wait_connection_changed_event(timeout=self._connect_timeout)
+
+        subscriptions = {'foo': False}
+        while not all(subscriptions.values()):
+            subscriptions = self._s.wait_subscription_change_event(timeout=self._subscribe_timeout)
+
+        return self
+
+    def __exit__(self, exc_type: type[BaseException] | None, exc_val: BaseException | None, exc_tb: TracebackType | None):
+        if self._s.ble_state() != BleState.OFF:
+            self._s.ble_state(BleState.OFF)
+
+        self._s.clear_ble_events()
