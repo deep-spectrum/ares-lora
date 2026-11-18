@@ -1,5 +1,12 @@
-from ares_lora import LoraSerial, SettingId, LoraConfig, LoraLedState, BleState, AresBleContextManager; s = LoraSerial('/dev/ttyACM3'); s.start_driver()
+from ares_lora import LoraSerial, SettingId, LoraConfig, LoraLedState, BleState, AresBleContextManager
 import time
+from random import getrandbits
+
+# Change this if necessary
+PORT = "/dev/ttyACM3"
+
+s = LoraSerial(PORT)
+s.start_driver()
 
 def config_changed_hook(name, value):
     print(f"{name}: {value}")
@@ -27,14 +34,23 @@ with AresBleContextManager(s) as ctx:
     print(s.node_configs)
     s.node_configs = d
     print(s.ble_connection_parameters)
+
     neighbors = {
-        1: True,
+        1: False,
         2: False,
         3: False,
-        4: True,
+        4: False,
     }
-    s.ble_send_neighbor_data(neighbors)
 
-    time.sleep(30)
+    while True:
+        neighbors = {}
+        try:
+            for i in range(4):
+                neighbors[int(i) + 1] = not not getrandbits(1)
+            s.ready = not not getrandbits(1)
+            ctx.notify_neighbor_updates(neighbors)
+            time.sleep(5)
+        except KeyboardInterrupt:
+            break
 
 s.stop_driver()
