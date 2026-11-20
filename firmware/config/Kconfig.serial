@@ -16,4 +16,8 @@ config ARES_SERIAL_RX_RINGBUF_LEN
     int "Serial RX ring buffer size"
     default 256
 
+module = ARES_SERIAL
+module-str = "Ares Serial"
+source "subsys/logging/Kconfig.template.log_config"
+
 endmenu  # Ares Serial

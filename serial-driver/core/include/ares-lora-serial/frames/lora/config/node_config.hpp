@@ -84,7 +84,8 @@ struct NodeConfig : Internal::FramePayloadBase, Internal::LoraBase {
     [[nodiscard]] response_type expected_response() const;
 
   private:
-    static constexpr size_t _payload_size = 3 + Internal::NodeConfigDataSizeof;
+    static constexpr size_t _payload_size =
+        sizeof(id) + sizeof(type) + Internal::NodeConfigDataSizeof;
 };
 } // namespace AresFrame
 

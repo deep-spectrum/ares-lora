@@ -263,6 +263,11 @@ static void set_block_no_usb_host(const struct ares_serial_transport *transport,
     }
 }
 
+static bool is_tx_blocking(const struct ares_serial_transport *transport) {
+    struct serial_uart_common *uart = transport->ctx;
+    return uart->block_tx;
+}
+
 const struct ares_serial_transport_api ares_serial_uart_transport_api = {
     .init = init,
     .uninit = uninit,
@@ -272,6 +277,7 @@ const struct ares_serial_transport_api ares_serial_uart_transport_api = {
     .wait_dtr = wait_dtr,
     .rx_error = check_uart_error,
     .block_no_usb_host = set_block_no_usb_host,
+    .is_tx_blocking = is_tx_blocking,
 };
 
 SERIAL_UART_DEFINE(ares_serial_transport_uart);
@@ -301,7 +307,7 @@ static void sample_msg_cb(struct usbd_context *const ctx,
 #endif
 
 static int enable_ares_serial_uart(void) {
-    const struct device *const dev = DEVICE_DT_GET(DT_CHOSEN(zephyr_console));
+    const struct device *const dev = DEVICE_DT_GET(DT_CHOSEN(ares_serial_uart));
     int ret;
 
     if (!device_is_ready(dev)) {

@@ -44,4 +44,8 @@ config ARES_LORA_NOTIF_RX_PACKETS
     bool "Notify serial when packets are received"
     default y
 
+config LORA_BACKEND_LORA
+    bool
+    default $(dt_nodelabel_enabled,lora)
+
 endmenu  # LoRa Configurations

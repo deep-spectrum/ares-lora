@@ -59,8 +59,8 @@ CommandResponse::specific_ret(const AresFrame::NodeConfigResponse &ret) {
         return py::cast(std::get<uint32_t>(ret.config));
     }
     case AresFrame::BANDWIDTH:
-    case AresFrame::CENTER_FREQ:
-    case AresFrame::REF_LEVEL: {
+    case AresFrame::CENTER_FREQUENCY:
+    case AresFrame::REFERENCE_LEVEL: {
         return py::cast(std::get<double>(ret.config));
     }
     default: {

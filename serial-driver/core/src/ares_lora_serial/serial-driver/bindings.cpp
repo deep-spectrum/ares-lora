@@ -32,6 +32,7 @@ PYBIND11_MODULE(_ares_lora_serial, m, py::mod_gil_not_used()) {
         .def("notify_run_ready", &AresSerial::notify_run_ready)
         .def("ble_state", &AresSerial::ble_state)
         .def("ble_disconnect", &AresSerial::ble_disconnect)
+        .def("ble_send_neighbors", &AresSerial::ble_send_neighbor_list)
 
         // Events
         .def("wait_start_event", &AresSerial::wait_start_event)
@@ -43,11 +44,14 @@ PYBIND11_MODULE(_ares_lora_serial, m, py::mod_gil_not_used()) {
              &AresSerial::wait_ble_connection_event)
         .def("wait_ble_subscribe_event", &AresSerial::wait_ble_subscribe_event)
         .def("wait_run_ready_event", &AresSerial::wait_run_ready_event)
+        .def("wait_ble_att_error_event", &AresSerial::wait_ble_att_error_event)
+        .def("wait_run_start_event", &AresSerial::wait_run_start_event)
+        .def("wait_node_config_changed_event",
+             &AresSerial::wait_node_config_changed_event)
 
         // Driver utilities
         .def("start_driver", &AresSerial::start_driver)
         .def("stop_driver", &AresSerial::stop_driver)
-        .def("get_node_config", &AresSerial::get_node_config)
         .def("cancel_events", &AresSerial::cancel_events)
 
         // Logging utilities
@@ -59,7 +63,11 @@ PYBIND11_MODULE(_ares_lora_serial, m, py::mod_gil_not_used()) {
         .def("get_logging_level", &AresSerial::get_log_level)
 
         // Properties
-        .def_property("ready", &AresSerial::get_ready, &AresSerial::set_ready);
+        .def_property("ready", &AresSerial::get_ready, &AresSerial::set_ready)
+        .def_property_readonly("ble_connection_params",
+                               &AresSerial::get_ble_connection_params)
+        .def_property("node_configs", &AresSerial::get_node_config,
+                      &AresSerial::set_node_config);
 
     // AresLoraConfig
     py::class_<AresLoraConfig>(m, "_AresLoraConfig",

@@ -16,41 +16,6 @@
 #include <variant>
 
 namespace AresFrame {
-/**
- * @enum NodeConfigType
- * The type of configurations that can be sent over LoRa.
- */
-enum NodeConfigType : uint8_t {
-    /**
-     * The save folder name.
-     */
-    SAVE_FOLDER,
-
-    /**
-     * The bandwidth.
-     */
-    BANDWIDTH,
-
-    /**
-     * The center frequency.
-     */
-    CENTER_FREQ,
-
-    /**
-     * The duration.
-     */
-    DURATION,
-
-    /**
-     * The reference level.
-     */
-    REF_LEVEL,
-
-    /**
-     * Invalid configuration.
-     */
-    INVALID,
-};
 
 /**
  * @typedef NodeConfigData

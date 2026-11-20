@@ -1,0 +1,45 @@
+menu "BLE Configurations"
+
+config ARES_BLE_WORKQ
+    bool "Dedicate work queue for BLE app"
+    default n
+
+config ARES_BLE_WORKQ_PRIO
+    int "BLE app work queue priority"
+    default -1
+    range -15 15
+    depends on ARES_BLE_WORKQ
+
+config ARES_BLE_WORKQ_STACK_SIZE
+    int "BLE app work queue stack size"
+    default 1024
+    depends on ARES_BLE_WORKQ
+
+config ARES_BLE_NUM_RX_NET_BUFS
+    int "Number of receive buffers"
+    default 6
+    range 1 8
+
+config ARES_BLE_RX_NETBUF_SIZE
+    int "Size of the receive buffers"
+    default 1034
+
+config ARES_BLE_NUM_TX_NET_BUFS
+    int "Number of transmit buffers"
+    default 8
+    range 1 10
+
+config ARES_BLE_TX_NETBUF_SIZE
+    int "Size of transmit buffers"
+    default 244
+
+config DESCRIPTION_BUF_SIZE
+    int "Size of the description configuration"
+    default 1024
+    range 512 2048
+
+module = BLE_APP
+module-str = BLE Application
+source "subsys/logging/Kconfig.template.log_config"
+
+endmenu # BLE Configurations

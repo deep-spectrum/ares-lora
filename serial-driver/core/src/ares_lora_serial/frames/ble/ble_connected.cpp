@@ -19,7 +19,7 @@ void BleConnect::deserialize(const uint8_t *buffer, std::size_t len) {
     }
 
     uint8_t flags;
-    ares::deserialize(buffer, flags, chunk_size);
+    ares::deserialize(buffer, flags);
     connected = ares::check_bit(flags, 0);
 }
 } // namespace AresFrame

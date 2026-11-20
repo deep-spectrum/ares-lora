@@ -165,14 +165,14 @@ struct ares_packet_payload {
         uint16_t ACK;
 
         struct {
-            uint8_t type;
+            uint16_t type;
             uint64_t config;
         } CONFIG_;
 
-        uint8_t CONFIG_POLL_;
+        uint16_t CONFIG_POLL_;
 
         struct {
-            uint8_t type;
+            uint16_t type;
             uint64_t config;
         } CONFIG_RESP_;
 

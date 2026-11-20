@@ -20,6 +20,7 @@ void BleSubscribed::deserialize(const uint8_t *buffer, std::size_t len) {
 
     uint8_t flags;
     ares::deserialize(buffer, flags);
-    ares::get_flags(flags, chunk, image);
+    ares::get_flags(flags, neighbor_states, bandwidth, center_frequency,
+                    ref_lvl, duration, description);
 }
 } // namespace AresFrame

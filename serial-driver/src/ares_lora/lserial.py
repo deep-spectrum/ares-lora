@@ -14,6 +14,7 @@ from weakref import WeakSet
 from queue import Queue, Empty
 from datetime import datetime, timedelta
 from pathlib import Path
+from types import TracebackType
 
 logger = logging.getLogger("ares_lora")
 
@@ -150,20 +151,19 @@ class LoraLedState(IntEnum):
     FETCH = 4
 
 
-# @dataclass
-# class LoraSerialConfig:
-#     """Configurations for the LoRa serial driver.
-#
-#     Attributes:
-#         port: The serial port to connect to.
-#         response_timeout: The amount of time (in seconds) to wait for a response from the firmware.
-#         rx_period: How often (in seconds) the serial driver polls the serial receive buffer.
-#         serial_timeout: The serial RX timeout (in seconds).
-#     """
-#     port: str = ""
-#     response_timeout: float = 2.0
-#     rx_period: float = 0.1
-#     serial_timeout: float = 0.1
+class BlePhy(IntEnum):
+    """BLE PHYs for communication over Bluetooth LE
+
+    Attributes:
+        PHY_1M: 1Mbps
+        PHY_2M: 2Mbps
+        PHY_CODED_S2: Coded PHY S=2
+        PHY_CODED_S8: Coded PHY S=8
+    """
+    PHY_1M = 0
+    PHY_2M = 1
+    PHY_CODED_S2 = 2
+    PHY_CODED_S8 = 3
 
 
 @dataclass
@@ -252,6 +252,15 @@ class LoraSerial:
         self._run_ready_hook_lock = threading.Lock()
         self._run_ready_hook: Callable[[int, bool], None] | None = None
 
+        self._node_config_changed_hook_lock = threading.Lock()
+        self._node_config_changed_hook: Callable[[str, float | int], None] | None = None
+
+        self._ble_start_event_hook_lock = threading.Lock()
+        self._ble_start_event_hook: Callable[[int], None] | None = None
+
+        self._ble_att_error_event_hook_lock = threading.Lock()
+        self._ble_att_error_event_hook: Callable[[int], None] | None = None
+
         self._dev = _AresSerial(port, **kwargs)
         self._nodes: dict[int, int] = {}
         self._log_msg: dict[int, LogMessage] = {}
@@ -270,12 +279,15 @@ class LoraSerial:
         self._pkt_tx_thread: Thread | None = None
         self._abort_event_thread: Thread | None = None
         self._node_ready_event_thread: Thread | None = None
+        self._node_config_changed_thread: Thread | None = None
+        self._ble_start_event_thread: Thread | None = None
+        self._ble_att_error_thread: Thread | None = None
 
         self._wait_ble_connect_event: Thread | None = None
         self._wait_ble_subscribe_event: Thread | None = None
 
         self._ble_connect_events: Queue[bool] = Queue()
-        self._ble_subscribe_events: Queue[tuple[bool, ...]] = Queue()
+        self._ble_subscribe_events: Queue[dict[str, bool]] = Queue()
 
         self._driver_started = Event()
 
@@ -372,6 +384,18 @@ class LoraSerial:
                 if self._run_ready_hook is not None:
                     self._run_ready_hook(source_id, broadcast)
 
+    def _node_config_changed_event_handler(self):
+        while True:
+            try:
+                config = self._dev.wait_node_config_changed_event()
+            except AresThreadTerminate:
+                break
+
+            with self._node_config_changed_hook_lock:
+                if self._node_config_changed_hook is not None:
+                    configs = self._dev.node_configs
+                    self._node_config_changed_hook(config, configs[config])
+
     def _ble_connect_event_handle(self):
         while True:
             try:
@@ -384,11 +408,33 @@ class LoraSerial:
     def _ble_subscribe_event_handle(self):
         while True:
             try:
-                subscriptions: tuple[bool, ...] = self._dev.wait_ble_subscribe_event()
+                subscriptions: dict[str, bool] = self._dev.wait_ble_subscribe_event()
             except AresThreadTerminate:
                 break
 
             self._ble_subscribe_events.put(subscriptions)
+
+    def _ble_start_event_handler(self):
+        while True:
+            try:
+                start_delay = self._dev.wait_run_start_event()
+            except AresThreadTerminate:
+                break
+
+            with self._ble_start_event_hook_lock:
+                if self._ble_start_event_hook is not None:
+                    self._ble_start_event_hook(start_delay)
+
+    def _ble_att_error_event_handler(self):
+        while True:
+            try:
+                code = self._dev.wait_ble_att_error_event()
+            except AresThreadTerminate:
+                break
+
+            with self._ble_att_error_event_hook_lock:
+                if self._ble_att_error_event_hook is not None:
+                    self._ble_att_error_event_hook(code)
 
     @staticmethod
     def _check_ret_code(code: int | tuple[int, ...] | dict[str, int]):
@@ -749,7 +795,7 @@ class LoraSerial:
         return None
 
     @lora_serial_command
-    def ble_state(self, state: BleState = BleState.REQUEST) -> BleState | None:
+    def ble_state(self, state: BleState = BleState.REQUEST, **kwargs) -> BleState | None:
         """Retrieve or update the BLE state.
 
         Args:
@@ -762,11 +808,25 @@ class LoraSerial:
             TimeoutError: No response from the firmware within the configured timeout.
             LoraException: Firmware responded with an error code.
         """
-        ret = self._dev.ble_state(state=state.value)
+        ret = self._dev.ble_state(state=state.value, **kwargs)
         self._check_ret_code(ret[0])
         if state == BleState.REQUEST:
             return BleState(ret[1][0])
         return None
+
+    @lora_serial_command
+    def ble_send_neighbor_data(self, neighbor_status: dict[int, bool], **kwargs):
+        """Send neighbor status data over BLE.
+
+        Args:
+            neighbor_status: A dictionary of the neighbor statuses.
+            **kwargs: Keyword arguments
+
+        Returns:
+
+        """
+        ret = self._dev.ble_send_neighbors(neighbors=neighbor_status, **kwargs)
+        self._check_ret_code(ret[0])
 
     @lora_serial_command
     def ble_disconnect(self):
@@ -778,20 +838,6 @@ class LoraSerial:
         """
         ret = self._dev.ble_disconnect()
         self._check_ret_code(ret[0])
-
-    # @lora_serial_command
-    # def ble_send(self, data: bytes):
-    #     """Send data over the BLE connection.
-    #
-    #     Args:
-    #         data: Data to send over BLE.
-    #
-    #     Raises:
-    #         TimeoutError: No response from the firmware within the configured timeout.
-    #         LoraException: Firmware responded with an error code.
-    #     """
-    #     codes = self._dev.ble_send_image(data)
-    #     self._check_ret_code(codes)
 
     def wait_connection_changed_event(self, block: bool = True, timeout: float | None = None) -> bool:
         """Wait for a connection event from BLE.
@@ -808,7 +854,7 @@ class LoraSerial:
         """
         return self._ble_connect_events.get(block, timeout)
 
-    def wait_subscription_change_event(self, block: bool = True, timeout: float | None = None) -> tuple[bool, ...]:
+    def wait_subscription_change_event(self, block: bool = True, timeout: float | None = None) -> dict[str, bool]:
         """Wait for subscription update event from BLE.
 
         Args:
@@ -934,6 +980,54 @@ class LoraSerial:
         with self._run_ready_hook_lock:
             self._run_ready_hook = hook
 
+    def register_config_changed_event_hook(self, hook: Callable[[str, float | int], None] | None):
+        """Register a configuration changed event hook.
+
+        Args:
+            hook: The function to call when a configuration change event occurs over BLE. `None` to unregister the hook.
+
+        Notes:
+            The hook signature is [config_name, value] -> None.
+
+        Warning:
+            Registering or unregistering a hook performs a blocking action. It is highly recommended
+            that hooks should be kept short and fast and offload work to other threads.
+        """
+        with self._node_config_changed_hook_lock:
+            self._node_config_changed_hook = hook
+
+    def register_ble_start_event_hook(self, hook: Callable[[int], None] | None):
+        """Register a ble start event hook.
+
+        Args:
+            hook: The function to call when a start request is received over BLE. `None` to unregister the hook.
+
+        Notes:
+            The hook signature is [start_delay] -> None.
+
+        Warning:
+            Registering or unregistering a hook performs a blocking action. It is highly recommended
+            that hooks should be kept short and fast and offload work to other threads.
+        """
+        with self._ble_start_event_hook_lock:
+            self._ble_start_event_hook = hook
+
+    def register_ble_att_error_event_hook(self, hook: Callable[[int], None] | None):
+        """Register a ble ATT error event hook.
+
+        Args:
+            hook: The function to call when a BLE ATT error occurs. `None` to unregister the hook.
+
+        Notes:
+            The hook signature is [att_code] -> None.
+
+        Warning:
+            Registering or unregistering a hook performs a blocking action. It is highly recommended
+            that hooks should be kept short and fast and offload work to other threads.
+        """
+        with self._ble_att_error_event_hook_lock:
+            self._ble_att_error_event_hook = hook
+
     def get_logging_level(self) -> int:
         """Retrieve the current logging level of the core logger.
 
@@ -1008,6 +1102,18 @@ class LoraSerial:
         assert isinstance(self._node_ready_event_thread, Thread)
         self._node_ready_event_thread.start()
 
+        self._node_config_changed_thread = Thread(target=self._node_config_changed_event_handler)
+        assert isinstance(self._node_config_changed_thread, Thread)
+        self._node_config_changed_thread.start()
+
+        self._ble_start_event_thread = Thread(target=self._ble_start_event_handler)
+        assert isinstance(self._ble_start_event_thread, Thread)
+        self._ble_start_event_thread.start()
+
+        self._ble_att_error_thread = Thread(target=self._ble_att_error_event_handler)
+        assert isinstance(self._ble_att_error_thread, Thread)
+        self._ble_att_error_thread.start()
+
         self._driver_started.set()
 
         global _instances
@@ -1060,6 +1166,18 @@ class LoraSerial:
         if self._node_ready_event_thread is not None:
             self._node_ready_event_thread.join()
             self._node_ready_event_thread = None
+
+        if self._node_config_changed_thread is not None:
+            self._node_config_changed_thread.join()
+            self._node_config_changed_thread = None
+
+        if self._ble_start_event_thread is not None:
+            self._ble_start_event_thread.join()
+            self._ble_start_event_thread = None
+
+        if self._ble_att_error_thread is not None:
+            self._ble_att_error_thread.join()
+            self._ble_att_error_thread = None
 
         self._driver_started.clear()
 
@@ -1129,73 +1247,50 @@ class LoraSerial:
     def node_configs(self) -> dict[str, float | int | datetime]:
         return self._dev.node_configs
 
+    @node_configs.setter
+    def node_configs(self, value: dict[str, float | int | datetime]):
+        self._dev.node_configs = value
 
-# class BleTransfer:
-#     """Context manager for transferring data over BLE. Only works on Linux."""
-#
-#     def __init__(self, serial: LoraSerial, timeout: float = 60.0, exit_timeout: float = 1.0):
-#         """Initializes the BleTransfer instance.
-#
-#         Args:
-#             serial: The LoRaSerial instance to transfer data over.
-#             timeout: The amount of time allowed to wait for a connection and for all the required attributes to be subscribed to.
-#             exit_timeout: The amount of time to wait for the central device to disconnect before turning off BLE forcefully.
-#
-#         Raises:
-#             ValueError: One or more of the timeout values are invalid.
-#         """
-#         self._dev = serial
-#
-#         if timeout < 0:
-#             raise ValueError("Timeout must be positive")
-#         if exit_timeout < 0:
-#             raise ValueError("Timeout must be positive")
-#
-#         self._timeout = timeout
-#         self._exit_timeout = exit_timeout
-#
-#     def _wait_connect_event(self):
-#         try:
-#             self._dev.wait_connection_changed_event(True, self._timeout)
-#         except Empty:
-#             raise TimeoutError("Could not establish BLE connection")
-#
-#     def _wait_subscriptions(self):
-#         try:
-#             subs = (False,)
-#             timeout_time = datetime.now() + timedelta(seconds=self._timeout)
-#             while not all(subs) and datetime.now() < timeout_time:
-#                 subs = self._dev.wait_subscription_change_event(True, self._timeout)
-#             if not all(subs):
-#                 raise TimeoutError("Central device did not subscribe to all required attributes")
-#         except Empty:
-#             raise TimeoutError("Central device did not subscribe to all required attributes")
-#
-#     def __enter__(self):
-#         if self._dev.ble_state() == BleState.ON:
-#             raise RuntimeError("BLE must be disabled before using this context manager")
-#         self._dev.clear_ble_events()
-#         self._dev.ble_state(BleState.ON)
-#         try:
-#             self._wait_connect_event()
-#             self._wait_subscriptions()
-#         except:
-#             self._dev.ble_state(BleState.OFF)
-#             raise
-#         return self
-#
-#     def __exit__(self, exc_type, exc_val, exc_tb):
-#         try:
-#             # Wait for central device to disconnect
-#             self._dev.wait_connection_changed_event(True, self._exit_timeout)
-#         except Empty:
-#             pass
-#         self._dev.ble_state(BleState.OFF)
-#
-#     def write(self, data: bytes):
-#         """Write data over the BLE connection.
-#
-#         Args:
-#             data: The data to send over BLE. Automatically chunked.
-#         """
-#         self._dev.ble_send(data)
+    @property
+    def ble_connection_parameters(self):
+        ret = self._dev.ble_connection_params
+        ret['phy'] = BlePhy(ret['phy'])
+        return ret
+
+
+class AresBleContextManager:
+    def __init__(self, s: LoraSerial, connect_timeout: float = 180, subscribe_timeout: float = 30):
+        self._s = s
+        self._connect_timeout = connect_timeout
+        self._subscribe_timeout = subscribe_timeout
+        id_ = self._s.setting(SettingId.ID)
+        assert id_ is not None
+        self._id = id_
+
+    def __enter__(self):
+        self._s.clear_ble_events()
+        if self._s.ble_state() == BleState.ON:
+            try:
+                self._s.ble_disconnect()
+            except LoraException:
+                pass
+            self._s.clear_ble_events()
+        self._s.ble_state(BleState.ON)
+
+        self._s.wait_connection_changed_event(timeout=self._connect_timeout)
+
+        subscriptions = {'foo': False}
+        while not all(subscriptions.values()):
+            subscriptions = self._s.wait_subscription_change_event(timeout=self._subscribe_timeout)
+
+        return self
+
+    def __exit__(self, exc_type: type[BaseException] | None, exc_val: BaseException | None, exc_tb: TracebackType | None):
+        if self._s.ble_state() != BleState.OFF:
+            self._s.ble_state(BleState.OFF)
+
+        self._s.clear_ble_events()
+
+    def notify_neighbor_updates(self, neighbors: dict[int, bool]):
+        neighbors[self._id] = self._s.ready
+        self._s.ble_send_neighbor_data(neighbors)

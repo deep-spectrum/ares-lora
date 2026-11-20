@@ -30,11 +30,6 @@ struct BleConnect : Internal::FramePayloadBase {
     bool connected = false;
 
     /**
-     * The maximum transfer size.
-     */
-    uint16_t chunk_size = 0;
-
-    /**
      * Decode the payload from a serial buffer.
      * @param buffer Pointer to buffer that contains encoded payload
      * @param len The size of the payload.
@@ -42,7 +37,7 @@ struct BleConnect : Internal::FramePayloadBase {
     void deserialize(const uint8_t *buffer, std::size_t len) override;
 
   private:
-    static constexpr size_t _payload_size = 3;
+    static constexpr size_t _payload_size = 1;
 };
 } // namespace AresFrame
 
