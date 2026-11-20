@@ -33,6 +33,10 @@ set(SHELL_SRC
         src/shell/ble.c
 )
 
+if ($ENV{CLION_IDE})
+    include_directories(generated_includes)
+endif ()
+
 target_sources(app PRIVATE ${SRC} ${SERIAL_SRC} ${LORA_SRC} ${BLE_SRC})
 target_sources_ifdef(CONFIG_SHELL app PRIVATE ${SHELL_SRC})
 target_sources_ifndef(CONFIG_SHELL app PRIVATE src/serial_commands.c)
